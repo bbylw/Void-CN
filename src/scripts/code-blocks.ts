@@ -2,7 +2,7 @@
  * 统一增强文档中的代码块：
  * 1. 把 MDX 围栏代码块（<pre class="astro-code">）包装成 .code-block 卡片
  * 2. 为所有代码块注入「复制」按钮
- * 页面切换（A5 视图过渡）后会重新执行。
+ * 模块加载时执行一次；监听 astro:page-load 以便将来启用视图过渡时自动重跑。
  */
 
 const COPY_ICON = `<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="size-3.5" aria-hidden="true"><path d="M8 8V5.5A1.5 1.5 0 0 1 9.5 4h6A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H13M6.5 8h6a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12.5 17h-6A1.5 1.5 0 0 1 5 15.5v-6A1.5 1.5 0 0 1 6.5 8Z"/></svg>`;

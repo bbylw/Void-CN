@@ -1,9 +1,9 @@
 ---
 import Logo from './Logo.astro';
 import Icon from './Icon.astro';
-import SearchDialog from './react/SearchDialog';
-import ThemeToggle from './react/ThemeToggle';
-import MobileMenu from './react/MobileMenu';
+import SearchTrigger from './SearchTrigger.astro';
+import ThemeToggle from './ThemeToggle.astro';
+import MobileMenu from './MobileMenu.astro';
 import { HOME_NAV, SITE } from '../data/site';
 
 const { pathname } = Astro.url;
@@ -50,10 +50,10 @@ const isActive = (href: string) =>
 
     <div class="ml-auto flex items-center gap-2">
       <div class="hidden w-56 lg:block xl:w-64">
-        <SearchDialog client:load />
+        <SearchTrigger />
       </div>
 
-      <ThemeToggle client:load />
+      <ThemeToggle />
 
       <a
         href={SITE.repo}
@@ -76,7 +76,7 @@ const isActive = (href: string) =>
         <Icon name="arrowRight" class="size-3.5" />
       </a>
 
-      <MobileMenu links={HOME_NAV} client:load />
+      <MobileMenu links={HOME_NAV} />
     </div>
   </div>
 </header>
@@ -94,6 +94,8 @@ const isActive = (href: string) =>
 </style>
 
 <script>
+  import '../scripts/search-launcher';
+
   const header = document.querySelector<HTMLElement>('[data-site-header]');
   if (header) {
     const onScroll = () => {

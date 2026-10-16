@@ -108,14 +108,27 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return <>{out}</>;
 }
 
-export default function SearchDialog() {
-  const [open, setOpen] = useState(false);
+interface Props {
+  /** 由按需加载器挂载时直接以展开状态出现 */
+  initialOpen?: boolean;
+}
+
+/**
+ * 站内搜索对话框。
+ *
+ * 本组件不在首屏挂载：页面只渲染原生的 `SearchTrigger` 按钮，
+ * 用户点击或按 ⌘K 时由 `scripts/search-launcher.ts` 动态载入并挂载为单例。
+ * 因此全局同一时刻只会有一个实例，⌘K 的切换行为也由本组件自行处理。
+ */
+export default function SearchDialog({ initialOpen = false }: Props) {
+  const [open, setOpen] = useState(initialOpen);
   const [query, setQuery] = useState('');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   const results = useMemo(() => search(entries, query), [entries, query]);
 
@@ -132,6 +145,13 @@ export default function SearchDialog() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // 已挂载后，触发按钮通过自定义事件请求展开
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener('search:open', onOpen);
+    return () => window.removeEventListener('search:open', onOpen);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     setCursor(0);
@@ -144,6 +164,37 @@ export default function SearchDialog() {
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
   }, [open, entries.length]);
+
+  // 展开时：锁定背景滚动 + 焦点陷阱 + 关闭后恢复焦点
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevFocus = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const focusables = panelRef.current.querySelectorAll<HTMLElement>(
+        'button, input, a[href], [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusables.length) return;
+      const first = focusables[0]!;
+      const last = focusables[focusables.length - 1]!;
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !panelRef.current.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+      prevFocus?.focus?.();
+    };
+  }, [open]);
 
   useEffect(() => setCursor(0), [query]);
 
@@ -172,181 +223,131 @@ export default function SearchDialog() {
 
   let lastGroup = '';
 
+  if (!open) return null;
+
   return (
-    <>
+    <div
+      className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]"
+      role="dialog"
+      aria-modal="true"
+      aria-label="搜索文档"
+    >
       <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="搜索文档"
-        className="group flex h-9 w-full items-center gap-2 rounded-lg border px-3 text-left text-[0.8rem] transition-colors hover:border-[color:var(--c-line-strong)]"
-        style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-subtle)' }}
+        className="absolute inset-0 cursor-default"
+        style={{
+          background: 'color-mix(in oklab, var(--c-bg-sunken) 78%, transparent)',
+          backdropFilter: 'blur(4px)',
+        }}
+        onClick={() => setOpen(false)}
+        aria-label="关闭搜索"
+        tabIndex={-1}
+      />
+      <div
+        ref={panelRef}
+        className="relative flex max-h-[68vh] w-full max-w-[42rem] flex-col overflow-hidden rounded-[var(--radius-panel)] border shadow-[var(--shadow-pop)]"
+        style={{ background: 'var(--c-surface)', borderColor: 'var(--c-line-strong)' }}
       >
-        <svg
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.6}
-          strokeLinecap="round"
-          className="size-3.5 shrink-0"
-          aria-hidden="true"
-        >
-          <path d="M9 15.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm4.6.6 4 4" />
-        </svg>
-        <span className="truncate">搜索文档…</span>
-        <span className="ml-auto hidden items-center gap-0.5 sm:flex">
-          <kbd
-            className="rounded border px-1.5 py-0.5 font-mono text-[0.62rem] leading-none"
-            style={{ borderColor: 'var(--c-line)', background: 'var(--c-surface-2)' }}
-          >
-            ⌘
-          </kbd>
-          <kbd
-            className="rounded border px-1.5 py-0.5 font-mono text-[0.62rem] leading-none"
-            style={{ borderColor: 'var(--c-line)', background: 'var(--c-surface-2)' }}
-          >
-            K
-          </kbd>
-        </span>
-      </button>
-
-      {open && (
         <div
-          className="fixed inset-0 z-[100] flex items-start justify-center px-4 pt-[12vh]"
-          role="dialog"
-          aria-modal="true"
-          aria-label="搜索文档"
+          className="flex items-center gap-3 border-b px-4"
+          style={{ borderColor: 'var(--c-line)' }}
         >
-          <button
-            className="absolute inset-0 cursor-default"
-            style={{
-              background: 'color-mix(in oklab, var(--c-bg-sunken) 78%, transparent)',
-              backdropFilter: 'blur(4px)',
-            }}
-            onClick={() => setOpen(false)}
-            aria-label="关闭搜索"
-            tabIndex={-1}
-          />
-          <div
-            className="relative flex max-h-[68vh] w-full max-w-[42rem] flex-col overflow-hidden rounded-[var(--radius-panel)] border shadow-[var(--shadow-pop)]"
-            style={{ background: 'var(--c-surface)', borderColor: 'var(--c-line-strong)' }}
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            className="size-4 shrink-0"
+            style={{ color: 'var(--c-fg-subtle)' }}
+            aria-hidden="true"
           >
-            <div
-              className="flex items-center gap-3 border-b px-4"
-              style={{ borderColor: 'var(--c-line)' }}
-            >
-              <svg
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.6}
-                strokeLinecap="round"
-                className="size-4 shrink-0"
-                style={{ color: 'var(--c-fg-subtle)' }}
-                aria-hidden="true"
-              >
-                <path d="M9 15.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm4.6.6 4 4" />
-              </svg>
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="搜索页面标题、章节或正文…"
-                className="h-12 flex-1 bg-transparent text-[0.95rem] outline-none placeholder:text-[color:var(--c-fg-subtle)]"
-                style={{ color: 'var(--c-fg)' }}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button
-                onClick={() => setOpen(false)}
-                className="rounded border px-1.5 py-0.5 font-mono text-[0.62rem] leading-none transition-colors"
-                style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-subtle)' }}
-              >
-                ESC
-              </button>
-            </div>
-
-            <ul ref={listRef} className="scroll-thin flex-1 overflow-y-auto p-2">
-              {loading && (
-                <li
-                  className="px-3 py-8 text-center text-sm"
-                  style={{ color: 'var(--c-fg-subtle)' }}
-                >
-                  正在加载索引…
-                </li>
-              )}
-              {!loading && !query && (
-                <li
-                  className="px-3 py-10 text-center text-sm"
-                  style={{ color: 'var(--c-fg-subtle)' }}
-                >
-                  输入关键词开始搜索全部文档
-                </li>
-              )}
-              {!loading && query && results.length === 0 && (
-                <li
-                  className="px-3 py-10 text-center text-sm"
-                  style={{ color: 'var(--c-fg-subtle)' }}
-                >
-                  没有找到 “{query}” 相关的内容
-                </li>
-              )}
-              {results.map((hit, i) => {
-                const showGroup = hit.entry.group !== lastGroup;
-                lastGroup = hit.entry.group;
-                return (
-                  <li key={hit.entry.url}>
-                    {showGroup && (
-                      <div
-                        className="px-3 pt-3 pb-1.5 font-mono text-[0.62rem] tracking-[0.18em] uppercase"
-                        style={{ color: 'var(--c-fg-subtle)' }}
-                      >
-                        {hit.entry.group}
-                      </div>
-                    )}
-                    <button
-                      data-active={i === cursor}
-                      onMouseEnter={() => setCursor(i)}
-                      onClick={() => go(hit.entry.url)}
-                      className="flex w-full flex-col gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors"
-                      style={{
-                        background:
-                          i === cursor
-                            ? 'color-mix(in oklab, var(--c-fg) 7%, transparent)'
-                            : 'transparent',
-                      }}
-                    >
-                      <span
-                        className="text-[0.875rem] font-medium"
-                        style={{ color: 'var(--c-fg)' }}
-                      >
-                        <Highlight text={hit.entry.title} query={query} />
-                      </span>
-                      <span
-                        className="line-clamp-1 text-[0.75rem]"
-                        style={{ color: 'var(--c-fg-subtle)' }}
-                      >
-                        <Highlight text={hit.snippet} query={query} />
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <div
-              className="flex items-center gap-4 border-t px-4 py-2 font-mono text-[0.65rem]"
-              style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-subtle)' }}
-            >
-              <span>↑↓ 选择</span>
-              <span>↵ 打开</span>
-              <span className="ml-auto">
-                {results.length > 0 ? `${results.length} 条结果` : ''}
-              </span>
-            </div>
-          </div>
+            <path d="M9 15.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm4.6.6 4 4" />
+          </svg>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="搜索页面标题、章节或正文…"
+            className="h-12 flex-1 bg-transparent text-[0.95rem] outline-none placeholder:text-[color:var(--c-fg-subtle)]"
+            style={{ color: 'var(--c-fg)' }}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button
+            onClick={() => setOpen(false)}
+            className="rounded border px-1.5 py-0.5 font-mono text-[0.62rem] leading-none transition-colors"
+            style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-subtle)' }}
+          >
+            ESC
+          </button>
         </div>
-      )}
-    </>
+
+        <ul ref={listRef} className="scroll-thin flex-1 overflow-y-auto p-2">
+          {loading && (
+            <li className="px-3 py-8 text-center text-sm" style={{ color: 'var(--c-fg-subtle)' }}>
+              正在加载索引…
+            </li>
+          )}
+          {!loading && !query && (
+            <li className="px-3 py-10 text-center text-sm" style={{ color: 'var(--c-fg-subtle)' }}>
+              输入关键词开始搜索全部文档
+            </li>
+          )}
+          {!loading && query && results.length === 0 && (
+            <li className="px-3 py-10 text-center text-sm" style={{ color: 'var(--c-fg-subtle)' }}>
+              没有找到 “{query}” 相关的内容
+            </li>
+          )}
+          {results.map((hit, i) => {
+            const showGroup = hit.entry.group !== lastGroup;
+            lastGroup = hit.entry.group;
+            return (
+              <li key={hit.entry.url}>
+                {showGroup && (
+                  <div
+                    className="px-3 pt-3 pb-1.5 font-mono text-[0.62rem] tracking-[0.18em] uppercase"
+                    style={{ color: 'var(--c-fg-subtle)' }}
+                  >
+                    {hit.entry.group}
+                  </div>
+                )}
+                <button
+                  data-active={i === cursor}
+                  onMouseEnter={() => setCursor(i)}
+                  onClick={() => go(hit.entry.url)}
+                  className="flex w-full flex-col gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors"
+                  style={{
+                    background:
+                      i === cursor
+                        ? 'color-mix(in oklab, var(--c-fg) 7%, transparent)'
+                        : 'transparent',
+                  }}
+                >
+                  <span className="text-[0.875rem] font-medium" style={{ color: 'var(--c-fg)' }}>
+                    <Highlight text={hit.entry.title} query={query} />
+                  </span>
+                  <span
+                    className="line-clamp-1 text-[0.75rem]"
+                    style={{ color: 'var(--c-fg-subtle)' }}
+                  >
+                    <Highlight text={hit.snippet} query={query} />
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div
+          className="flex items-center gap-4 border-t px-4 py-2 font-mono text-[0.65rem]"
+          style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-subtle)' }}
+        >
+          <span>↑↓ 选择</span>
+          <span>↵ 打开</span>
+          <span className="ml-auto">{results.length > 0 ? `${results.length} 条结果` : ''}</span>
+        </div>
+      </div>
+    </div>
   );
 }

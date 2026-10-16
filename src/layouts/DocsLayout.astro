@@ -36,7 +36,6 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
       <!-- 侧边栏 -->
       <aside
         class="sticky top-16 hidden h-[calc(100dvh-4rem)] w-[16.5rem] shrink-0 overflow-y-auto py-8 pr-1 lg:block scroll-thin"
-        data-docs-sidebar
       >
         <DocsSidebar currentPath={Astro.url.pathname} />
       </aside>

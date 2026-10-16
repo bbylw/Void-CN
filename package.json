@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Void 中文官网与文档 —— Cloudflare Workers 上的全栈框架，由 Vite 驱动。",
+  "engines": {
+    "node": ">=24.21.0"
+  },
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",

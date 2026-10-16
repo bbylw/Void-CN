@@ -24,8 +24,6 @@ const docs = defineCollection({
   schema: z.object({
     title: z.string(),
     description: z.string().optional(),
-    /** 侧边栏分组标签 */
-    group: z.string().optional(),
     /** 标题旁的提示徽标 */
     badge: z.string().optional(),
   }),

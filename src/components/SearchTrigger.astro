@@ -1,0 +1,50 @@
+---
+/**
+ * 站内搜索触发按钮（零 JS 框架）。
+ * 点击行为由 scripts/search-launcher.ts 统一接管：
+ * 首次交互时动态载入 React 版 SearchDialog 并挂载为单例。
+ */
+interface Props {
+  class?: string;
+}
+
+const { class: className = '' } = Astro.props;
+---
+
+<button
+  type="button"
+  data-search-trigger
+  aria-label="搜索文档"
+  class:list={[
+    'group flex h-9 w-full items-center gap-2 rounded-lg border px-3 text-left text-[0.8rem] transition-colors hover:border-[color:var(--c-line-strong)]',
+    className,
+  ]}
+  style="border-color:var(--c-line);color:var(--c-fg-subtle)"
+>
+  <svg
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    stroke-width={1.6}
+    stroke-linecap="round"
+    class="size-3.5 shrink-0"
+    aria-hidden="true"
+  >
+    <path d="M9 15.5a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13Zm4.6.6 4 4"></path>
+  </svg>
+  <span class="truncate">搜索文档…</span>
+  <span class="ml-auto hidden items-center gap-0.5 sm:flex">
+    <kbd
+      class="rounded border px-1.5 py-0.5 font-mono text-[0.62rem] leading-none"
+      style="border-color:var(--c-line);background:var(--c-surface-2)"
+    >
+      ⌘
+    </kbd>
+    <kbd
+      class="rounded border px-1.5 py-0.5 font-mono text-[0.62rem] leading-none"
+      style="border-color:var(--c-line);background:var(--c-surface-2)"
+    >
+      K
+    </kbd>
+  </span>
+</button>

@@ -6,6 +6,8 @@ interface Props {
 }
 const { commands, class: className = '' } = Astro.props;
 const names = Object.keys(commands);
+/** 同一页面可能存在多个实例（Hero 与 Cta），用 uid 区分 aria 关联 id */
+const uid = `it${Math.random().toString(36).slice(2, 8)}`;
 ---
 
 <div
@@ -20,8 +22,11 @@ const names = Object.keys(commands);
         <button
           type="button"
           role="tab"
-          data-pm={n}
+          id={`${uid}-tab-${i}`}
+          aria-controls={`${uid}-panel`}
           aria-selected={i === 0 ? 'true' : 'false'}
+          tabindex={i === 0 ? 0 : -1}
+          data-pm={n}
           class="rounded-lg px-2.5 py-1.5 font-mono text-[0.75rem] transition-colors"
           style={{
             color: i === 0 ? 'var(--c-bg)' : 'var(--c-fg-subtle)',
@@ -35,6 +40,9 @@ const names = Object.keys(commands);
   </div>
 
   <code
+    id={`${uid}-panel`}
+    role="tabpanel"
+    aria-label="安装命令"
     class="min-w-0 flex-1 truncate px-2.5 py-1.5 font-mono text-[0.8rem] sm:text-[0.85rem]"
     style="color:var(--c-fg)"
     data-install-cmd
@@ -88,13 +96,30 @@ const names = Object.keys(commands);
         buttons.forEach((b) => {
           const on = b.dataset.pm === active;
           b.setAttribute('aria-selected', String(on));
+          b.tabIndex = on ? 0 : -1;
           b.style.color = on ? 'var(--c-bg)' : 'var(--c-fg-subtle)';
           b.style.background = on ? 'var(--c-fg)' : 'transparent';
         });
         if (output) output.textContent = map[active] ?? '';
       };
 
-      buttons.forEach((b) => b.addEventListener('click', () => paint(b.dataset.pm!)));
+      buttons.forEach((b, i) => {
+        b.addEventListener('click', () => paint(b.dataset.pm!));
+        // 方向键在标签间移动并切换（roving tabindex）
+        b.addEventListener('keydown', (e) => {
+          const dir =
+            e.key === 'ArrowRight' || e.key === 'ArrowDown'
+              ? 1
+              : e.key === 'ArrowLeft' || e.key === 'ArrowUp'
+                ? -1
+                : 0;
+          if (!dir) return;
+          e.preventDefault();
+          const next = buttons[(i + dir + buttons.length) % buttons.length]!;
+          paint(next.dataset.pm!);
+          next.focus();
+        });
+      });
       paint(buttons[0]?.dataset.pm ?? '');
 
       copyBtn?.addEventListener('click', async () => {

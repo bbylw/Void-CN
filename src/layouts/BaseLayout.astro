@@ -23,6 +23,7 @@ const pageTitle = title
   ? `${title} · ${SITE.name} 中文文档`
   : `${SITE.name} — Cloudflare Workers 上的全栈框架`;
 const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://void-cn.pages.dev');
+const ogImage = new URL('/og.png', Astro.site ?? 'https://void-cn.pages.dev').href;
 ---
 
 <!doctype html>
@@ -51,6 +52,12 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://void-cn.pag
     <meta name="theme-color" content="#07080c" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)" />
 
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Void 中文文档" />
+    <meta name="twitter:image" content={ogImage} />
+
     <link rel="alternate" hreflang="zh-CN" href={canonical.href} />
     <link rel="alternate" hreflang="x-default" href={canonical.href} />
 
@@ -78,34 +85,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://void-cn.pag
     <slot />
 
     <script>
-      import { enhanceCodeBlocks } from '../scripts/code-blocks';
-
-      // 进入视口时揭示区块（单例观察器，支持 A5 视图过渡后新增的节点）
-      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      let observer: IntersectionObserver | null = null;
-
-      const setup = () => {
-        enhanceCodeBlocks();
-        if (reduce) {
-          document.querySelectorAll('.reveal').forEach((el) => el.classList.add('is-in'));
-          return;
-        }
-        observer ??= new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (entry.isIntersecting) {
-                entry.target.classList.add('is-in');
-                observer?.unobserve(entry.target);
-              }
-            }
-          },
-          { rootMargin: '0px 0px -8% 0px', threshold: 0.06 },
-        );
-        document.querySelectorAll('.reveal:not(.is-in)').forEach((el) => observer!.observe(el));
-      };
-
-      setup();
-      document.addEventListener('astro:page-load', setup);
+      // 代码块与表格增强（模块首次执行时自初始化，并在 astro:page-load 时重跑）
+      import '../scripts/code-blocks';
     </script>
   </body>
 </html>

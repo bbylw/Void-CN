@@ -5,6 +5,8 @@ dist/
 .vercel/
 .netlify/
 .playwright-mcp/
+.playwright-cli/
+.workbuddy/
 .DS_Store
 *.log
 .env

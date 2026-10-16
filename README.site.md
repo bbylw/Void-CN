@@ -28,9 +28,12 @@ bun run check    # astro check
 ```text
 src/
 ├── components/
-│   ├── react/            React 岛（搜索、主题、移动菜单、复制按钮）
+│   ├── react/            SearchDialog（唯一的 React 岛，按需载入）
 │   ├── docs/             文档专用组件（侧边栏、目录、Callout、表格…）
 │   ├── home/             落地页各区块
+│   ├── SearchTrigger.astro  搜索触发按钮（原生，零框架）
+│   ├── ThemeToggle.astro    主题切换（原生）
+│   ├── MobileMenu.astro     移动端抽屉（原生）
 │   ├── CodeBlock.astro   带标题栏与复制按钮的代码块
 │   ├── ShikiCode.astro   双主题 Shiki 高亮（跟随站点主题）
 │   └── SiteHeader.astro / SiteFooter.astro
@@ -40,13 +43,17 @@ src/
 │   ├── index.astro       落地页
 │   ├── docs/[...slug].astro
 │   ├── 404.astro
+│   ├── robots.txt.ts     构建期生成的 robots（sitemap 跟随 site 配置）
 │   ├── search-index.json.ts  构建期生成的站内搜索索引
-├── scripts/code-blocks.ts    代码块 / 表格的渐进增强
+├── scripts/
+│   ├── code-blocks.ts    代码块 / 表格的渐进增强
+│   └── search-launcher.ts   搜索对话框的按需载入器（单例）
 ├── styles/global.css         设计系统（Tailwind v4 `@theme`）
 └── data/site.ts              站点信息与文档导航树
 
 scripts/
-└── static-server.mjs         本地静态预览服务器
+├── static-server.mjs         本地静态预览服务器
+└── gen-og-image.py           生成 public/og.png 分享图（需 Pillow）
 ```
 
 ## 内容约定
@@ -57,7 +64,7 @@ scripts/
 ---
 title: 页面标题
 description: 一句话摘要
-group: 分组标签
+badge: 可选徽标
 ---
 
 正文，支持 MDX 组件：<Callout>、<CardGrid>/<Card>、<Steps>、<ApiTable>、<CodeBlock>。
@@ -76,18 +83,27 @@ group: 分组标签
 
 主题通过 `<html class="dark">` 切换，选择结果保存在 `localStorage` 的 `void-theme`，默认跟随系统偏好。
 
-## React 岛
+## 交互岛
 
-只有需要交互的部分才用 React，其余全部是零 JS 的 Astro 组件：
+首屏不加载任何前端框架：主题切换、移动菜单与搜索触发按钮都是零 JS 框架的原生组件，
+只有搜索对话框（`SearchDialog.tsx`）使用 React，并且在用户点击搜索按钮或按 ⌘K 时
+才由 `scripts/search-launcher.ts` 动态载入、挂载为全局唯一实例——首屏 JS 约 3.5KB，
+React 与 react-dom（约 227KB）只在产生搜索意图后才下载。
 
-| 岛             | 位置           | 职责                                  |
-| -------------- | -------------- | ------------------------------------- |
-| `SearchDialog` | 顶栏 / 404     | ⌘K 命令面板，按子序列匹配支持中文检索 |
-| `ThemeToggle`  | 顶栏           | 深浅色切换                            |
-| `MobileMenu`   | 顶栏（移动端） | 抽屉式导航                            |
-| `CopyButton`   | 代码块         | 复制到剪贴板                          |
+| 交互           | 实现          | 职责                                  |
+| -------------- | ------------- | ------------------------------------- |
+| `SearchDialog` | React（按需） | ⌘K 命令面板，按子序列匹配支持中文检索 |
+| `ThemeToggle`  | 原生 Astro    | 深浅色切换                            |
+| `MobileMenu`   | 原生 Astro    | 抽屉式导航                            |
+| 代码块复制按钮 | 原生脚本      | 由 `code-blocks.ts` 注入              |
 
 搜索索引由 `src/pages/search-index.json.ts` 在构建期从内容集合生成，运行时按需拉取。
+
+> **dev 模式注意**：`astro.config.mjs` 中将 `SearchDialog.tsx` 排除出了
+> `@vitejs/plugin-react`。否则 dev 下动态导入该组件时，其模块体的
+> `$RefreshSig$()` 调用会因 Astro 不为无岛页面注入 react-refresh 前置脚本而报错，
+> 搜索在 `astro dev` 下失效。排除后它走 tsconfig 的默认 JSX 转换，dev 与生产
+> 行为一致；代价是编辑该文件时触发整页刷新而非 fast refresh。
 
 ## 部署
 
@@ -98,7 +114,8 @@ name = "void-cn"
 pages_build_output_dir = "dist"
 ```
 
-部署前记得把 `astro.config.mjs` 中的 `site` 改成真实域名，`public/robots.txt` 里的 sitemap 地址也一并更新。
+部署前记得把 `astro.config.mjs` 中的 `site` 改成真实域名。`robots.txt` 由
+`src/pages/robots.txt.ts` 在构建期生成，sitemap 地址会自动跟随该配置。
 
 ## 致谢
 

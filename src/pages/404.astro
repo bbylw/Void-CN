@@ -3,7 +3,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import Icon from '../components/Icon.astro';
-import SearchDialog from '../components/react/SearchDialog';
+import SearchTrigger from '../components/SearchTrigger.astro';
 import { DOCS_NAV } from '../data/site';
 
 const popular = [
@@ -42,7 +42,7 @@ const popular = [
       </p>
 
       <div class="mt-8 w-full max-w-[26rem]">
-        <SearchDialog client:load />
+        <SearchTrigger />
       </div>
 
       <ul class="mt-8 flex flex-wrap items-center justify-center gap-2">

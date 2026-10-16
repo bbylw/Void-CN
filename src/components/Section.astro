@@ -6,8 +6,6 @@ interface Props {
   lead?: string;
   align?: 'left' | 'center';
   class?: string;
-  /** 标题中需要强调的片段（用 **…** 包裹） */
-  titleHtml?: string;
 }
 const { id, eyebrow, title, lead, align = 'left', class: className = '' } = Astro.props;
 

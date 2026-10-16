@@ -1,9 +1,8 @@
 ---
 interface Props {
   class?: string;
-  markOnly?: boolean;
 }
-const { class: className = '', markOnly = false } = Astro.props;
+const { class: className = '' } = Astro.props;
 ---
 
 <span class:list={['inline-flex items-center gap-2', className]}>
