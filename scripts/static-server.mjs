@@ -4,7 +4,7 @@ import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';
 
-const port = Number(process.argv[2] ?? 4400);
+const port = Number(process.argv[2] ?? process.env.PORT ?? 4400);
 const root = resolve(process.argv[3] ?? 'dist');
 
 const MIME = {

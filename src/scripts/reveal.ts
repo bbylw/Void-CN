@@ -21,7 +21,9 @@ function initReveal() {
         }
       }
     },
-    { rootMargin: '0px 0px -8% 0px', threshold: 0.12 },
+    // threshold 0 + 负底边距：元素顶端进入视口 88% 处即触发。
+    // 不用比例阈值，避免超高元素（大于视口 8 倍）永远达不到比例而不可见。
+    { rootMargin: '0px 0px -12% 0px', threshold: 0 },
   );
 
   els.forEach((el) => io.observe(el));
