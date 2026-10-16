@@ -119,15 +119,17 @@ React 与 react-dom（约 227KB）只在产生搜索意图后才下载。
 
 ## 部署
 
-产物是纯静态文件，可部署到 Cloudflare Pages、Vercel、Netlify 或任意静态托管。
+产物是纯静态文件（`dist/`），可部署到任意静态托管。本仓库走 **GitHub Pages**。
 
-```toml title="wrangler.toml"
-name = "void-cn"
-pages_build_output_dir = "dist"
-```
+- 仓库：<https://github.com/bbylw/Void-CN>
+- 自定义域：`voidcloud.ndjp.net`（由 `public/CNAME` 声明，构建后进入产物根目录）
+- CI：`.github/workflows/deploy.yml` —— `oven-sh/setup-bun` 安装依赖并 `bun run build`，
+  再用 `actions/deploy-pages` 发布 `dist/`。推送到 `main` 即触发。
 
-部署前记得把 `astro.config.mjs` 中的 `site` 改成真实域名。`robots.txt` 由
-`src/pages/robots.txt.ts` 在构建期生成，sitemap 地址会自动跟随该配置。
+站点地址由 `astro.config.mjs` 的 `site` 决定（当前 `https://voidcloud.ndjp.net`），
+`robots.txt` 与 sitemap 的绝对地址会自动跟随该配置。
+
+> 也可改用 Cloudflare Pages（保留 `wrangler.toml`，`pages_build_output_dir = "dist"`）。
 
 ## 致谢
 

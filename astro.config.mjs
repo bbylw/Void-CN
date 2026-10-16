@@ -8,7 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://void-cn.pages.dev',
+  site: 'https://voidcloud.ndjp.net',
   trailingSlash: 'ignore',
   integrations: [
     react({
