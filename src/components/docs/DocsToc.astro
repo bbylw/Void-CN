@@ -56,9 +56,9 @@ const { headings, nested = false } = Astro.props;
     const paint = () => {
       for (const [slug, link] of bySlug) {
         const on = slug === currentId;
-        link.style.color = on ? 'var(--c-violet)' : 'var(--c-fg-subtle)';
-        link.style.borderColor = on ? 'var(--c-violet)' : 'transparent';
-        link.style.fontWeight = on ? '560' : '400';
+        link.style.color = on ? 'var(--c-accent)' : 'var(--c-fg-subtle)';
+        link.style.borderColor = on ? 'var(--c-accent)' : 'transparent';
+        link.style.fontWeight = on ? '600' : '400';
       }
     };
 

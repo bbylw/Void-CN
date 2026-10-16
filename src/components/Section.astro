@@ -9,7 +9,7 @@ interface Props {
 }
 const { id, eyebrow, title, lead, align = 'left', class: className = '' } = Astro.props;
 
-/** 标题里用 **…** 包裹的片段会被高亮 */
+/** 标题里用 **…** 包裹的片段会被高亮为信号色 */
 const titleParts = title
   ? title.split(/\*\*(.+?)\*\*/g).map((text, i) => ({ text, accent: i % 2 === 1 }))
   : [];
@@ -22,41 +22,47 @@ const titleParts = title
       align === 'center' && 'flex flex-col items-center text-center',
     ]}
   >
-    {
-      eyebrow && (
-        <div class:list={['flex items-center gap-2.5', align === 'center' && 'justify-center']}>
-          <span class="h-px w-6" style="background:var(--c-line-strong)" aria-hidden="true" />
-          <span class="eyebrow">{eyebrow}</span>
-        </div>
-      )
-    }
-    {
-      title && (
-        <h2
-          class:list={[
-            'mt-5 max-w-[22ch] text-title font-[680] text-gradient-soft',
-            align === 'center' && 'max-w-[26ch]',
-          ]}
-        >
-          {titleParts.map((p) =>
-            p.accent ? <span class="text-gradient">{p.text}</span> : <span>{p.text}</span>,
-          )}
-        </h2>
-      )
-    }
-    {
-      lead && (
-        <p
-          class:list={[
-            'mt-5 max-w-[54ch] text-[1.02rem] leading-[1.8]',
-            align === 'center' && 'max-w-[60ch]',
-          ]}
-          style="color:var(--c-fg-muted)"
-        >
-          {lead}
-        </p>
-      )
-    }
+    <div class="reveal">
+      {
+        eyebrow && (
+          <div class:list={['flex items-center gap-2.5', align === 'center' && 'justify-center']}>
+            <span
+              class="h-[3px] w-6 rounded-full"
+              style="background:var(--c-accent)"
+              aria-hidden="true"
+            />
+            <span class="eyebrow">{eyebrow}</span>
+          </div>
+        )
+      }
+      {
+        title && (
+          <h2
+            class:list={[
+              'mt-5 max-w-[22ch] text-title font-semibold',
+              align === 'center' && 'max-w-[26ch]',
+            ]}
+          >
+            {titleParts.map((p) =>
+              p.accent ? <span class="text-signal">{p.text}</span> : <span>{p.text}</span>,
+            )}
+          </h2>
+        )
+      }
+      {
+        lead && (
+          <p
+            class:list={[
+              'mt-5 max-w-[54ch] text-[1.02rem] leading-[1.8]',
+              align === 'center' && 'max-w-[60ch]',
+            ]}
+            style="color:var(--c-fg-muted)"
+          >
+            {lead}
+          </p>
+        )
+      }
+    </div>
     <slot />
   </div>
 </section>

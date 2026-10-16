@@ -34,7 +34,7 @@ const current = norm(currentPath);
                     style={{
                       color: active ? 'var(--c-fg)' : 'var(--c-fg-muted)',
                       background: active
-                        ? 'color-mix(in oklab, var(--c-violet) 12%, transparent)'
+                        ? 'color-mix(in oklab, var(--c-accent) 12%, transparent)'
                         : 'transparent',
                     }}
                   >
@@ -84,18 +84,18 @@ const current = norm(currentPath);
                     <span
                       class="absolute inset-y-1 left-0 w-[2px] rounded-full transition-all duration-300"
                       style={{
-                        background: active ? 'var(--c-violet)' : 'transparent',
+                        background: active ? 'var(--c-accent)' : 'transparent',
                         opacity: active ? '1' : '0',
                       }}
                     />
                     <span
                       class="transition-colors group-hover:text-[color:var(--c-fg)]"
-                      style={{ fontWeight: active ? '560' : '400' }}
+                      style={{ fontWeight: active ? '600' : '400' }}
                     >
                       {i.title}
                     </span>
                     {active && (
-                      <span class="ml-auto font-mono text-[0.6rem]" style="color:var(--c-violet)">
+                      <span class="ml-auto font-mono text-[0.6rem]" style="color:var(--c-accent)">
                         ●
                       </span>
                     )}

@@ -22,16 +22,16 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
   lead="两种目标使用完全相同的应用 API。选择自托管的 Void 平台，可以获得共享访问控制、保留的部署历史与后台管理。"
 >
   <div class="mt-14 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6">
-    <div class="card card-hover flex flex-col p-6 sm:p-8">
+    <div class="reveal card card-hover flex flex-col p-6 sm:p-8">
       <div class="flex items-center gap-3">
         <span
           class="grid size-10 place-items-center rounded-xl border"
-          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
         >
           <Icon name="bolt" class="size-[1.15rem]" />
         </span>
         <div>
-          <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+          <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
             Cloudflare
           </h3>
           <p class="font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">
@@ -56,46 +56,46 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
         style="border-color:var(--c-line);color:var(--c-fg-muted)"
       >
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           资源直接开通在你的账户中
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           支持自定义应用域名
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           日志使用 Cloudflare 实时 tail
         </li>
       </ul>
     </div>
 
-    <div class="card card-hover relative flex flex-col overflow-hidden p-6 sm:p-8">
+    <div class="reveal card card-hover relative flex flex-col overflow-hidden p-6 sm:p-8">
       <div
         class="pointer-events-none absolute inset-x-0 -top-px h-px"
-        style="background:linear-gradient(90deg,transparent,var(--c-violet),transparent)"
+        style="background:linear-gradient(90deg,transparent,var(--c-accent),transparent)"
         aria-hidden="true"
       >
       </div>
       <div class="flex items-center gap-3">
         <span
           class="grid size-10 place-items-center rounded-xl border"
-          style="border-color:color-mix(in oklab, var(--c-violet) 32%, transparent);background:color-mix(in oklab, var(--c-violet) 11%, transparent);color:var(--c-violet)"
+          style="border-color:color-mix(in oklab, var(--c-accent) 32%, transparent);background:color-mix(in oklab, var(--c-accent) 11%, transparent);color:var(--c-accent)"
         >
           <Icon name="globe" class="size-[1.15rem]" />
         </span>
         <div>
-          <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+          <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
             Void 平台
           </h3>
           <p class="font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">--platform void</p>
         </div>
         <span
           class="ml-auto rounded-full border px-2 py-0.5 font-mono text-[0.6rem] uppercase"
-          style="border-color:color-mix(in oklab, var(--c-violet) 35%, transparent);color:var(--c-violet)"
+          style="border-color:color-mix(in oklab, var(--c-accent) 35%, transparent);color:var(--c-accent)"
           >团队</span
         >
       </div>
@@ -117,17 +117,17 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
         style="border-color:var(--c-line);color:var(--c-fg-muted)"
       >
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           访问控制、资源限额与用量统计
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           保留的部署历史与平台日志
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           关联应用可请求用户授权部署
         </li>
@@ -137,7 +137,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
 
   <!-- 对比表 -->
   <div
-    class="mt-4 overflow-hidden rounded-[var(--radius-card)] border"
+    class="reveal mt-4 overflow-hidden rounded-[var(--radius-card)] border"
     style="border-color:var(--c-line)"
   >
     <div class="overflow-x-auto scroll-thin">
@@ -180,7 +180,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
                     r.cf ? (
                       <span
                         class="inline-flex items-center"
-                        style="color:var(--c-violet)"
+                        style="color:var(--c-accent)"
                         role="img"
                         aria-label="支持"
                         title="支持"
@@ -202,7 +202,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
                     r.platform ? (
                       <span
                         class="inline-flex items-center"
-                        style="color:var(--c-violet)"
+                        style="color:var(--c-accent)"
                         role="img"
                         aria-label="支持"
                         title="支持"

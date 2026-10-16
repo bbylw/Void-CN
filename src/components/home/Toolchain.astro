@@ -44,62 +44,74 @@ const items = [
   title="为**你和你的编程智能体**准备"
   lead="SDK、CLI 与平台各自独立，也可以组合使用：从本地开发到团队规模化部署，都由同一套工具覆盖。"
 >
-  <div class="mt-14 grid gap-4 lg:grid-cols-3">
+  <div class="mt-14 border-t" style="border-color:var(--c-line)">
     {
-      items.map((item) => (
+      items.map((item, i) => (
         <a
           href={item.href}
-          class="card card-hover bracket group relative flex flex-col overflow-hidden p-6 sm:p-7"
+          class="reveal group relative grid gap-x-8 gap-y-5 border-b py-8 transition-colors hover:bg-[color-mix(in_oklab,var(--c-fg)_3%,transparent)] lg:grid-cols-[6.5rem_minmax(0,1fr)_minmax(0,1.1fr)] lg:py-10"
+          style={`border-color:var(--c-line);--reveal-i:${i}`}
         >
-          <div
-            class="pointer-events-none absolute inset-x-0 -top-px h-px opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-            style="background:linear-gradient(90deg,transparent,var(--c-violet),transparent)"
+          <span
+            class="pointer-events-none absolute top-0 bottom-0 left-0 w-px origin-top scale-y-0 transition-transform duration-500 group-hover:scale-y-100"
+            style="background:var(--c-accent)"
             aria-hidden="true"
           />
 
-          <div class="flex items-start">
+          <div class="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-4 lg:pl-3">
             <span
-              class="grid size-10 place-items-center rounded-xl border"
-              style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+              class="font-display text-[1.5rem] leading-none font-semibold tabular-nums"
+              style="color:var(--c-fg-subtle)"
+            >
+              0{i + 1}
+            </span>
+            <span
+              class="grid size-10 place-items-center rounded-lg border transition-colors group-hover:border-[color:var(--c-accent)]"
+              style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
             >
               <Icon name={item.icon as never} class="size-[1.15rem]" />
             </span>
           </div>
 
-          <h3 class="mt-6 text-[1.4rem] font-[650] tracking-[-0.025em]" style="color:var(--c-fg)">
-            {item.name}
-          </h3>
-          <p class="mt-1 font-mono text-[0.75rem]" style="color:var(--c-fg-subtle)">
-            {item.en}
-          </p>
+          <div class="lg:pl-3">
+            <h3
+              class="font-display text-[1.5rem] font-semibold tracking-[-0.03em]"
+              style="color:var(--c-fg)"
+            >
+              {item.name}
+            </h3>
+            <p class="mt-1.5 font-mono text-[0.75rem]" style="color:var(--c-fg-subtle)">
+              {item.en}
+            </p>
+          </div>
 
-          <p class="mt-4 text-[0.925rem] leading-[1.8]" style="color:var(--c-fg-muted)">
-            {item.desc}
-          </p>
-
-          <ul class="mt-6 space-y-2 border-t pt-5" style="border-color:var(--c-line)">
-            {item.points.map((p) => (
-              <li class="flex items-start gap-2 text-[0.85rem]" style="color:var(--c-fg-muted)">
-                <span
-                  class="mt-[0.5em] size-1 shrink-0 rounded-full"
-                  style="background:var(--c-violet);opacity:0.7"
-                  aria-hidden="true"
-                />
-                {p}
-              </li>
-            ))}
-          </ul>
-
-          <span
-            class="mt-auto inline-flex items-center gap-1.5 pt-6 text-[0.85rem] font-medium transition-colors group-hover:text-[color:var(--c-violet)]"
-            style="color:var(--c-fg)"
-          >
-            了解详情
-            <Icon
-              name="arrowRight"
-              class="size-3.5 transition-transform duration-300 group-hover:translate-x-1"
-            />
-          </span>
+          <div class="lg:pl-3">
+            <p class="text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+              {item.desc}
+            </p>
+            <ul class="mt-5 space-y-2">
+              {item.points.map((p) => (
+                <li class="flex items-start gap-2 text-[0.85rem]" style="color:var(--c-fg-muted)">
+                  <span
+                    class="mt-[0.55em] size-1 shrink-0 rounded-full"
+                    style="background:var(--c-accent)"
+                    aria-hidden="true"
+                  />
+                  {p}
+                </li>
+              ))}
+            </ul>
+            <span
+              class="mt-5 inline-flex items-center gap-1.5 text-[0.85rem] font-medium"
+              style="color:var(--c-fg)"
+            >
+              了解详情
+              <Icon
+                name="arrowRight"
+                class="size-3.5 transition-transform duration-300 group-hover:translate-x-1"
+              />
+            </span>
+          </div>
         </a>
       ))
     }

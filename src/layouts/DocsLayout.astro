@@ -56,7 +56,7 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
           <header class="border-b pb-8" style="border-color:var(--c-line)">
             <div class="flex flex-wrap items-center gap-2.5">
               <h1
-                class="text-[2.1rem] leading-[1.12] font-[680] tracking-[-0.03em] sm:text-[2.6rem]"
+                class="text-[2.1rem] leading-[1.12] font-semibold tracking-[-0.03em] sm:text-[2.6rem]"
               >
                 {title}
               </h1>
@@ -64,7 +64,7 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
                 badge && (
                   <span
                     class="rounded-full border px-2 py-0.5 font-mono text-[0.62rem] leading-none font-medium"
-                    style="border-color:color-mix(in oklab, var(--c-violet) 40%, transparent);color:var(--c-violet)"
+                    style="border-color:color-mix(in oklab, var(--c-accent) 40%, transparent);color:var(--c-accent)"
                   >
                     {badge}
                   </span>

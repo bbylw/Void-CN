@@ -74,14 +74,26 @@ badge: 可选徽标
 
 ## 设计系统
 
-所有颜色、圆角、字号都定义在 `src/styles/global.css` 的 `@theme` 中，通过 CSS 变量 `--c-*` 输出。深浅色主题各自定义一套 `--c-*`，Tailwind 工具类不需要关心具体值。
+整体视觉为「石墨 × 信号橙」：冷灰石墨底 + 唯一的点缀色（信号橙），工程/技术编辑气质，刻意避开通用的紫蓝渐变。
+
+所有颜色、字体、圆角、字号都定义在 `src/styles/global.css` 的 `@theme` 与 `:root`/`.dark` 中，通过 CSS 变量 `--c-*` 输出。深浅色主题各自定义一套 `--c-*`，Tailwind 工具类不需要关心具体值。
 
 ```css
-:root        { --c-bg: #fbfbfd; --c-fg: #0b0d14; --c-violet: #5b48f5; … }
-.dark        { --c-bg: #07080c; --c-fg: #e9ebf2; --c-violet: #9b8cff; … }
+:root { --c-bg: #f4f4f2; --c-fg: #18181b; --c-accent: #e4572e; … }
+.dark { --c-bg: #0b0b0d; --c-fg: #ecece8; --c-accent: #ff7a45; … }
 ```
 
+字体（均只取 latin 子集，中文由系统 CJK 字体承接）：
+
+| 用途      | 字体                                             |
+| --------- | ------------------------------------------------ |
+| 展示/标题 | Space Grotesk（`font-display`，h1–h3 自动应用）  |
+| 正文      | IBM Plex Sans                                    |
+| 代码      | JetBrains Mono                                   |
+
 主题通过 `<html class="dark">` 切换，选择结果保存在 `localStorage` 的 `void-theme`，默认跟随系统偏好。
+
+滚动入场：给元素加 `.reveal`（可配 `--reveal-i` 做错峰），由 `src/scripts/reveal.ts` 用 IntersectionObserver 在进入视口时添加 `.is-in`。初始隐藏态仅在 `<html class="js">` 下生效，无 JS 时内容照常可见，并尊重 `prefers-reduced-motion`。
 
 ## 交互岛
 

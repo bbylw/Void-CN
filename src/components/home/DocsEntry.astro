@@ -9,11 +9,19 @@ import { DOCS_NAV } from '../../data/site';
   title="从**快速上手**到**生产部署**"
   lead="完整的中文指南，按主题分组。站内搜索支持 Ctrl / ⌘ + K。"
 >
-  <div class="mt-14 grid gap-10 lg:grid-cols-[repeat(5,minmax(0,1fr))]">
+  <div class="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-5">
     {
-      DOCS_NAV.map((group) => (
-        <nav aria-label={group.label}>
-          <h3 class="pb-3 text-[0.8rem] font-semibold tracking-[0.02em]" style="color:var(--c-fg)">
+      DOCS_NAV.map((group, gi) => (
+        <nav class="reveal" aria-label={group.label} style={`--reveal-i:${gi}`}>
+          <h3
+            class="flex items-center gap-2 pb-3 text-[0.8rem] font-semibold"
+            style="color:var(--c-fg)"
+          >
+            <span
+              class="size-1.5 rounded-[2px]"
+              style="background:var(--c-accent)"
+              aria-hidden="true"
+            />
             {group.label}
           </h3>
           <ul class="space-y-0.5 border-t pt-2.5" style="border-color:var(--c-line)">
@@ -24,7 +32,7 @@ import { DOCS_NAV } from '../../data/site';
                   class="group flex items-start rounded-md py-[0.3rem] text-[0.85rem] leading-snug transition-colors"
                   style="color:var(--c-fg-muted)"
                 >
-                  <span class="transition-colors group-hover:text-[color:var(--c-fg)]">
+                  <span class="transition-colors group-hover:text-[color:var(--c-accent)]">
                     {item.title}
                   </span>
                 </a>
@@ -36,45 +44,55 @@ import { DOCS_NAV } from '../../data/site';
     }
   </div>
 
-  <div class="mt-14 grid gap-4 md:grid-cols-3">
-    <a href="/docs/quickstart" class="card card-hover bracket group flex flex-col p-5">
+  <!-- 三个入口：整合为一块带分隔线的面板，取代等宽三卡 -->
+  <div
+    class="reveal mt-14 grid divide-y overflow-hidden rounded-[var(--radius-card)] border md:grid-cols-3 md:divide-x md:divide-y-0"
+    style="border-color:var(--c-line)"
+  >
+    <a
+      href="/docs/quickstart"
+      class="group flex flex-col p-6 transition-colors hover:bg-[color-mix(in_oklab,var(--c-accent)_6%,transparent)]"
+    >
       <span class="text-[0.95rem] font-semibold" style="color:var(--c-fg)">五分钟跑起来</span>
-      <span class="mt-1.5 flex-1 text-[0.86rem] leading-relaxed" style="color:var(--c-fg-muted)">
+      <span class="mt-2 flex-1 text-[0.86rem] leading-relaxed" style="color:var(--c-fg-muted)">
         创建项目、启动本地开发、部署到你的 Cloudflare 账户。
       </span>
       <Icon
         name="arrowRight"
-        class="mt-4 size-4 transition-transform duration-300 group-hover:translate-x-1"
-        style="color:var(--c-violet)"
+        class="mt-5 size-4 transition-transform duration-300 group-hover:translate-x-1"
+        style="color:var(--c-accent)"
       />
     </a>
-    <a href="/docs/agents" class="card card-hover bracket group flex flex-col p-5">
+    <a
+      href="/docs/agents"
+      class="group flex flex-col p-6 transition-colors hover:bg-[color-mix(in_oklab,var(--c-accent)_6%,transparent)]"
+    >
       <span class="text-[0.95rem] font-semibold" style="color:var(--c-fg)">和编程智能体一起用</span>
-      <span class="mt-1.5 flex-1 text-[0.86rem] leading-relaxed" style="color:var(--c-fg-muted)">
+      <span class="mt-2 flex-1 text-[0.86rem] leading-relaxed" style="color:var(--c-fg-muted)">
         <code class="!bg-transparent !border-0 !p-0">void init</code> 会写入精简的 <code
           class="!bg-transparent !border-0 !p-0">AGENTS.md</code
         >，并为检测到的智能体链接打包好的技能。
       </span>
       <Icon
         name="arrowRight"
-        class="mt-4 size-4 transition-transform duration-300 group-hover:translate-x-1"
-        style="color:var(--c-violet)"
+        class="mt-5 size-4 transition-transform duration-300 group-hover:translate-x-1"
+        style="color:var(--c-accent)"
       />
     </a>
     <a
       href="https://void.cloud/guide/"
       target="_blank"
       rel="noreferrer noopener"
-      class="card card-hover bracket group flex flex-col p-5"
+      class="group flex flex-col p-6 transition-colors hover:bg-[color-mix(in_oklab,var(--c-accent)_6%,transparent)]"
     >
       <span class="text-[0.95rem] font-semibold" style="color:var(--c-fg)">英文原站</span>
-      <span class="mt-1.5 flex-1 text-[0.86rem] leading-relaxed" style="color:var(--c-fg-muted)">
+      <span class="mt-2 flex-1 text-[0.86rem] leading-relaxed" style="color:var(--c-fg-muted)">
         本站为社区翻译版本，内容如有出入，以 void.cloud 官方指南为准。
       </span>
       <Icon
         name="arrowUpRight"
-        class="mt-4 size-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-        style="color:var(--c-violet)"
+        class="mt-5 size-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+        style="color:var(--c-accent)"
       />
     </a>
   </div>

@@ -8,8 +8,8 @@ interface Props {
 const { type = 'info', title } = Astro.props;
 
 const MAP = {
-  info: { icon: 'sparkle', label: '说明', color: 'var(--c-cyan)' },
-  tip: { icon: 'bolt', label: '提示', color: 'var(--c-violet)' },
+  info: { icon: 'sparkle', label: '说明', color: 'var(--c-info)' },
+  tip: { icon: 'bolt', label: '提示', color: 'var(--c-accent)' },
   warn: { icon: 'shield', label: '注意', color: 'var(--c-amber)' },
   danger: { icon: 'close', label: '警告', color: 'var(--c-red)' },
 } as const;

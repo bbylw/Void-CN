@@ -52,15 +52,15 @@ const frameworks = [
 >
   <div class="mt-14 grid gap-4 lg:grid-cols-3">
     <!-- 文件即路由 -->
-    <article class="card card-hover relative overflow-hidden p-6 sm:p-7 lg:col-span-2">
+    <article class="reveal card card-hover relative overflow-hidden p-6 sm:p-7 lg:col-span-2">
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
-          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
         >
           <Icon name="file" class="size-4" />
         </span>
-        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+        <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
           文件即路由
         </h3>
       </div>
@@ -80,15 +80,17 @@ const frameworks = [
     </article>
 
     <!-- 类型管道 -->
-    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+    <article
+      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
+    >
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
-          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
         >
           <Icon name="bolt" class="size-4" />
         </span>
-        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+        <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
           类型管道
         </h3>
       </div>
@@ -98,17 +100,17 @@ const frameworks = [
       </p>
       <ul class="mt-4 space-y-2 text-[0.85rem]" style="color:var(--c-fg-muted)">
         <li class="flex items-start gap-2">
-          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           数据库列的类型在编译期即已知
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           处理器返回类型生成 <code class="!bg-transparent !border-0 !p-0">.void/</code> 路由表
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
           ></span>
           客户端的路径、方法、请求体与响应全部受检
         </li>
@@ -127,15 +129,17 @@ const frameworks = [
     </article>
 
     <!-- 资源即代码 -->
-    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+    <article
+      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
+    >
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
-          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
         >
           <Icon name="cube" class="size-4" />
         </span>
-        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+        <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
           资源即代码
         </h3>
       </div>
@@ -157,15 +161,17 @@ const frameworks = [
     </article>
 
     <!-- 本地即生产 -->
-    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+    <article
+      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
+    >
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
-          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
         >
           <Icon name="terminal" class="size-4" />
         </span>
-        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+        <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
           本地即生产
         </h3>
       </div>
@@ -186,15 +192,17 @@ const frameworks = [
     </article>
 
     <!-- 页面与表单 -->
-    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+    <article
+      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
+    >
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
-          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
         >
           <Icon name="layers" class="size-4" />
         </span>
-        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+        <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
           页面与表单
         </h3>
       </div>
@@ -216,17 +224,17 @@ const frameworks = [
     </article>
 
     <!-- 可组合 -->
-    <article class="card relative min-w-0 overflow-hidden p-6 sm:p-7 lg:col-span-3">
+    <article class="reveal card relative min-w-0 overflow-hidden p-6 sm:p-7 lg:col-span-3">
       <div class="grid gap-7 lg:grid-cols-[1fr_1.25fr] lg:items-center">
         <div>
           <div class="flex items-center gap-2.5">
             <span
               class="grid size-8 place-items-center rounded-lg border"
-              style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+              style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-accent)"
             >
               <Icon name="layers" class="size-4" />
             </span>
-            <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+            <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
               随时可组合
             </h3>
           </div>
@@ -236,7 +244,7 @@ const frameworks = [
           </p>
           <a
             href="/docs/frameworks"
-            class="mt-5 inline-flex items-center gap-1.5 text-[0.87rem] font-medium transition-colors hover:text-[color:var(--c-violet)]"
+            class="mt-5 inline-flex items-center gap-1.5 text-[0.87rem] font-medium transition-colors hover:text-[color:var(--c-accent)]"
             style="color:var(--c-fg)"
           >
             查看全部集成

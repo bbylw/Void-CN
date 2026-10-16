@@ -34,28 +34,27 @@ const COMMANDS = {
   </div>
   <div
     class="absolute inset-x-0 top-0 h-px"
-    style="background:linear-gradient(90deg,transparent,var(--c-line-strong),transparent)"
+    style="background:linear-gradient(90deg,transparent,var(--c-accent),transparent)"
     aria-hidden="true"
   >
   </div>
 
-  <div class="relative mx-auto max-w-[88rem] px-4 pt-14 pb-16 sm:px-6 sm:pt-20 lg:px-10 lg:pb-24">
+  <div class="relative mx-auto max-w-[88rem] px-4 pt-14 pb-16 sm:px-6 sm:pt-20 lg:px-10 lg:pb-28">
     <div
-      class="grid items-center gap-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-14"
+      class="grid items-center gap-14 lg:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)] lg:gap-16"
     >
       <!-- 左：文案 -->
-      <div class="min-w-0 max-w-[35rem]">
+      <div class="min-w-0 max-w-[36rem]">
         <a
           href={SITE.upstreamGuide}
           target="_blank"
           rel="noreferrer noopener"
-          class="group inline-flex items-center gap-2 rounded-full border py-1 pr-3 pl-1.5 text-[0.78rem] transition-colors hover:border-[color:var(--c-line-strong)]"
-          style="border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-muted)"
+          class="reveal group inline-flex items-center gap-2 rounded-full border py-1 pr-3 pl-1.5 text-[0.78rem] transition-colors hover:border-[color:var(--c-line-strong)]"
+          style="--reveal-i:0;border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-muted)"
         >
           <span
             class="rounded-full px-2 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide"
-            style="background:color-mix(in oklab, var(--c-violet) 16%, transparent);color:var(--c-violet)"
-            >新</span
+            style="background:var(--c-accent-soft);color:var(--c-accent)">新</span
           >
           中文文档已上线，翻译自官方指南
           <Icon
@@ -64,17 +63,21 @@ const COMMANDS = {
           />
         </a>
 
-        <h1 class="mt-7 text-display font-[700] text-gradient-soft">
-          全栈开发，<br />类型<span class="text-gradient">不断链</span>。
+        <h1 class="reveal mt-7 text-display font-semibold" style="--reveal-i:1">
+          全栈开发，<br />类型<span class="text-signal">不断链</span>。
         </h1>
 
-        <p class="mt-7 max-w-[32rem] text-[1.06rem] leading-[1.85]" style="color:var(--c-fg-muted)">
-          Void 是运行在 Cloudflare Workers 之上、由 <span style="color:var(--c-fg)">Vite</span> 驱动的全栈框架。
-          用 React、Vue、Svelte 或 Solid 构建界面，在同一个项目里编写服务端代码：路由、数据访问与部署连成一条线，类型从数据库查询一路贯穿到
+        <p
+          class="reveal mt-7 max-w-[32rem] text-[1.06rem] leading-[1.85]"
+          style="--reveal-i:2;color:var(--c-fg-muted)"
+        >
+          Void 是运行在 Cloudflare Workers 之上、由 <span style="color:var(--c-fg)">Vite</span
+          >驱动的全栈框架。 用 React、Vue、Svelte 或 Solid
+          构建界面，在同一个项目里编写服务端代码：路由、数据访问与部署连成一条线，类型从数据库查询一路贯穿到
           UI。
         </p>
 
-        <div class="mt-9 flex flex-wrap items-center gap-3">
+        <div class="reveal mt-9 flex flex-wrap items-center gap-3" style="--reveal-i:3">
           <a href="/docs/quickstart" class="btn btn-primary h-11 px-5 text-[0.9rem]">
             快速开始
             <Icon name="arrowRight" class="size-4" />
@@ -85,14 +88,16 @@ const COMMANDS = {
           </a>
         </div>
 
-        <InstallTabs commands={COMMANDS} class="mt-8 max-w-[32rem]" />
+        <div class="reveal" style="--reveal-i:4">
+          <InstallTabs commands={COMMANDS} class="mt-8 max-w-[32rem]" />
+        </div>
       </div>
 
-      <!-- 右：类型管道 -->
-      <div class="relative min-w-0">
+      <!-- 右：类型管道（越出栅格，形成不对称） -->
+      <div class="reveal relative min-w-0 lg:-mt-4 lg:-mr-2" style="--reveal-i:2">
         <div
           class="card overflow-hidden !rounded-[var(--radius-panel)]"
-          style="box-shadow:var(--shadow-pop)"
+          style="box-shadow:var(--shadow-pop);border-top:2px solid var(--c-accent)"
         >
           <!-- 面板头 -->
           <div
@@ -100,7 +105,7 @@ const COMMANDS = {
             style="border-color:var(--c-line);background:var(--c-surface-2)"
           >
             <span class="flex gap-1.5" aria-hidden="true">
-              <i class="size-2 rounded-full" style="background:var(--c-line-strong)"></i>
+              <i class="size-2 rounded-full" style="background:var(--c-accent)"></i>
               <i class="size-2 rounded-full" style="background:var(--c-line-strong)"></i>
               <i class="size-2 rounded-full" style="background:var(--c-line-strong)"></i>
             </span>
@@ -122,11 +127,11 @@ const COMMANDS = {
               class="flex items-center gap-2 px-4 pt-3.5 pb-1.5 font-mono text-[0.7rem]"
               style="color:var(--c-fg-subtle)"
             >
-              <span class="size-1.5 rounded-full" style="background:var(--c-violet)"></span>
+              <span class="size-1.5 rounded-full" style="background:var(--c-accent)"></span>
               db/schema.ts
               <span
                 class="ml-auto rounded border px-1.5 py-px text-[0.58rem] uppercase"
-                style="border-color:color-mix(in oklab, var(--c-violet) 32%, transparent);color:var(--c-violet)"
+                style="border-color:color-mix(in oklab, var(--c-accent) 32%, transparent);color:var(--c-accent)"
                 >真相来源</span
               >
             </header>
@@ -138,7 +143,7 @@ const COMMANDS = {
           <!-- 连接 -->
           <div
             class="flex items-center gap-2.5 border-y px-4 py-1.5 font-mono text-[0.65rem]"
-            style="border-color:var(--c-line);background:color-mix(in oklab, var(--c-violet) 7%, transparent);color:var(--c-fg-subtle)"
+            style="border-color:var(--c-line);background:var(--c-accent-soft);color:var(--c-fg-subtle)"
           >
             <svg
               viewBox="0 0 12 12"
@@ -159,7 +164,7 @@ const COMMANDS = {
               class="flex items-center gap-2 px-4 pt-3.5 pb-1.5 font-mono text-[0.7rem]"
               style="color:var(--c-fg-subtle)"
             >
-              <span class="size-1.5 rounded-full" style="background:var(--c-violet)"></span>
+              <span class="size-1.5 rounded-full" style="background:var(--c-accent)"></span>
               <span style="color:var(--c-green)">GET</span>
               routes/api/users.ts
             </header>
@@ -171,7 +176,7 @@ const COMMANDS = {
           <!-- 连接 -->
           <div
             class="flex items-center gap-2.5 border-y px-4 py-1.5 font-mono text-[0.65rem]"
-            style="border-color:var(--c-line);background:color-mix(in oklab, var(--c-violet) 7%, transparent);color:var(--c-fg-subtle)"
+            style="border-color:var(--c-line);background:var(--c-accent-soft);color:var(--c-fg-subtle)"
           >
             <svg
               viewBox="0 0 12 12"
@@ -192,11 +197,11 @@ const COMMANDS = {
               class="flex items-center gap-2 px-4 pt-3.5 pb-1.5 font-mono text-[0.7rem]"
               style="color:var(--c-fg-subtle)"
             >
-              <span class="size-1.5 rounded-full" style="background:var(--c-violet)"></span>
+              <span class="size-1.5 rounded-full" style="background:var(--c-accent)"></span>
               pages/dashboard/index.tsx
               <span
                 class="ml-auto rounded border px-1.5 py-px text-[0.58rem] uppercase"
-                style="border-color:color-mix(in oklab, var(--c-violet) 32%, transparent);color:var(--c-violet)"
+                style="border-color:color-mix(in oklab, var(--c-accent) 32%, transparent);color:var(--c-accent)"
                 >client</span
               >
             </header>
@@ -211,7 +216,7 @@ const COMMANDS = {
           class="absolute -bottom-4 -left-3 hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[0.62rem] xl:flex"
           style="border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-subtle);box-shadow:var(--shadow-card)"
         >
-          <Icon name="bolt" class="size-3" style="color:var(--c-violet)" />
+          <Icon name="bolt" class="size-3" style="color:var(--c-accent)" />
           改动字段 → 立即定位到受影响的代码
         </div>
       </div>

@@ -49,8 +49,8 @@ const ogImage = new URL('/og.png', Astro.site ?? 'https://void-cn.pages.dev').hr
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description} />
 
-    <meta name="theme-color" content="#07080c" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f4f4f2" media="(prefers-color-scheme: light)" />
 
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
@@ -63,6 +63,7 @@ const ogImage = new URL('/og.png', Astro.site ?? 'https://void-cn.pages.dev').hr
 
     <script is:inline>
       (() => {
+        document.documentElement.classList.add('js');
         try {
           const stored = localStorage.getItem('void-theme');
           const dark = stored
@@ -87,6 +88,8 @@ const ogImage = new URL('/og.png', Astro.site ?? 'https://void-cn.pages.dev').hr
     <script>
       // 代码块与表格增强（模块首次执行时自初始化，并在 astro:page-load 时重跑）
       import '../scripts/code-blocks';
+      // 滚动入场动效
+      import '../scripts/reveal';
     </script>
   </body>
 </html>

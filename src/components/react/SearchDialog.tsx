@@ -81,8 +81,8 @@ function Highlight({ text, query }: { text: string; query: string }) {
       out.push(
         <mark
           key={i}
-          className="rounded-[3px] px-0.5 text-[color:var(--c-violet)]"
-          style={{ background: 'color-mix(in oklab, var(--c-violet) 16%, transparent)' }}
+          className="rounded-[3px] px-0.5 text-[color:var(--c-accent)]"
+          style={{ background: 'color-mix(in oklab, var(--c-accent) 16%, transparent)' }}
         >
           {buf}
         </mark>,
@@ -97,7 +97,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
       active ? (
         <mark
           key="t"
-          style={{ background: 'color-mix(in oklab, var(--c-violet) 16%, transparent)' }}
+          style={{ background: 'color-mix(in oklab, var(--c-accent) 16%, transparent)' }}
         >
           {buf}
         </mark>
