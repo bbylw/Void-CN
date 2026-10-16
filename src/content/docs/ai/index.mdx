@@ -1,0 +1,243 @@
+---
+title: AI
+description: 用 void/ai 的 ai 在服务端代码中运行 Workers AI 模型与第三方提供方 API，提供方请求通过 Cloudflare 的 AI Gateway 发出。
+group: 后端能力
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 本地开发
+
+对于直连 Cloudflare 的项目，先连接你的账户再开始开发：
+
+```bash
+void connect --platform cloudflare
+npm run dev
+```
+
+当应用导入 `void/ai` 时，Void 会在开发与预览期间启用远程 Workers AI 绑定。请求使用你的 Cloudflare 账户及其额度；Workers AI 没有本地模拟器。
+
+开发与预览使用与 `void connect` 相同的 Cloudflare 登录；使用 `void cloudflare login` 登录。`CLOUDFLARE_API_TOKEN` 优先级更高，自动化环境中请使用它。
+
+如果开发因为 Cloudflare 认证错误而停止，请以能够访问部署账户的用户在终端中运行 `void cloudflare login`（该账户由 `void cloudflare status` 展示），或设置 `CLOUDFLARE_API_TOKEN`。`wrangler login` 不影响开发。
+
+对于团队平台，使用 `void connect <platform-url>` 并关联你的项目。开发请求使用该平台的账户与用量限制。
+
+## 基本用法
+
+用 `ai.run()` 传入模型名与输入。模型名与输入类型完全由 `@cloudflare/workers-types` 提供类型。
+
+```ts title="routes/api/chat.ts"
+import { defineHandler } from 'void';
+import { ai } from 'void/ai';
+
+export const POST = defineHandler(async (c) => {
+  const { prompt } = await c.req.json();
+
+  const result = await ai.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return c.json(result);
+});
+```
+
+AI 方法返回 Promise。`await` 它们以获得结果，或者直接从处理器返回该 Promise。
+
+你可以使用通过 Cloudflare AI 绑定可用的任何模型，包括 Workers AI 模型（如 `@cf/meta/llama-3.3-70b-instruct-fp8-fast`）以及 Cloudflare Gateway 模型（如 `google/gemini-2.5-flash` 或 `openai/gpt-4.1-mini`）。输入对象必须与所选 Cloudflare 模型的 schema 匹配。返回二进制数据的模型（例如生成的图像）会以 `Blob` 形式从 `ai.run()` 返回。
+
+## 流式响应
+
+用 `ai.stream()` 获得带 SSE 头的流式响应，可以直接从路由处理器返回：
+
+```ts title="routes/api/chat.ts"
+import { defineHandler } from 'void';
+import { ai } from 'void/ai';
+
+export const POST = defineHandler(async (c) => {
+  const { prompt } = await c.req.json();
+
+  return ai.stream('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+    messages: [{ role: 'user', content: prompt }],
+  });
+});
+```
+
+<Callout type="info" title="流式错误">
+  如果响应开始之后生成被中断，流式响应会以 `void:error` SSE 事件结束；如果是用量限制，则为
+  `void:limit`。`void/client` 的 `fetchStream()` 会在流开始前或流中为限制抛出
+  `UsageLimit`，为其他终止错误抛出 `StreamError`。在 UI
+  中捕获这些错误以停止生成状态、保留部分输出并提供重试。这同样适用于提供方的流式响应与带 `stream:
+  true` 的 `ai.run()`。
+</Callout>
+
+## 列出模型
+
+```ts
+const models = await ai.models();
+
+// 按任务筛选
+const textModels = await ai.models({ task: 'Text Generation' });
+```
+
+## 文档转 Markdown
+
+```ts
+const result = await ai.toMarkdown([{ name: 'document.pdf', blob: pdfBytes }]);
+```
+
+## 用量限制
+
+Workers AI 的用量以 **neurons** 计量。直接部署时，用量归属于你的 Cloudflare 账户。提供方原生请求同时使用你的提供方凭据及其计费条款。
+
+团队平台使用自己的 Cloudflare 账户，并可能对每个用户施加限制。请向管理员了解可用额度。
+
+用量限制会以 `void/limits` 中的 `UsageLimit` 拒绝该操作的 Promise。它包含 `resource`、`reason` 与可选的 `retryAt` 时间戳。在 Void 路由处理器与页面 action 中，未捕获的限制会产生带重试信息的结构化 HTTP 429；在队列、定时任务与其他服务端代码中，它仍是一个被拒绝的 Promise。
+
+处理限制是可选的。当你想提供兜底逻辑或针对自己应用优化的提示时，使用 `instanceof UsageLimit`：
+
+```ts
+import { defineHandler } from 'void';
+import { ai } from 'void/ai';
+import { UsageLimit } from 'void/limits';
+
+export const POST = defineHandler(async (c) => {
+  const { prompt } = await c.req.json();
+  try {
+    const result = await ai.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+      messages: [{ role: 'user', content: prompt }],
+    });
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof UsageLimit) {
+      return error.response({ message: '请稍后重试，你的提示已被保留。' });
+    }
+    throw error;
+  }
+});
+```
+
+`error.response()` 会创建结构化的 HTTP 429，并接受一个可选的自定义 `message`。其他失败正常 reject。使用 `fetchStream()` 时，同样的 `instanceof UsageLimit` 检查能让客户端拿到该消息与重试信息。
+
+## Cloudflare Gateway 模型
+
+`ai.run()` 与 Cloudflare 的 `env.AI.run()` 在模型命名与输入 schema 上保持一致。第三方模型使用 Cloudflare 模型 ID 与由 Cloudflare 管理的凭据。
+
+```ts
+const result = await ai.run('google/gemini-2.5-flash', {
+  contents: [
+    {
+      role: 'user',
+      parts: [{ text: '用一段话解释 Durable Objects。' }],
+    },
+  ],
+});
+```
+
+作为第三个参数传入 AI Gateway 选项：`ai.run(model, inputs, { gateway: { skipCache: true } })`。在团队平台上，网关由平台选择并设置其元数据与日志；`skipCache`、`cacheTtl` 等选项仍然生效。直接部署时，请为提供方原生请求配置 `ai.gateway`。
+
+## 提供方原生请求
+
+用 `ai.provider(provider).fetch(path, init)` 调用第三方提供方的原生 API，使用你自己的提供方密钥。请求会经过配置好的 Cloudflare AI Gateway，并保留提供方的原生 HTTP 结构。在团队平台上，它还会经过该安装的代理；`cf-aig-cache-ttl`、`cf-aig-max-attempts` 等 AI Gateway 缓存、超时与重试头仍然生效，平台会忽略日志、元数据与成本头。
+
+```ts title="OpenAI"
+import { defineHandler } from 'void';
+import { ai } from 'void/ai';
+
+export const POST = defineHandler(async (c) => {
+  const { prompt } = await c.req.json();
+
+  return ai.provider('openai').fetch('/chat/completions', {
+    body: {
+      model: 'gpt-4o',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 512,
+    },
+  });
+});
+```
+
+```ts title="Google AI Studio"
+const response = await ai
+  .provider('google-ai-studio')
+  .fetch('/v1/models/gemini-2.5-flash:generateContent', {
+    body: {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: '什么是 Cloudflare？' }],
+        },
+      ],
+    },
+  });
+```
+
+```ts title="自定义提供方"
+const response = await ai
+  .provider('custom-provider', {
+    apiKeyEnv: 'CUSTOM_PROVIDER_API_KEY',
+    apiKeyHeader: 'x-api-key',
+    apiKeyPrefix: '',
+  })
+  .fetch('/v1/respond', {
+    body: { prompt: '你好' },
+  });
+```
+
+## 图像生成
+
+```ts
+export const POST = defineHandler(async (c) => {
+  const { prompt } = await c.req.json();
+  return ai.image('@cf/black-forest-labs/flux-1-schnell', { prompt });
+});
+```
+
+提供方原生的图像 API 使用 `ai.provider().fetch()`，注意匹配提供方的请求 schema：
+
+```ts
+export const POST = defineHandler(async (c) => {
+  const { prompt } = await c.req.json();
+
+  return ai.provider('openai').fetch('/images/generations', {
+    body: {
+      model: 'gpt-image-2.5-sunburst',
+      prompt,
+      size: '1024x1024',
+    },
+  });
+});
+```
+
+对于 multipart 的提供方 API，传入 `FormData`：
+
+```ts
+export const POST = defineHandler(async (c) => {
+  const body = await c.req.parseBody();
+  const form = new FormData();
+  form.set('model', 'gpt-image-2.5-sunburst');
+  form.set('prompt', String(body.prompt));
+  form.set('image', body.image as Blob, 'source.png');
+
+  return ai.provider('openai').fetch('/images/edits', { body: form });
+});
+```
+
+## 提供方密钥约定
+
+提供方原生请求使用项目密钥，例如 OpenAI 用 `OPENAI_API_KEY`，Google AI Studio 用 `GOOGLE_API_KEY`。
+
+OpenAI 风格的提供方使用 `Authorization: Bearer <key>`，Google AI Studio 使用 `x-goog-api-key`。自定义提供方请使用 `apiKeyHeader` 与 `apiKeyPrefix`。
+
+生产环境中，把 API 密钥添加为项目密钥：
+
+```bash
+void secret put OPENAI_API_KEY=sk-...
+```
+
+本地开发时，把它加到项目根目录的 `.env` 中：
+
+```bash title=".env"
+OPENAI_API_KEY=sk-...
+```
+
+提供方原生 API 的流式响应只需直接返回提供方的响应 —— 例如在上面的 OpenAI 请求体中加入 `stream: true` 即可。

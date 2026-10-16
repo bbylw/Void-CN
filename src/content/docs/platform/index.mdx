@@ -1,0 +1,71 @@
+---
+title: Void 平台
+description: Void 平台让团队把应用部署到一个共享的 Cloudflare 账户中。管理员负责安装与维护，开发者连接它的 URL、登录并部署自己的应用。
+group: 开发与部署
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+<Callout type="tip">
+  如果只是给自己部署，直接[部署到 Cloudflare](/docs/deployment#部署到-cloudflare)即可 ——
+  你不需要先安装平台。
+</Callout>
+
+核心平台支持 GitHub、Google、通用 OIDC 与 Cloudflare Access 登录，支持 CLI 部署、D1、KV、R2、队列、定时任务、Workers AI、WebSocket、SSE、ISR、路由、日志与回滚。
+
+核心安装包含托管的沙箱与邮件网关；当配置了共享邮件域名与 zone 时启用邮件。用户后台、GitHub 构建与 webhook、构建容器与自定义项目域名不属于核心安装。
+
+## 部署能力对比
+
+两种目标使用完全相同的应用 API。核心平台额外提供共享访问控制与保留的部署历史：
+
+| 能力                                          | 直连 Cloudflare             | 核心自托管平台                   |
+| --------------------------------------------- | --------------------------- | -------------------------------- |
+| 静态站点、SPA 与原生页面 SSR                  | 支持                        | 支持                             |
+| 路由规则、WebSocket、队列、Cron 与 ISR        | 支持                        | 支持                             |
+| D1、KV、R2 与经 Hyperdrive 的外部 SQL         | 支持                        | 支持                             |
+| Workers AI 与提供方请求                       | 你的账户与网关              | 安装方的网关与代理               |
+| 运行时日志                                    | Cloudflare 实时 tail        | 保留的平台日志                   |
+| 应用回滚                                      | Worker 版本                 | 保留的平台部署记录               |
+| 带类型的 Durable State 与原生 Durable Objects | 支持                        | 支持                             |
+| 沙箱                                          | 需要 Workers Paid 与 Docker | 需要平台账户为 Workers Paid      |
+| 自定义应用域名                                | 支持                        | 核心安装不包含                   |
+| 生成的 GitHub 部署工作流                      | 支持                        | 使用你自己的 CI 与受限开发者令牌 |
+| 用户后台与托管的 GitHub 构建                  | 不需要                      | 标准安装不包含                   |
+
+<Callout type="info">
+  团队平台需要 Workers for Platforms 与配套基础设施。具体功能取决于安装时的配置。
+</Callout>
+
+## 安装指南
+
+完整的安装流程由以下文档组成：
+
+1. **前置条件** —— 所需的账户、套餐与权限
+2. **凭据** —— Cloudflare API 令牌与密钥的申请
+3. **安装与配置登录** —— 部署平台并接入 GitHub、Google、OIDC 或 Cloudflare Access
+4. **首次部署** —— 用一个示例应用验证整条链路
+5. **域名与资源** —— 配置共享域名、数据库与存储
+6. **维护与恢复** —— 备份、升级与故障恢复
+7. **从 CI 安装** —— 在 CI 环境中自动化平台安装
+8. **停用与卸载** —— 安全地移除平台
+
+## 开发者视角
+
+作为平台的使用者，你通常只需要：
+
+```bash
+# 连接管理员提供的平台地址
+void connect platform.example.com
+
+# 部署到你的项目
+void deploy --platform void --project my-app
+```
+
+<Callout type="warn" title="两个目标各有独立的数据">
+  每个平台都有各自的项目、密钥与数据。把应用从平台 A 切换到平台 B 不会迁移任何数据。
+</Callout>
+
+## 关联应用
+
+平台可以安装[关联应用](https://github.com/voidzero-dev/void/blob/main/docs/guide/platform/administration/connected-apps.md)：这些应用可以请求用户授权后为其执行部署，让你的用户在应用内直接把改动部署到你的 Cloudflare 账户。

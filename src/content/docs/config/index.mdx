@@ -1,0 +1,102 @@
+---
+title: 配置
+description: void.config.ts 控制应用类型推断、资源推断与部署行为。本页汇总最常用的配置项与 CLI 命令。
+group: 开发与部署
+---
+
+import Callout from '@/components/docs/Callout.astro';
+import ApiTable from '@/components/docs/ApiTable.astro';
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  inference: {
+    appType: 'void',
+  },
+  routing: {
+    notFound: '404-page',
+  },
+});
+```
+
+## inference
+
+| 选项                  | 类型                                         | 说明                                                |
+| --------------------- | -------------------------------------------- | --------------------------------------------------- |
+| `inference.appType`   | `"void" \| "framework" \| "spa" \| "static"` | 应用类型。省略时自动检测。                          |
+| `inference.outputDir` | `string`                                     | 静态应用类型的输出目录，相对项目根目录，默认 `dist` |
+| `inference.database`  | `"d1" \| "pg" \| "mysql"`                    | 数据库方言                                          |
+
+详见[支持的应用类型](/docs/app-types#显式配置)。
+
+## routing
+
+```json title="void.config.json"
+{ "routing": { "notFound": "404-page" } }
+```
+
+当 Worker 处理未匹配的请求时，用 `routing.notFound` 指定要提供的生成器 404 页面。
+
+## deploy
+
+```ts
+export default defineConfig({
+  deploy: {
+    cloudflare: { mode: 'atomic' },
+  },
+});
+```
+
+对于使用了自定义 [Durable Objects](/docs/durable-state) 的 Worker，`deploy.cloudflare.mode: 'atomic'` 可以让每次部署都以原子方式进行。
+
+## auth
+
+```json title="void.config.json"
+{ "auth": { "providers": ["email", "google", "github"] } }
+```
+
+提供方凭据来自 `AUTH_<PROVIDER>_CLIENT_ID` 与 `AUTH_<PROVIDER>_CLIENT_SECRET`。更复杂的配置请使用根级的 `auth.ts` 文件。
+
+## Cloudflare 绑定
+
+```ts
+export default defineConfig({
+  cloudflare: {
+    d1_databases: [{ binding: 'DB', database_name: 'my-app' }],
+  },
+});
+```
+
+声明绑定后，Void 会使用它所指定的数据库 ID；本地开发期间 `preview_database_id` 优先。
+
+## CLI 命令速查
+
+| 命令                    | 作用                                                               |
+| ----------------------- | ------------------------------------------------------------------ |
+| `void init`             | 初始化项目（`--tsconfig` 合并类型配置，`--github` 生成 CI 工作流） |
+| `void dev`              | 启动本地开发服务器                                                 |
+| `void build`            | 构建应用                                                           |
+| `void deploy`           | 构建、开通资源、执行迁移并部署                                     |
+| `void connect <url>`    | 连接一个部署目标                                                   |
+| `void prepare`          | 生成 `.void/` 类型                                                 |
+| `void info`             | 打印资源信息（含 Durable Object 重命名建议）                       |
+| `void db generate`      | 生成 SQL 迁移                                                      |
+| `void db migrate`       | 在本地应用待处理的迁移                                             |
+| `void db push`          | 不生成迁移文件，直接在本地应用 schema 变更                         |
+| `void db status`        | 检查 schema 漂移与待处理迁移                                       |
+| `void db seed`          | 重置本地数据库并运行种子文件                                       |
+| `void gen model`        | 生成表、路由与处理器脚手架                                         |
+| `void env check`        | 校验环境变量（`--remote` 校验远端）                                |
+| `void env types`        | 重新生成 `.void/env.d.ts`                                          |
+| `void secret put`       | 设置一个服务端密钥                                                 |
+| `void secret sync`      | 批量上传 dotenv 格式的密钥文件                                     |
+| `void project status`   | 查看当前项目的部署状态                                             |
+| `void project logs`     | 查看运行时日志                                                     |
+| `void project rollback` | 回滚到之前的部署                                                   |
+| `void github connect`   | 连接仓库以启用托管的 GitHub 构建                                   |
+
+<Callout type="tip" title="完整参考">
+  完整的 API 与 CLI 参考位于随 `void` 包提供的 `node_modules/void/docs/reference/`，也可以在
+  [void.cloud/reference](https://void.cloud/reference/api) 在线阅读。
+</Callout>

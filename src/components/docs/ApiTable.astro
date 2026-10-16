@@ -1,0 +1,56 @@
+---
+interface Props {
+  rows: { name: string; type: string; description?: string; default?: string }[];
+  caption?: string;
+}
+const { rows, caption } = Astro.props;
+---
+
+<div
+  class="my-6 overflow-x-auto scroll-thin rounded-[var(--radius-card)] border"
+  style="border-color:var(--c-line)"
+>
+  <table class="api-table w-full min-w-[32rem]">
+    {
+      caption && (
+        <caption
+          class="border-b px-4 py-2.5 text-left font-mono text-[0.7rem] tracking-[0.12em] uppercase"
+          style="border-color:var(--c-line);color:var(--c-fg-subtle)"
+        >
+          {caption}
+        </caption>
+      )
+    }
+    <thead>
+      <tr>
+        <th class="!w-[30%] !py-2.5 !pl-4">选项</th>
+        <th class="!w-[28%] !py-2.5">类型</th>
+        <th class="!py-2.5">说明</th>
+      </tr>
+    </thead>
+    <tbody>
+      {
+        rows.map((r) => (
+          <tr>
+            <td class="!py-2.5 !pl-4 whitespace-nowrap">
+              <code>{r.name}</code>
+            </td>
+            <td class="!py-2.5 whitespace-nowrap">
+              <span class="font-mono text-[0.78rem]" style="color:var(--c-fg-muted)">
+                {r.type}
+              </span>
+            </td>
+            <td class="!py-2.5 !pr-4">
+              {r.description}
+              {r.default && (
+                <span class="ml-1 text-[0.8rem]" style="color:var(--c-fg-subtle)">
+                  默认 <code>{r.default}</code>
+                </span>
+              )}
+            </td>
+          </tr>
+        ))
+      }
+    </tbody>
+  </table>
+</div>

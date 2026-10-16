@@ -1,0 +1,266 @@
+---
+import ShikiCode from '../ShikiCode.astro';
+import Icon from '../Icon.astro';
+import Section from '../Section.astro';
+
+const tree = `routes/
+├── api/
+│   ├── hello.ts        → /api/hello
+│   └── users/
+│       ├── index.ts    → /api/users
+│       └── [id].ts     → /api/users/:id
+└── search/
+    └── [...query].ts   → /api/search/*`;
+
+const typedFetch = `await fetch('/api/users');
+//    ^ { id, name, email }[]`;
+
+const resources = `import { db } from 'void/db';
+import { kv } from 'void/kv';
+import { ai } from 'void/ai';
+// 部署时自动开通资源`;
+
+const localDev = `$ npm run dev
+  ➜ Local: localhost:5173
+  ➜ workerd ready in 41ms`;
+
+const pages = `// users/index.server.ts
+const loader = defineHandler(
+  () => db.select().from(users)
+);`;
+
+const frameworks = [
+  'React',
+  'Vue',
+  'Svelte',
+  'Solid',
+  'TanStack Start',
+  'React Router',
+  'SvelteKit',
+  'Nuxt',
+  'Analog',
+  'Astro',
+  'Hono',
+  'Next.js',
+];
+---
+
+<Section
+  id="features"
+  eyebrow="核心能力"
+  title="**文件即约定**，资源即代码"
+  lead="SDK 的各项功能都是可选且可组合的。你可以从一个 API 开始，也可以直接构建完整的全栈应用。"
+>
+  <div class="mt-14 grid gap-4 lg:grid-cols-3">
+    <!-- 文件即路由 -->
+    <article class="card card-hover relative overflow-hidden p-6 sm:p-7 lg:col-span-2">
+      <div class="flex items-center gap-2.5">
+        <span
+          class="grid size-8 place-items-center rounded-lg border"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+        >
+          <Icon name="file" class="size-4" />
+        </span>
+        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+          文件即路由
+        </h3>
+      </div>
+      <p class="mt-3 max-w-[46ch] text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        在 <code class="!bg-transparent !border-0 !p-0" style="color:var(--c-fg)">routes/</code>
+        下新建一个文件即可添加端点，导出你想支持的方法。动态段用方括号，catch-all 用省略号，括号目录是路由组
+        —— 不改变 URL，只整理文件。
+      </p>
+      <div
+        class="mt-5 overflow-hidden rounded-[0.85rem] border"
+        style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+      >
+        <div class="shiki-panel scroll-thin text-[0.7rem] leading-[1.62] tracking-[-0.005em]">
+          <ShikiCode code={tree} lang="text" />
+        </div>
+      </div>
+    </article>
+
+    <!-- 类型管道 -->
+    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+      <div class="flex items-center gap-2.5">
+        <span
+          class="grid size-8 place-items-center rounded-lg border"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-cyan)"
+        >
+          <Icon name="bolt" class="size-4" />
+        </span>
+        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+          类型管道
+        </h3>
+      </div>
+      <p class="mt-3 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        处理器推断响应类型，类型化 fetch 检查它们的调用方。改动一个字段，TypeScript
+        立刻指出应用里需要跟着改的地方。
+      </p>
+      <ul class="mt-4 space-y-2 text-[0.85rem]" style="color:var(--c-fg-muted)">
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-cyan)"
+          ></span>
+          数据库列的类型在编译期即已知
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          ></span>
+          处理器返回类型生成 <code class="!bg-transparent !border-0 !p-0">.void/</code> 路由表
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-amber)"
+          ></span>
+          客户端的路径、方法、请求体与响应全部受检
+        </li>
+      </ul>
+      <div
+        class="mt-auto overflow-hidden rounded-[0.85rem] border pt-4"
+        style="border-color:var(--c-line)"
+      >
+        <div
+          class="shiki-panel scroll-thin border-t text-[0.7rem] leading-[1.62] tracking-[-0.005em]"
+          style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+        >
+          <ShikiCode code={typedFetch} lang="ts" />
+        </div>
+      </div>
+    </article>
+
+    <!-- 资源即代码 -->
+    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+      <div class="flex items-center gap-2.5">
+        <span
+          class="grid size-8 place-items-center rounded-lg border"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-amber)"
+        >
+          <Icon name="cube" class="size-4" />
+        </span>
+        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+          资源即代码
+        </h3>
+      </div>
+      <p class="mt-3 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        导入即启用。开发时 Void 提供本地资源，部署时自动开通真实的 Cloudflare 资源，不需要手写
+        wrangler 配置。
+      </p>
+      <div
+        class="mt-auto overflow-hidden rounded-[0.85rem] border pt-4"
+        style="border-color:var(--c-line)"
+      >
+        <div
+          class="shiki-panel scroll-thin border-t text-[0.7rem] leading-[1.62] tracking-[-0.005em]"
+          style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+        >
+          <ShikiCode code={resources} lang="ts" />
+        </div>
+      </div>
+    </article>
+
+    <!-- 本地即生产 -->
+    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+      <div class="flex items-center gap-2.5">
+        <span
+          class="grid size-8 place-items-center rounded-lg border"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+        >
+          <Icon name="terminal" class="size-4" />
+        </span>
+        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+          本地即生产
+        </h3>
+      </div>
+      <p class="mt-3 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        Vite 使用 Cloudflare 的运行时在本地运行你的应用。本地看到的行为，就是边缘节点上的行为。
+      </p>
+      <div
+        class="mt-auto overflow-hidden rounded-[0.85rem] border pt-4"
+        style="border-color:var(--c-line)"
+      >
+        <div
+          class="shiki-panel scroll-thin border-t text-[0.7rem] leading-[1.62] tracking-[-0.005em]"
+          style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+        >
+          <ShikiCode code={localDev} lang="bash" />
+        </div>
+      </div>
+    </article>
+
+    <!-- 页面与表单 -->
+    <article class="card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
+      <div class="flex items-center gap-2.5">
+        <span
+          class="grid size-8 place-items-center rounded-lg border"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-cyan)"
+        >
+          <Icon name="layers" class="size-4" />
+        </span>
+        <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+          页面与表单
+        </h3>
+      </div>
+      <p class="mt-3 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        loader 读取数据成为带类型的 props，action 处理表单与其他变更，然后更新页面 —— 不需要手写 API
+        再对接客户端状态。
+      </p>
+      <div
+        class="mt-auto overflow-hidden rounded-[0.85rem] border pt-4"
+        style="border-color:var(--c-line)"
+      >
+        <div
+          class="shiki-panel scroll-thin border-t text-[0.7rem] leading-[1.62] tracking-[-0.005em]"
+          style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+        >
+          <ShikiCode code={pages} lang="ts" />
+        </div>
+      </div>
+    </article>
+
+    <!-- 可组合 -->
+    <article class="card relative min-w-0 overflow-hidden p-6 sm:p-7 lg:col-span-3">
+      <div class="grid gap-7 lg:grid-cols-[1fr_1.25fr] lg:items-center">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <span
+              class="grid size-8 place-items-center rounded-lg border"
+              style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-amber)"
+            >
+              <Icon name="layers" class="size-4" />
+            </span>
+            <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+              随时可组合
+            </h3>
+          </div>
+          <p class="mt-3 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+            Void 页面可使用 React、Vue、Svelte 或
+            Solid；也可以沿用某个受支持的应用框架负责路由与渲染，由 Void 接管资源 API、迁移和部署。
+          </p>
+          <a
+            href="/docs/frameworks"
+            class="mt-5 inline-flex items-center gap-1.5 text-[0.87rem] font-medium transition-colors hover:text-[color:var(--c-violet)]"
+            style="color:var(--c-fg)"
+          >
+            查看全部集成
+            <Icon name="arrowRight" class="size-3.5" />
+          </a>
+        </div>
+
+        <ul class="flex flex-wrap gap-2">
+          {
+            frameworks.map((f) => (
+              <li>
+                <a
+                  href="/docs/frameworks"
+                  class="inline-flex items-center rounded-lg border px-3 py-2 text-[0.82rem] font-medium transition-all duration-300 hover:-translate-y-0.5"
+                  style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-fg-muted)"
+                >
+                  {f}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </article>
+  </div>
+</Section>

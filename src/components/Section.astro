@@ -1,0 +1,64 @@
+---
+interface Props {
+  id?: string;
+  eyebrow?: string;
+  title?: string;
+  lead?: string;
+  align?: 'left' | 'center';
+  class?: string;
+  /** 标题中需要强调的片段（用 **…** 包裹） */
+  titleHtml?: string;
+}
+const { id, eyebrow, title, lead, align = 'left', class: className = '' } = Astro.props;
+
+/** 标题里用 **…** 包裹的片段会被高亮 */
+const titleParts = title
+  ? title.split(/\*\*(.+?)\*\*/g).map((text, i) => ({ text, accent: i % 2 === 1 }))
+  : [];
+---
+
+<section id={id} class:list={['relative py-16 sm:py-24', className]}>
+  <div
+    class:list={[
+      'mx-auto max-w-[76rem] px-4 sm:px-6 lg:px-10',
+      align === 'center' && 'flex flex-col items-center text-center',
+    ]}
+  >
+    {
+      eyebrow && (
+        <div class:list={['flex items-center gap-2.5', align === 'center' && 'justify-center']}>
+          <span class="h-px w-6" style="background:var(--c-line-strong)" aria-hidden="true" />
+          <span class="eyebrow">{eyebrow}</span>
+        </div>
+      )
+    }
+    {
+      title && (
+        <h2
+          class:list={[
+            'mt-5 max-w-[22ch] text-title font-[680] text-gradient-soft',
+            align === 'center' && 'max-w-[26ch]',
+          ]}
+        >
+          {titleParts.map((p) =>
+            p.accent ? <span class="text-gradient">{p.text}</span> : <span>{p.text}</span>,
+          )}
+        </h2>
+      )
+    }
+    {
+      lead && (
+        <p
+          class:list={[
+            'mt-5 max-w-[54ch] text-[1.02rem] leading-[1.8]',
+            align === 'center' && 'max-w-[60ch]',
+          ]}
+          style="color:var(--c-fg-muted)"
+        >
+          {lead}
+        </p>
+      )
+    }
+    <slot />
+  </div>
+</section>

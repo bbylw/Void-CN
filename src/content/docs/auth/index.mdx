@@ -1,0 +1,186 @@
+---
+title: 身份认证
+description: Void 为你配置好 Better Auth，包括数据库连接、API 路由与客户端。从邮箱密码开始，或添加社交登录提供方。
+group: 后端能力
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+<Callout type="warn" title="仅限 Void 应用">
+  Void 托管的认证需要运行在 Cloudflare 上的原生 Void 应用。对于元框架，或
+  Node.js、Bun、Deno，请直接使用 [Better Auth](https://better-auth.com)。
+</Callout>
+
+Void 会为你的应用配置好 Better Auth，包括它的数据库连接、API 路由与客户端。
+
+## 快速开始
+
+### 1. 启用认证
+
+从 `void/client` 导入 `auth` 即可自动启用邮箱密码认证。使用配置来添加社交提供方。
+
+### 2. 注册与登录
+
+使用 `void/client` 中预配置好的认证客户端：
+
+```tsx
+import { auth } from 'void/client';
+
+// 注册
+await auth.signUp.email({
+  email: 'alice@example.com',
+  password: 'example-password-123',
+  name: 'Alice',
+});
+
+// 登录
+await auth.signIn.email({
+  email: 'alice@example.com',
+  password: 'example-password-123',
+});
+```
+
+### 3. 保护一个服务端路由
+
+在需要登录用户的路由处理器或页面 loader 中调用 `requireAuth`。它返回该用户，或在请求未认证时抛出 401：
+
+```ts title="routes/api/profile.ts"
+import { defineHandler } from 'void';
+import { requireAuth } from 'void/auth';
+
+export const GET = defineHandler((c) => {
+  const user = requireAuth(c);
+  return { email: user.email };
+});
+```
+
+在页面模式的 loader 中，如果你希望允许未认证访问，请使用 `getUser` 或 `getSession`：
+
+```ts title="pages/dashboard.server.ts"
+import { defineHandler, type InferProps } from 'void';
+import { getUser } from 'void/auth';
+
+export type Props = InferProps<typeof loader>;
+
+export const loader = defineHandler(() => {
+  const user = getUser();
+  return { user };
+});
+```
+
+### 4. 退出登录
+
+```tsx
+await auth.signOut();
+```
+
+## 配置
+
+满足以下任一条件时认证会自动开启：
+
+- 从 `void/auth` 导入任意内容
+- 从 `void/client` 导入 `auth`
+- 在 `void.config.ts` 中添加 `auth`
+- 添加一个根级的 `auth.ts` 文件
+
+邮箱密码默认启用。要添加社交提供方：
+
+```json title="void.config.json"
+{ "auth": { "providers": ["email", "google", "github"] } }
+```
+
+提供方凭据来自 `AUTH_<PROVIDER>_CLIENT_ID` 与 `AUTH_<PROVIDER>_CLIENT_SECRET`。`cognito` 还需要域名、区域与用户池 ID：设置 `AUTH_COGNITO_DOMAIN`、`AUTH_COGNITO_REGION` 与 `AUTH_COGNITO_USER_POOL_ID`，或在 `auth.ts` 中设置它们。
+
+例如 `github` 使用：
+
+```bash title=".env"
+AUTH_GITHUB_CLIENT_ID=
+AUTH_GITHUB_CLIENT_SECRET=
+```
+
+## 客户端用法
+
+认证客户端使用 Better Auth 在 `/api/auth` 的客户端 API。Void 会自动为你的框架选择客户端。
+
+需要自定义客户端时，从 `void/client` 导入 `createAuthClient`。
+
+## 服务端用法
+
+`void/auth` 提供以下服务端辅助函数：
+
+```ts
+import { getSession, getUser, requireAuth } from 'void/auth';
+```
+
+| 函数             | 返回                        |
+| ---------------- | --------------------------- |
+| `getUser()`      | 当前的 `AuthUser \| null`   |
+| `getSession()`   | `{ user, session } \| null` |
+| `requireAuth(c)` | 已认证的用户，否则抛出 401  |
+
+从 `void/auth` 导入 `AuthUser` 与 `AuthSession` 用于类型标注。
+
+## 行为
+
+- **会话存储**：认证会话使用与你应用相同的数据库。部署时如果缺少 `BETTER_AUTH_SECRET`，Void 会自动创建，并在后续部署中复用。本地开发无需设置密钥；若要在本地预览生产构建，请提供 `BETTER_AUTH_SECRET`。
+- **缓存**：已登录请求的响应会带上 `Cache-Control: no-store`，浏览器缓存与共享缓存都不会保留用户数据。当路由自己设置 `no-store`，或同时设置 `private` 与 `no-cache` 时会保留自己的策略。若要用 `304` 响应重复请求，请使用 Hono 的 `etag()` 中间件搭配 `private, no-cache`。如果自己设置 ETag，请确保它按用户区分，否则 `304` 会复用另一个账号的页面。
+- **跨源请求**：来自其他源的 `POST`、`PUT`、`PATCH`、`DELETE` 请求与 WebSocket 连接不会使用已登录的会话，除非该源在 `trustedOrigins` 中。
+- **限流**：部署在 Cloudflare 上的应用会按客户端 IP 限制认证请求次数（Better Auth 的默认值，例如每 10 秒 3 次登录尝试），每个 Worker 实例各自计数。在 `auth.ts` 中通过 `rateLimit` 修改或关闭限制。若要在多个实例间共享同一计数，设置 `rateLimit: { storage: 'database' }`，然后对直接部署到 Cloudflare 的应用运行 `void db generate`。
+
+## 代理与端到端测试
+
+来自同一个 IP 的所有请求共享同一个计数。以下两种常见设置会触及限制：
+
+- 服务端为你的用户调用认证端点，例如 backend-for-frontend、来自 Vercel 或 nginx 的重写，或另一个 Worker 的 `fetch` —— 这些用户共享该服务器的 IP。
+- 端到端测试对已部署的应用反复注册或登录。
+
+不要改为从 `x-forwarded-for` 读取客户端 IP：任何客户端都能发送该头。给可信调用方一个密钥头，并只对携带该头的请求跳过限制：
+
+```ts
+import { defineAuth } from 'void/auth';
+
+export default defineAuth(({ defaults, env }) => ({
+  ...defaults,
+  rateLimit: {
+    customRules: {
+      '/**': (request, rule) =>
+        env.AUTH_TRUSTED_KEY && request.headers.get('x-auth-trusted-key') === env.AUTH_TRUSTED_KEY
+          ? false
+          : rule,
+    },
+  },
+}));
+```
+
+`'/**'` 匹配所有认证端点。返回 `false` 跳过限制，返回 `rule` 则为其他人保留默认限制。在 `env.ts` 中声明 `AUTH_TRUSTED_KEY: string().optional()`，并用 `void secret put AUTH_TRUSTED_KEY` 设置它。
+
+<Callout type="warn" title="密钥头的责任">
+  发送该密钥的代理必须自行按其每个用户限制所有转发出去的认证请求，包括注册、密码重置与验证邮件。测试运行器应当只把该密钥发送给你的应用。绝不要把密钥放进会在用户浏览器中运行的代码。
+</Callout>
+
+## 自定义
+
+高级配置请在项目根目录创建 `auth.ts` 并导出 `defineAuth(...)`：
+
+```ts
+import { defineAuth } from 'void/auth';
+
+export default defineAuth(({ defaults }) => ({
+  ...defaults,
+  trustedOrigins: ['https://example.com'],
+}));
+```
+
+`defaults` 已经包含了 Void 的约定。请显式扩展它，而不是期待深度合并。
+
+## 数据库与迁移
+
+认证表与应用自己的表放在一起。本地开发期间，Void 会自动创建它们。
+
+Void 平台会自动创建认证表。直接部署到 Cloudflare 时，请把它们包含进你已提交的迁移中：
+
+```bash
+void db generate
+```
+
+部署前检查并提交生成的 SQL。Void 会包含你的认证配置与插件表 —— 你不需要在 `db/schema.ts` 中重复它们，也不需要运行 Better Auth 的 CLI。

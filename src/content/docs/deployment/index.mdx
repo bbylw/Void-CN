@@ -1,0 +1,132 @@
+---
+title: 部署
+description: void deploy 会构建应用、开通资源、执行迁移并完成部署。选择你自己的 Cloudflare 账户，或由团队运维的 Void 平台。
+group: 开发与部署
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+部署成功后，Void 会把部署地址与目标报告的详情一起打印在摘要框中。
+
+## 部署到 Cloudflare
+
+在 `void init` 期间选择 Cloudflare，或稍后再连接：
+
+```bash
+void connect --platform cloudflare
+void deploy --platform cloudflare
+```
+
+Void 会打开浏览器让你登录，并询问使用哪个账户。之后的部署使用已保存的目标，你可以直接运行 `void deploy`。
+
+<Callout type="info" title="套餐要求">
+  原生应用在 Workers Free 的配额内可用。沙箱需要 Workers Paid 与 Containers
+  权限。配置、令牌权限以及其他有额外要求的功能参见 Cloudflare 指南。
+</Callout>
+
+如果你已经有一个 Worker 与根级的 `wrangler.jsonc` 或 `wrangler.json`，`void deploy` 可以关联它并保留其资源。
+
+## 准备你的应用
+
+### 迁移
+
+部署会应用 `db/migrations/` 中待处理的 SQL 迁移。如果你的 schema 有变化却没有对应的迁移，部署会停下来：
+
+```bash
+void db generate
+```
+
+检查并提交生成的 SQL，然后重新部署。注意回滚不会回退数据库迁移。
+
+### 环境变量
+
+在 `env.ts` 中声明值，用 `void secret put` 设置生产服务端密钥。部署绝不会上传你的本地 `.env`。通过构建环境提供公开的 `VITE_*` 值。参见[环境变量](/docs/env-vars)。
+
+请保持 CLI 与框架适配器版本一致，并在生成后提交 `void.config.ts` 与 `void.lock.json`。
+
+## 从 GitHub 部署
+
+为已保存的目标与包管理器生成一个工作流：
+
+```bash
+void init --github
+```
+
+对于 Cloudflare，把 `CLOUDFLARE_API_TOKEN` 添加到仓库密钥中。该令牌需要访问你的应用所使用的账户与产品。PostgreSQL 与 MySQL 应用还需要 `DATABASE_URL`。
+
+## 团队平台 CI
+
+对于核心自托管平台，使用你自己的工作流与项目部署令牌。设置 `VOID_TOKEN`、`VOID_API_URL` 与项目 slug，然后在每个全新的 CI 环境中连接：
+
+```bash
+void connect "$VOID_API_URL" --no-login
+void deploy --platform void --project "$VOID_PROJECT"
+```
+
+支持可选 GitHub Actions 集成的平台使用短期 OIDC 凭据：
+
+```bash
+void github connect <project> --repo <owner/repo> --executor github_actions
+```
+
+授权该仓库，在仓库中设置 `VOID_API_URL`，并在生成的工作流中保留 `permissions: id-token: write`。
+
+如果平台支持托管的 Git 构建，GitHub App 可以在 push 时直接部署，无需工作流文件。
+
+<Callout type="tip" title="CI 中的类型检查">
+  如果 CI 在部署前运行类型检查，请在安装依赖之后运行 `void prepare` 以生成 `.void/` 类型。
+</Callout>
+
+## 部署到团队平台
+
+使用管理员提供的 API URL。在新的或尚未关联的应用中：
+
+```bash
+void connect platform.example.com
+void deploy --platform void --project my-app
+```
+
+按提示登录并确认创建项目。要使用已有项目，运行 `void project link`。之后的部署会使用已保存的目标。
+
+项目所有者可以[共享访问权限](/docs/platform)。要为团队安装平台，请从[安装 Void 平台](/docs/platform)开始，它也对比了两种部署目标的功能差异。
+
+## 部署到另一个 Void 平台
+
+要单次部署到不同的平台，连接它并命名它的项目：
+
+```bash
+void connect second.example.com
+VOID_API_URL=https://second.example.com void deploy --platform void --project my-app
+```
+
+这样可以保留你已保存的目标。每个平台都有各自的项目、密钥与数据。
+
+## 日志与回滚
+
+检查部署、读取运行时日志，或选择之前的某次部署：
+
+```bash
+void project status
+void project logs
+void project rollback
+```
+
+Cloudflare 的日志使用实时 tail；团队平台保留日志历史。
+
+<Callout type="warn" title="回滚前请确认">
+  回滚之前，请检查较早的代码是否与当前的数据库 schema 兼容。
+</Callout>
+
+## 其他运行时
+
+使用 `target` 设置为 Node.js、Bun 或 Deno 构建一个独立服务器。把 `dist/ssr` 与 `dist/client` 一起部署到你自己的托管平台。这些目标上无法使用 D1、KV、R2 与 Workers AI 等 Cloudflare 绑定。
+
+## 用量与执行限制页面
+
+当应用超出请求数或 CPU 额度时，团队平台会向 API 与页面 action 请求返回结构化的 HTTP 429。浏览器请求会得到一个错误页面。
+
+要自定义它，添加 `public/usage-limit.html`（请求限制）或 `public/execution-limit.html`（执行限制）。使用带内联 CSS 与 data URL 图片的独立 HTML 页面。脚本、外部资源与表单提交都会被禁用。缺少自定义页面时使用内置页面。
+
+<Callout type="info" title="流式响应的限制">
+  响应不会被缓存。已经开始的流式响应无法再被替换为错误页面 —— 请在 UI 中处理流失败。
+</Callout>

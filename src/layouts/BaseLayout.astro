@@ -1,0 +1,111 @@
+---
+import '../styles/global.css';
+import { SITE } from '../data/site';
+
+interface Props {
+  title?: string;
+  description?: string;
+  /** og:type */
+  type?: 'website' | 'article';
+  noindex?: boolean;
+  class?: string;
+}
+
+const {
+  title,
+  description = SITE.description,
+  type = 'website',
+  noindex = false,
+  class: bodyClass = '',
+} = Astro.props;
+
+const pageTitle = title
+  ? `${title} · ${SITE.name} 中文文档`
+  : `${SITE.name} — Cloudflare Workers 上的全栈框架`;
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://void-cn.pages.dev');
+---
+
+<!doctype html>
+<html lang="zh-CN" class="dark scroll-smooth">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical.href} />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
+
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="Void" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical.href} />
+    <meta property="og:locale" content="zh_CN" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+
+    <meta name="theme-color" content="#07080c" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fbfbfd" media="(prefers-color-scheme: light)" />
+
+    <link rel="alternate" hreflang="zh-CN" href={canonical.href} />
+    <link rel="alternate" hreflang="x-default" href={canonical.href} />
+
+    <script is:inline>
+      (() => {
+        try {
+          const stored = localStorage.getItem('void-theme');
+          const dark = stored
+            ? stored === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.classList.toggle('dark', dark);
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch {}
+      })();
+    </script>
+
+    <slot name="head" />
+  </head>
+  <body class="min-h-dvh overflow-x-clip antialiased" class:list={[bodyClass]}>
+    <a
+      href="#main"
+      class="sr-only rounded-md px-4 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[200]"
+      style="background:var(--c-surface);border:1px solid var(--c-line-strong)">跳到主要内容</a
+    >
+    <slot />
+
+    <script>
+      import { enhanceCodeBlocks } from '../scripts/code-blocks';
+
+      // 进入视口时揭示区块（单例观察器，支持 A5 视图过渡后新增的节点）
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let observer: IntersectionObserver | null = null;
+
+      const setup = () => {
+        enhanceCodeBlocks();
+        if (reduce) {
+          document.querySelectorAll('.reveal').forEach((el) => el.classList.add('is-in'));
+          return;
+        }
+        observer ??= new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('is-in');
+                observer?.unobserve(entry.target);
+              }
+            }
+          },
+          { rootMargin: '0px 0px -8% 0px', threshold: 0.06 },
+        );
+        document.querySelectorAll('.reveal:not(.is-in)').forEach((el) => observer!.observe(el));
+      };
+
+      setup();
+      document.addEventListener('astro:page-load', setup);
+    </script>
+  </body>
+</html>

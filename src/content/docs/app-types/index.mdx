@@ -1,0 +1,146 @@
+---
+title: 支持的应用类型
+description: Void 支持三类应用：Void 应用、元框架应用与预构建的静态站点。类型会自动检测，也可以显式指定。
+group: 开始
+---
+
+import Callout from '@/components/docs/Callout.astro';
+import ApiTable from '@/components/docs/ApiTable.astro';
+
+- **Void 应用**：由 Void 框架层驱动的 Vite 应用，包含 [API 路由](/docs/server-routing)、[页面模式](/docs/pages-routing)、[认证](/docs/auth)、[定时任务](/docs/jobs)与[队列](/docs/queues)。
+- **元框架**：TanStack Start、React Router、SvelteKit、Nuxt 与 Astro。
+- **静态站点**：SPA、使用 VitePress 等工具构建的站点，或任何一个存放静态文件的目录。
+
+应用类型会从项目结构自动推断，你也可以在 `void.config.ts` 中显式设置。
+
+## Void 应用
+
+在 Void 应用中，Void 负责服务端路由与部署。你可以用 React、Vue、Svelte 或 Solid 编写服务端渲染的页面，也可以用任何能在 Vite 中工作的库构建前端。
+
+一个 Void 应用可以是纯 API（只有 `routes/`）、SPA + API（前端在 `src/`，接口在 `routes/`），也可以是开启了页面模式的完整全栈应用（服务端渲染页面在 `pages/`，数据就近加载）：
+
+```text title="一个完整的 Void 应用"
+pages/              服务端渲染页面
+├── index.tsx
+└── users/
+    ├── [id].tsx
+    └── [id].server.ts
+
+routes/             API 端点
+└── api/
+    └── hello.ts
+
+db/                 schema 与迁移
+middleware/         全局中间件
+crons/              定时任务
+queues/             队列消费者
+vite.config.ts
+void.config.ts
+```
+
+Void 提供 API 路由、页面渲染与可选的自定义 SSR，并同时分发静态资源。D1、KV、R2 之类的资源会从你的代码中推断出来，并在部署时开通。
+
+Void 应用也可以使用 `output: 'static'` 在构建期预渲染所有页面。这样你会得到一个可以部署到任意位置的纯静态站点，不需要 Cloudflare Worker。
+
+## 元框架
+
+Void 可以用 `void deploy` 部署基于 Vite 的元框架应用。框架负责路由与 SSR，Void 负责绑定推断、带类型的数据库查询、迁移与部署。
+
+| 框架            | 通过哪个依赖识别        | 集成文档                                 |
+| --------------- | ----------------------- | ---------------------------------------- |
+| TanStack Start  | `@tanstack/react-start` | [查看](/docs/frameworks#tanstack-start)  |
+| React Router v7 | `@react-router/dev`     | [查看](/docs/frameworks#react-router-v7) |
+| SvelteKit       | `@sveltejs/kit`         | [查看](/docs/frameworks#sveltekit)       |
+| Nuxt            | `nuxt`                  | [查看](/docs/frameworks#nuxt)            |
+| Analog          | `@analogjs/platform`    | [查看](/docs/frameworks#analog)          |
+| Astro           | `astro`                 | [查看](/docs/frameworks#astro)           |
+
+把 `voidPlugin()` 加进框架的 Vite 配置，即可获得绑定推断、带类型的数据库代码生成、迁移管理、定时任务、队列与缓存。
+
+<Callout type="warn" title="框架模式下不支持 Void 托管的认证">
+  请改用 Better Auth 针对你的框架的官方集成。
+</Callout>
+
+## 预构建的静态站点
+
+任何能产出静态文件的项目都可以部署 —— 无论是 SPA、静态站点生成器，还是一个纯目录。Void 会分发这些资源，不需要任何应用代码。
+
+- **SPA**（客户端单页应用）：对于没有对应文件的路径返回 `index.html` 且状态为 200，因此客户端路由开箱即用。在 Void 平台上，带哈希的资源目录（`/assets/`）下的缺失文件则返回 404。当 `vite` 是依赖且不存在后端文件时会被识别。
+- **静态站点**（VitePress、Docusaurus 等静态站点生成器，或任何预构建目录）：为每个页面产出独立的 HTML 文件。当已知的 SSG 是依赖，或使用 `--dir` 参数时会被识别。
+
+在边缘节点上，路径解析顺序是：
+
+1. 精确的文件路径（`/styles.css` → `styles.css`）
+2. 嵌套的 index（`/about` → `about/index.html`）
+3. 存在时返回 404 状态的 `404.html`
+4. 普通的 404 响应
+
+运行 `void deploy` 或 `void deploy --dir <path>` 即可直接上传静态文件。资源会从边缘节点分发，并自动缓存。
+
+## 给静态站点加后端
+
+如果你给一个静态站点生成器添加了 API 路由，需要告诉 Void 是否同时部署后端。自动检测会同时看到 SSG 依赖与后端文件，并停下来等待你设置 `inference.appType`。
+
+要同时部署两者，把 `appType` 设为 `"void"`，并让静态站点在 Void 应用之前构建：
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  inference: {
+    appType: 'void',
+    build: 'vitepress build && vite build',
+  },
+});
+```
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  plugins: [voidPlugin()],
+  // SSG 的产物成为 Void 构建的静态资源
+  publicDir: '.vitepress/dist',
+});
+```
+
+`vitepress build` 先产出站点，然后 `vite build` 把 `publicDir` 复制到 `dist/client` 并输出 Worker 到 `dist/ssr`。把 `voidPlugin()` 只保留在根 `vite.config.ts` 中，不要放进生成器自己的配置（例如 `.vitepress/config.ts`）。
+
+Worker 会处理未匹配的请求。把 `routing.notFound` 设为生成器的 404 页面：
+
+```json title="void.config.json"
+{ "routing": { "notFound": "404-page" } }
+```
+
+如果只想部署静态产物，设置 `"inference": { "appType": "static" }`。
+
+## 显式配置
+
+要锁定应用类型并跳过自动检测，在 `void.config.ts` 中设置：
+
+```json title="void.config.json"
+{
+  "inference": {
+    "appType": "static",
+    "outputDir": ".vitepress/dist"
+  }
+}
+```
+
+<ApiTable
+  caption="inference 选项"
+  rows={[
+    {
+      name: 'inference.appType',
+      type: '"void" | "framework" | "spa" | "static"',
+      description: '应用类型。',
+    },
+    {
+      name: 'inference.outputDir',
+      type: 'string',
+      description: '静态应用类型的输出目录，相对项目根目录，默认',
+      default: 'dist',
+    },
+  ]}
+/>

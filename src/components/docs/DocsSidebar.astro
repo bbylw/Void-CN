@@ -1,0 +1,125 @@
+---
+import Icon from '../Icon.astro';
+import { DOCS_NAV } from '../../data/site';
+
+interface Props {
+  currentPath: string;
+  compact?: boolean;
+}
+const { currentPath, compact = false } = Astro.props;
+const norm = (p: string) => p.replace(/\/+$/, '') || '/';
+const current = norm(currentPath);
+---
+
+{
+  compact ? (
+    <ul class="space-y-1">
+      {DOCS_NAV.map((g) => (
+        <li>
+          <p
+            class="px-2 pt-2 pb-1 font-mono text-[0.62rem] tracking-[0.16em] uppercase"
+            style="color:var(--c-fg-subtle)"
+          >
+            {g.label}
+          </p>
+          <ul class="space-y-0.5">
+            {g.items.map((i) => {
+              const active = norm(i.href) === current;
+              return (
+                <li>
+                  <a
+                    href={i.href}
+                    aria-current={active ? 'page' : undefined}
+                    class="block rounded-md px-2 py-1 text-[0.82rem] transition-colors"
+                    style={{
+                      color: active ? 'var(--c-fg)' : 'var(--c-fg-muted)',
+                      background: active
+                        ? 'color-mix(in oklab, var(--c-violet) 12%, transparent)'
+                        : 'transparent',
+                    }}
+                  >
+                    {i.title}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <nav aria-label="文档导航" class="pb-4">
+      <div
+        class="mb-5 rounded-[0.7rem] border p-3"
+        style="border-color:var(--c-line);background:var(--c-surface)"
+      >
+        <p class="text-[0.8rem] leading-relaxed" style="color:var(--c-fg-muted)">
+          Void 中文文档，翻译自官方
+          <a
+            href="https://void.cloud/guide/"
+            target="_blank"
+            rel="noreferrer noopener"
+            class="link-underline"
+            style="color:var(--c-fg)"
+          >
+            void.cloud/guide
+          </a>
+        </p>
+      </div>
+
+      {DOCS_NAV.map((g) => (
+        <div class="mb-5">
+          <h2 class="eyebrow px-2 pb-1.5">{g.label}</h2>
+          <ul class="space-y-0.5">
+            {g.items.map((i) => {
+              const active = norm(i.href) === current;
+              return (
+                <li>
+                  <a
+                    href={i.href}
+                    aria-current={active ? 'page' : undefined}
+                    class="group relative flex items-center rounded-md py-[0.3rem] pr-2 pl-2.5 text-[0.845rem] transition-colors"
+                    style={{ color: active ? 'var(--c-fg)' : 'var(--c-fg-muted)' }}
+                  >
+                    <span
+                      class="absolute inset-y-1 left-0 w-[2px] rounded-full transition-all duration-300"
+                      style={{
+                        background: active ? 'var(--c-violet)' : 'transparent',
+                        opacity: active ? '1' : '0',
+                      }}
+                    />
+                    <span
+                      class="transition-colors group-hover:text-[color:var(--c-fg)]"
+                      style={{ fontWeight: active ? '560' : '400' }}
+                    >
+                      {i.title}
+                    </span>
+                    {active && (
+                      <span class="ml-auto font-mono text-[0.6rem]" style="color:var(--c-violet)">
+                        ●
+                      </span>
+                    )}
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+
+      <div class="mt-6 border-t pt-4" style="border-color:var(--c-line)">
+        <a
+          href="https://github.com/voidzero-dev/void"
+          target="_blank"
+          rel="noreferrer noopener"
+          class="flex items-center gap-2 rounded-md px-2 py-1.5 text-[0.8rem] transition-colors"
+          style="color:var(--c-fg-muted)"
+        >
+          <Icon name="link" class="size-3.5" />
+          英文原站
+          <Icon name="arrowUpRight" class="ml-auto size-3 opacity-50" />
+        </a>
+      </div>
+    </nav>
+  )
+}

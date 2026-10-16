@@ -1,0 +1,128 @@
+---
+interface Props {
+  /** 包管理器 → 安装命令 */
+  commands: Record<string, string>;
+  class?: string;
+}
+const { commands, class: className = '' } = Astro.props;
+const names = Object.keys(commands);
+---
+
+<div
+  class:list={['flex flex-wrap items-center gap-1 rounded-xl border p-1', className]}
+  style="border-color:var(--c-line);background:var(--c-surface)"
+  data-install-tabs
+  data-cmds={JSON.stringify(commands)}
+>
+  <div class="flex items-center gap-0.5" role="tablist" aria-label="包管理器">
+    {
+      names.map((n, i) => (
+        <button
+          type="button"
+          role="tab"
+          data-pm={n}
+          aria-selected={i === 0 ? 'true' : 'false'}
+          class="rounded-lg px-2.5 py-1.5 font-mono text-[0.75rem] transition-colors"
+          style={{
+            color: i === 0 ? 'var(--c-bg)' : 'var(--c-fg-subtle)',
+            background: i === 0 ? 'var(--c-fg)' : 'transparent',
+          }}
+        >
+          {n}
+        </button>
+      ))
+    }
+  </div>
+
+  <code
+    class="min-w-0 flex-1 truncate px-2.5 py-1.5 font-mono text-[0.8rem] sm:text-[0.85rem]"
+    style="color:var(--c-fg)"
+    data-install-cmd
+  >
+    {commands[names[0]!]}
+  </code>
+
+  <button
+    type="button"
+    data-install-copy
+    class="grid size-8 shrink-0 place-items-center rounded-lg transition-colors hover:bg-[color-mix(in_oklab,var(--c-fg)_8%,transparent)]"
+    style="color:var(--c-fg-subtle)"
+    aria-label="复制命令"
+    title="复制命令"
+  >
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.6"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      class="size-3.5"
+      aria-hidden="true"
+      data-icon-copy
+    >
+      <path
+        d="M8 8V5.5A1.5 1.5 0 0 1 9.5 4h6A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H13M6.5 8h6a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12.5 17h-6A1.5 1.5 0 0 1 5 15.5v-6A1.5 1.5 0 0 1 6.5 8Z"
+      ></path>
+    </svg>
+  </button>
+</div>
+
+<script>
+  const COPY =
+    'M8 8V5.5A1.5 1.5 0 0 1 9.5 4h6A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H13M6.5 8h6a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12.5 17h-6A1.5 1.5 0 0 1 5 15.5v-6A1.5 1.5 0 0 1 6.5 8Z';
+  const DONE = 'm4 10.5 3.5 3.5L16 5.5';
+
+  const initTabs = () => {
+    document.querySelectorAll<HTMLElement>('[data-install-tabs]').forEach((root) => {
+      if (root.dataset.ready) return;
+      root.dataset.ready = '1';
+
+      const map = JSON.parse(root.dataset.cmds ?? '{}') as Record<string, string>;
+      const output = root.querySelector<HTMLElement>('[data-install-cmd]');
+      const copyBtn = root.querySelector<HTMLButtonElement>('[data-install-copy]');
+      const icon = copyBtn?.querySelector('[data-icon-copy] path');
+      const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-pm]')];
+
+      const paint = (active: string) => {
+        buttons.forEach((b) => {
+          const on = b.dataset.pm === active;
+          b.setAttribute('aria-selected', String(on));
+          b.style.color = on ? 'var(--c-bg)' : 'var(--c-fg-subtle)';
+          b.style.background = on ? 'var(--c-fg)' : 'transparent';
+        });
+        if (output) output.textContent = map[active] ?? '';
+      };
+
+      buttons.forEach((b) => b.addEventListener('click', () => paint(b.dataset.pm!)));
+      paint(buttons[0]?.dataset.pm ?? '');
+
+      copyBtn?.addEventListener('click', async () => {
+        const text = output?.textContent ?? '';
+        try {
+          await navigator.clipboard.writeText(text);
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.append(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+        if (icon) {
+          icon.setAttribute('d', DONE);
+          copyBtn.style.color = 'var(--c-violet)';
+          setTimeout(() => {
+            icon.setAttribute('d', COPY);
+            copyBtn.style.color = '';
+          }, 1600);
+        }
+      });
+    });
+  };
+
+  initTabs();
+  document.addEventListener('astro:page-load', initTabs);
+</script>

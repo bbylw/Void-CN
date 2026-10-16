@@ -1,0 +1,60 @@
+---
+import InstallTabs from '../InstallTabs.astro';
+import Icon from '../Icon.astro';
+import { SITE } from '../../data/site';
+
+const COMMANDS = {
+  bun: 'bun add -D void && bunx void init',
+  npm: 'npm install -D void && npx void init',
+  pnpm: 'pnpm add -D void && pnpm void init',
+  yarn: 'yarn add -D void && yarn void init',
+};
+---
+
+<div
+  class="relative overflow-hidden border-t"
+  style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+>
+  <div
+    class="bg-dots absolute inset-0 [mask-image:radial-gradient(ellipse_60%_80%_at_50%_50%,#000,transparent_70%)]"
+  >
+  </div>
+
+  <div class="relative mx-auto max-w-[76rem] px-4 py-24 text-center sm:px-6 sm:py-32 lg:px-10">
+    <div class="flex items-center justify-center gap-2.5">
+      <span class="h-px w-6" style="background:var(--c-line-strong)" aria-hidden="true"></span>
+      <span class="eyebrow">开始构建</span>
+      <span class="h-px w-6" style="background:var(--c-line-strong)" aria-hidden="true"></span>
+    </div>
+
+    <h2 class="mx-auto mt-6 max-w-[18ch] text-title font-[680] text-gradient-soft">
+      三条命令，<br />把应用部署到<span class="text-gradient">边缘</span>。
+    </h2>
+
+    <p
+      class="mx-auto mt-5 max-w-[46ch] text-[1.02rem] leading-[1.8]"
+      style="color:var(--c-fg-muted)"
+    >
+      在一个空目录中运行安装与初始化命令，选择你的 UI 框架与部署目标，然后执行
+      <code>npx void deploy</code> —— Void 会构建应用、开通资源、执行迁移，并打印出你的部署地址。
+    </p>
+
+    <InstallTabs commands={COMMANDS} class="mx-auto mt-9 max-w-[34rem] text-left" />
+
+    <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+      <a href="/docs/quickstart" class="btn btn-primary h-11 px-5 text-[0.9rem]">
+        阅读快速开始
+        <Icon name="arrowRight" class="size-4" />
+      </a>
+      <a
+        href={SITE.repo}
+        target="_blank"
+        rel="noreferrer noopener"
+        class="btn btn-ghost h-11 px-5 text-[0.9rem]"
+      >
+        <Icon name="star" class="size-4" />
+        在 GitHub 上查看
+      </a>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,200 @@
+---
+title: Durable State
+description: 当请求需要在同一个名字下共享状态时（购物车、房间、限流器），使用 Durable Object。Void 给你带类型的方法，并把对象状态保存在多次调用之间。
+group: 数据
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+在 `durable-objects/` 中用 `defineDurableState()` 定义一个模块，Void 会为它提供一个由 SQLite 支持的 Cloudflare Durable Object。
+
+<Callout type="info" title="适用范围">
+  该功能支持 Void 平台上的原生 Void 应用与直接部署到 Cloudflare。
+</Callout>
+
+## 定义状态与方法
+
+```ts title="durable-objects/counter.ts"
+import { defineDurableState } from 'void/durable';
+
+export const Counter = defineDurableState({
+  initialState: { count: 0 },
+  methods: {
+    increment(context, amount: number) {
+      context.state.count += amount;
+      return context.state.count;
+    },
+    read(context) {
+      return context.state.count;
+    },
+  },
+});
+
+export default Counter;
+```
+
+请默认导出 `defineDurableState()` 返回的对象。
+
+## 从路由中调用
+
+导入你的定义，调用 `get()` 并传入一个名字来选择对象。方法的参数与返回值都是带类型的：
+
+```ts title="routes/api/counter.ts"
+import { defineHandler } from 'void';
+import { Counter } from '../../durable-objects/counter';
+
+export const POST = defineHandler(async () => {
+  const counter = Counter.get('global');
+  const count = await counter.increment(1);
+  return { count };
+});
+```
+
+同一个名字始终解析到同一个 Durable Object。当你已经有 `DurableObjectId` 时使用 `getById(id)`。在更高级的场景中，这两个辅助函数也都接受显式的 `DurableObjectNamespace` 作为第一个参数。
+
+## 执行与持久化
+
+Void 会在第一次操作之前加载状态，并一次只运行一个 RPC 方法。在方法、`fetch` 或 alarm 处理器成功之后，它会保存更新后的状态。
+
+如果处理器或保存失败，Void 会把 `context.state` 恢复到之前的值。直接写入 `context.storage` 的内容不包含在这个回滚中。
+
+每个方法会收到：
+
+- `context.state` —— 可以修改或整体替换
+- `context.env` —— Durable Object 的环境
+- `context.id` 与 `context.storage`
+- `context.setAlarm()` 与 `context.deleteAlarm()`
+
+名为 `fetch`、`alarm` 或 `constructor` 的方法是保留字。请把 `fetch` 与 `alarm` 定义为顶层钩子：
+
+```ts
+export const Room = defineDurableState({
+  initialState: { wakeups: 0 },
+  methods: {},
+  fetch(context) {
+    return Response.json(context.state);
+  },
+  async alarm(context) {
+    context.state.wakeups += 1;
+    await context.setAlarm(Date.now() + 60_000);
+  },
+});
+
+export default Room;
+```
+
+## 状态迁移
+
+当持久化值的结构发生变化时为它加上版本号。版本从 `1` 开始，必须连续，并且在某次操作处理迁移后的状态之前按顺序执行：
+
+```ts
+export const Counter = defineDurableState({
+  initialState: { count: 0, label: 'Counter' },
+  version: 2,
+  migrations: [
+    {
+      version: 1,
+      migrate(old) {
+        return { count: (old as { count: number }).count, label: 'Counter' };
+      },
+    },
+    {
+      version: 2,
+      migrate(old) {
+        return { ...(old as { count: number; label: string }), label: 'Total' };
+      },
+    },
+  ],
+  methods: {
+    read(context) {
+      return context.state;
+    },
+  },
+});
+
+export default Counter;
+```
+
+状态迁移会更新你保存的值。Cloudflare 独立的类迁移则由 Void 在 `void.lock.json` 中管理。
+
+<Callout type="warn" title="不要删除或重排类迁移">
+  直接部署到 Cloudflare 时，不要在部署后删除或重排 `void.lock.json` 中生成的 Durable Object 迁移。对于已有 Worker 上的类新增、重命名或删除，请检查迁移并运行 `void deploy --platform cloudflare --atomic`。如果这个 Worker 每次部署都需要原子发布，在 `void.config.ts` 中设置 `deploy: { cloudflare: { mode: 'atomic' } }`。
+</Callout>
+
+## 重命名文件同时保留状态
+
+在重命名一个已部署的定义之前，先运行：
+
+```bash
+void info
+```
+
+对于 `durable-objects/counter.ts`，Void 会打印：
+
+```text
+To preserve this resource when moving its code, add this to 'defineDurableState':
+  name: "counter",
+```
+
+把这个属性加到已有定义中：
+
+```ts
+export const Counter = defineDurableState({
+  name: 'counter',
+  initialState: { count: 0 },
+  methods: {
+    read(context) {
+      return context.state.count;
+    },
+  },
+});
+
+export default Counter;
+```
+
+然后在 `durable-objects/` 内重命名文件、更新它的导入并部署。保持 `name: 'counter'` 与传给 `Counter.get()` 的名字不变，即可保留已存储的状态。
+
+`name` 是可选的。使用由字母开头的词组成的静态字符串，可以内联，也可以放在局部 `const` 中，例如 `'shopping-cart'`。名字必须能生成互不相同的 Worker 类与绑定。修改已有资源的 `name` 会选中一个不同的资源。
+
+如果文件已经被移动，`void info` 也会显示 `void.lock.json` 中记录但找不到对应定义的资源。找到原始资源并使用它建议的 `name`。如果无法建议，请从源码历史中恢复原始文件，在再次移动之前运行 `void info`。保留已有的 lock 与迁移历史。
+
+## 部署支持
+
+带类型的状态在本地开发、Void 平台以及原生 Void 应用直接部署到 Cloudflare 时都可用。部署到 Void 平台用 `void deploy`，部署到你自己的 Cloudflare 账户用 `void deploy --platform cloudflare`。
+
+在 Void 平台上，每个类在多次部署与回滚之间都会保留存储。回滚会恢复类的代码并保留当前存储的数据。删除一个定义会让该类变为非活动状态；用相同的资源名再次添加它即可重新访问其数据。删除项目会删除它的 Durable Object 存储。
+
+<Callout type="warn" title="限制">
+  一个项目最多支持 32
+  个互不相同的自定义类，包含那些已删除但仍保留存储的类。请保持资源名与实例名稳定以保留数据。升级较旧的
+  Void 安装后，再部署使用自定义 Durable Objects 的应用。
+</Callout>
+
+## 原生 Durable Object 类
+
+使用 `defineDurableObject` 可以保留一个原生 Cloudflare 类，包括继承自 Cloudflare Agents 的类。Void 会发现它的绑定并导出这个类，不会替换它的构造函数、生命周期或 RPC 方法。
+
+```ts title="durable-objects/workspace.ts"
+import { DurableObject } from 'cloudflare:workers';
+import { defineDurableObject } from 'void/durable';
+
+class WorkspaceObject extends DurableObject {
+  async fetch() {
+    return new Response('Workspace');
+  }
+}
+
+export const Workspace = defineDurableObject({
+  name: 'workspace',
+  class: WorkspaceObject,
+});
+export default Workspace;
+```
+
+在服务端处理器中调用 `Workspace.get('project-id')` 获得它的带类型 stub。保持资源名与实例名跨部署稳定，以保留存储。
+
+<Callout type="info" title="与之无关的功能">
+  自定义 Durable Object 模块在元框架模式下，以及在 Node.js、Bun、Deno 上不受支持。这与[带类型的
+  WebSocket 路由](/docs/websockets)无关 —— 后者同样使用由 SQLite 支持的 Durable
+  Objects，并且在直接部署到 Cloudflare 与托管的 Void 部署上都能工作。
+</Callout>

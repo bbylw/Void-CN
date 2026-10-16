@@ -1,0 +1,259 @@
+---
+title: 页面路由
+description: 把 UI 组件放进 pages/ 即可得到路由。页面的服务端 loader 返回数据，组件把它作为 props 接收。该模式受 Inertia.js 启发，兼容 React、Vue、Svelte 与 Solid。
+group: 路由与渲染
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+存在 `pages/` 目录时即进入页面模式。它可以与 `routes/` 并存：页面负责 UI，`routes/` 负责 API。页面组件通常在首次请求时于服务端渲染，随后在浏览器中运行以完成导航与交互。
+
+你也可以保留自己的客户端路由，用[类型化 fetch](/docs/typed-fetch)调用 Void 的 API。页面模式是可选的。
+
+## 安装
+
+在空项目中，`void init` 可以帮你配置好页面模式。选择 Vite+ 或原生 Vite，然后选择 React、Vue、Svelte 或 Solid，以及一个数据库或静态起始模板。生成的应用会包含对应的 Vite 配置与页面文件。
+
+如果要手动添加页面模式，请与 `void` 一起安装对应的框架适配器：
+
+```bash title="React"
+npm install @void/react
+```
+
+```bash title="Vue"
+npm install @void/vue
+```
+
+```bash title="Svelte"
+npm install @void/svelte
+```
+
+```bash title="Solid"
+npm install @void/solid
+```
+
+然后把两个插件都加进 Vite 配置：
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+import { voidReact } from '@void/react/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidReact()],
+});
+```
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+import { voidVue } from '@void/vue/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidVue()],
+});
+```
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+import { voidSvelte } from '@void/svelte/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidSvelte()],
+});
+```
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+import { voidSolid } from '@void/solid/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidSolid()],
+});
+```
+
+每个适配器都内置了对应框架的 Vite 插件。如果需要，可以这样传入框架插件选项：`voidReact({ react: { ... } })`、`voidVue({ vue: { ... } })`、`voidSvelte({ svelte: { ... } })` 或 `voidSolid({ solid: { ... } })`。
+
+## 目录结构
+
+页面既可以是 `about.vue` 这样的扁平文件，也可以是 `about/index.vue` 这样的目录式路由，两者映射到同一个 URL：
+
+```text title="pages/"
+├── layout.tsx           根布局（包裹所有页面）
+├── index.tsx            → /
+├── index.server.ts      / 的服务端 loader 与 action
+├── about.tsx            → /about
+├── users/
+│   ├── layout.tsx       /users/* 的嵌套布局
+│   ├── [id].tsx         → /users/:id
+│   └── [id].server.ts   /users/:id 的服务端 loader 与 action
+└── blog/
+    └── hello.md         → /blog/hello（Markdown 页面）
+```
+
+每个页面都可以有一个配套的 `.server.ts` 文件，它只在服务端运行，可以导出：
+
+- **loader**：在 GET 上运行，返回成为页面组件 props 的数据。
+- **actions**：处理来自表单与程序化调用的变更。一个页面可以导出单个 action，也可以导出多个具名 action。
+- `ssr = false`：让某条路由退出服务端渲染的组件 HTML，同时保留服务端 loader 与客户端路由。
+
+基于文件的路由规则与服务端路由相同：`[param]` 是动态段，`[...param]` 是 catch-all，`(group)/` 是路由组。
+
+## 导航是如何工作的
+
+第一次请求会收到渲染好的 HTML。之后的导航会运行 loader 并更新页面，而不重新加载文档。表单提交会运行 action，然后刷新页面 props 或重定向。
+
+要��某条特定路由退出服务端渲染的组件 HTML，从它配套的 `.server.ts` 中导出 `ssr = false`：
+
+```ts title="pages/dashboard.server.ts"
+import { defineHandler } from 'void';
+
+export const ssr = false;
+
+export const loader = defineHandler(async () => {
+  return { title: 'Dashboard' };
+});
+```
+
+Loader 仍然会在第一次请求时运行，它的 props 也会嵌入 HTML 外壳中；区别在于页面组件改为在浏览器中挂载，而不是对服务端渲染的标记做 hydration。
+
+渲染与预渲染标志的组合如下：
+
+| 页面导出                                | 行为                                       |
+| --------------------------------------- | ------------------------------------------ |
+| 未设置 `ssr` 或 `ssr = true`            | 在请求时服务端渲染组件 HTML                |
+| `ssr = false`                           | 在请求时返回一个客户端挂载的外壳           |
+| `ssr = false` + `prerender = true`      | 预渲染一个内嵌 loader 数据的客户端挂载外壳 |
+| `ssr = false` + `prerender = false`     | 只在请求时返回客户端挂载的外壳，永不预渲染 |
+| 岛屿页面 + `ssr = false`                | 无效 —— 岛屿页面已经使用岛屿渲染器         |
+| `output: "static"` + 未设置 `prerender` | 自动预渲染路径已知的页面，包括纯客户端外壳 |
+
+## Link 组件
+
+页面之间使用 `Link` 组件做 SPA 导航。它渲染一个 `<a>` 标签，拦截点击并导航，不触发整页重新加载：
+
+```tsx
+import { Link } from '@void/react';
+
+<Link href="/users">用户</Link>
+<Link href={`/users/${id}`}>查看</Link>
+```
+
+```vue
+<script setup lang="ts">
+import { Link } from '@void/vue';
+</script>
+
+<template>
+  <Link href="/users">用户</Link>
+  <Link :href="`/users/${id}`">查看</Link>
+</template>
+```
+
+```svelte
+<script>
+  import { Link } from '@void/svelte';
+</script>
+
+<Link href="/users">用户</Link>
+<Link href={`/users/${id}`}>查看</Link>
+```
+
+```tsx
+import { Link } from '@void/solid';
+
+<Link href="/users">用户</Link>
+<Link href={`/users/${id}`}>查看</Link>
+```
+
+`Link` 还支持查询数据、替换历史记录、整页导航与取消导航：
+
+```tsx
+<Link href="/users" data={{ page: 2, tag: ['active', 'new'] }}>
+  筛选用户
+</Link>
+
+<Link href="/users" replace>用户</Link>
+
+<Link href="/logout" reloadDocument>退出登录</Link>
+
+<Link
+  href="/settings"
+  onNavigate={(event) => {
+    if (!confirm('确定离开当前页面？')) event.preventDefault();
+  }}
+>
+  设置
+</Link>
+```
+
+`prefetch` 与 `reloadDocument` 只对 GET 链接有效。GET 数据会变成查询参数，可以使用标量值或数组。
+
+## 程序化导航
+
+使用 `useRouter()`：
+
+```ts
+import { useRouter } from '@void/react';
+
+const router = useRouter();
+router.visit('/users');
+router.refresh(); // 重新获取当前页面 props
+router.visit('/logout', { method: 'POST' }); // 非 GET 导航
+```
+
+`router.visit()` 对同源 URL 会就地更新页面。其他源上的 http(s) URL 会触发整页加载，`javascript:` 等其他协议则会被拒绝。
+
+对于动态路由参数，从同一个适配器包中导入 `useParams()`：
+
+```tsx
+import { useParams } from '@void/react';
+
+export default function PostPage() {
+  const { id } = useParams<{ id: string }>();
+  return <h1>文章 {id}</h1>;
+}
+```
+
+## 滚动位置恢复
+
+Void 会自动管理页面模式的滚动位置：
+
+- 后退 / 前进导航与刷新会恢复已保存的滚动位置。
+- 新的导航会滚动到页面顶部。
+- 锚点链接（`/docs#api`）会滚动到目标元素；同页锚点链接（`#section`）会完全跳过服务端请求。
+
+要保持当前滚动位置，传入 `preserveScroll: true`：
+
+```ts
+router.visit('/users', { preserveScroll: true });
+```
+
+`Link` 也接受 `preserveScroll`：
+
+```tsx
+<Link href="/users" preserveScroll>
+  用户
+</Link>
+```
+
+```vue
+<Link href="/users" preserve-scroll>用户</Link>
+```
+
+```svelte
+<Link href="/users" preserveScroll>用户</Link>
+```
+
+```tsx
+<Link href="/users" preserveScroll>
+  用户
+</Link>
+```
+
+<Callout type="tip">
+  页面模式是可选的。如果你更喜欢自己的客户端状态方案，可以只用[服务端路由](/docs/server-routing)配合[类型化
+  fetch](/docs/typed-fetch)。
+</Callout>

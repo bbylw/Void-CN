@@ -1,0 +1,84 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Icon from '../components/Icon.astro';
+import SearchDialog from '../components/react/SearchDialog';
+import { DOCS_NAV } from '../data/site';
+
+const popular = [
+  { title: '快速开始', href: '/docs/quickstart' },
+  { title: '服务端路由', href: '/docs/server-routing' },
+  { title: '数据库', href: '/docs/database' },
+  { title: '部署', href: '/docs/deployment' },
+];
+---
+
+<BaseLayout title="页面不存在" description="你访问的页面不存在或已被移动。" noindex>
+  <SiteHeader />
+
+  <main id="main" class="relative overflow-hidden">
+    <div
+      class="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_60%_50%_at_50%_30%,#000,transparent_75%)]"
+      aria-hidden="true"
+    >
+    </div>
+
+    <div
+      class="relative mx-auto flex max-w-[44rem] flex-col items-center px-4 py-24 text-center sm:px-6 sm:py-32"
+    >
+      <p
+        class="font-mono text-[clamp(4rem,12vw,7rem)] leading-none font-[700] tracking-[-0.04em] text-gradient"
+        aria-hidden="true"
+      >
+        404
+      </p>
+
+      <h1 class="mt-6 text-[1.6rem] font-[680] tracking-[-0.02em] sm:text-[2rem]">
+        这里什么都没有
+      </h1>
+      <p class="mt-4 max-w-[38ch] text-[1rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        页面可能已被移动或重命名。试试站内搜索，或从下面的常用入口开始。
+      </p>
+
+      <div class="mt-8 w-full max-w-[26rem]">
+        <SearchDialog client:load />
+      </div>
+
+      <ul class="mt-8 flex flex-wrap items-center justify-center gap-2">
+        {
+          popular.map((p) => (
+            <li>
+              <a
+                href={p.href}
+                class="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-[0.85rem] transition-all hover:-translate-y-0.5"
+                style="border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-muted)"
+              >
+                {p.title}
+                <Icon name="arrowRight" class="size-3" />
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+
+      <div class="mt-14 w-full border-t pt-8" style="border-color:var(--c-line)">
+        <p class="eyebrow">全部文档</p>
+        <nav
+          class="mt-4 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[0.85rem]"
+          aria-label="文档"
+        >
+          {
+            DOCS_NAV.flatMap((g) => g.items).map((i) => (
+              <a href={i.href} class="link-underline" style="color:var(--c-fg-muted)">
+                {i.title}
+              </a>
+            ))
+          }
+        </nav>
+      </div>
+    </div>
+  </main>
+
+  <SiteFooter />
+</BaseLayout>

@@ -1,0 +1,103 @@
+---
+title: KV 键值存储
+description: 用 void/kv 的 kv 在 Cloudflare Workers KV 中读写数据。值以 JSON 存储，kv.map() 为集合提供独立的前缀与值类型。
+group: 数据
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 基本操作
+
+### 读取
+
+```ts
+import { kv } from 'void/kv';
+
+const user = await kv.get<User>('user:123');
+// User | null
+```
+
+<Callout type="info" title="JSON 解析">
+  值会被自动解析为 JSON。如果存储的值不是合法 JSON，则返回原始字符串。
+</Callout>
+
+### 写入
+
+```ts
+await kv.put('user:123', { name: 'Alice', role: 'admin' });
+```
+
+包括字符串在内的所有值都会被 JSON 序列化。读取时类型会被保留，因此 `"123"` 或 `"null"` 这样的字符串仍会作为字符串返回。
+
+添加 TTL（秒）或绝对过期时间（Unix 时间戳）：
+
+```ts
+await kv.put('session:abc', sessionData, { ttl: 3600 });
+await kv.put('token:xyz', tokenData, { expiration: 1700000000 });
+```
+
+为 key 附加元数据：
+
+```ts
+await kv.put('user:123', userData, {
+  metadata: { updatedBy: 'admin' },
+});
+```
+
+### 删除
+
+```ts
+await kv.delete('user:123');
+```
+
+### 列举
+
+```ts
+const result = await kv.list({ prefix: 'user:' });
+// { keys: [{ name: "user:1" }, { name: "user:2" }], list_complete: true }
+```
+
+用 `limit` 与 `cursor` 分页：
+
+```ts
+const page = await kv.list({ prefix: 'user:', limit: 100 });
+if (!page.list_complete) {
+  const next = await kv.list({ prefix: 'user:', limit: 100, cursor: page.cursor });
+}
+```
+
+### 带元数据读取
+
+```ts
+const result = await kv.getWithMetadata<User, { updatedBy: string }>('user:123');
+// { value: User | null, metadata: { updatedBy: string } | null }
+```
+
+## 类型化 Map
+
+对于同类型的集合，用 `kv.map()` 创建一个带作用域、带类型且自动加前缀的客户端：
+
+```ts
+const sessions = kv.map<Session>('sessions');
+
+await sessions.put('abc', { userId: 1, token: '...' }, { ttl: 3600 });
+// KV key: "sessions:abc"
+
+const session = await sessions.get('abc');
+// Session | null
+
+await sessions.delete('abc');
+```
+
+Map 会自动为所有 key 加上 `"sessions:"` 前缀，并在列举时去掉该前缀：
+
+```ts
+const result = await sessions.list();
+// keys: [{ name: "abc" }, { name: "def" }]（前缀已被去除）
+```
+
+Map 与基础客户端方法完全相同（`get`、`put`、`delete`、`list`、`getWithMetadata`），只是值类型被固定且前缀自动处理。
+
+<Callout type="tip">
+  需要超出这个客户端能力的操作时，在路由处理器中访问原始的 `KVNamespace`：`c.env.KV`。
+</Callout>

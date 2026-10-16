@@ -1,0 +1,68 @@
+---
+const words = [
+  'D1',
+  'PostgreSQL',
+  'MySQL',
+  'KV',
+  'R2 对象存储',
+  'Queues',
+  'Durable Objects',
+  'Workers AI',
+  'WebSockets',
+  'SSE',
+  'Cron',
+  'Hyperdrive',
+  'Better Auth',
+  'Hono',
+  'ISR 增量静态再生',
+];
+
+const loop = [...words, ...words];
+---
+
+<div
+  class="relative flex overflow-hidden border-y py-4"
+  style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+  aria-hidden="true"
+>
+  <div class="flex shrink-0 animate-[var(--animate-marquee)] items-center">
+    {
+      loop.map((w) => (
+        <span class="flex items-center">
+          <span
+            class="px-6 font-mono text-[0.8rem] whitespace-nowrap"
+            style="color:var(--c-fg-subtle)"
+          >
+            {w}
+          </span>
+          <span class="size-1 rounded-full" style="background:var(--c-line-strong)" />
+        </span>
+      ))
+    }
+  </div>
+  <div class="flex shrink-0 animate-[var(--animate-marquee)] items-center" aria-hidden="true">
+    {
+      loop.map((w) => (
+        <span class="flex items-center">
+          <span
+            class="px-6 font-mono text-[0.8rem] whitespace-nowrap"
+            style="color:var(--c-fg-subtle)"
+          >
+            {w}
+          </span>
+          <span class="size-1 rounded-full" style="background:var(--c-line-strong)" />
+        </span>
+      ))
+    }
+  </div>
+  <div
+    class="pointer-events-none absolute inset-y-0 left-0 w-24"
+    style="background:linear-gradient(90deg,var(--c-bg-sunken),transparent)"
+  >
+  </div>
+  <div
+    class="pointer-events-none absolute inset-y-0 right-0 w-24"
+    style="background:linear-gradient(270deg,var(--c-bg-sunken),transparent)"
+  >
+  </div>
+</div>

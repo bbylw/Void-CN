@@ -1,0 +1,234 @@
+---
+import Icon from '../Icon.astro';
+import Section from '../Section.astro';
+
+const rows: { feature: string; cf: string | boolean; platform: string | boolean }[] = [
+  { feature: '静态站点、SPA 与原生页面 SSR', cf: true, platform: true },
+  { feature: '路由规则、WebSocket、队列、Cron 与 ISR', cf: true, platform: true },
+  { feature: 'D1、KV、R2 与经 Hyperdrive 的外部 SQL', cf: true, platform: true },
+  { feature: 'Workers AI 与第三方模型请求', cf: '你的账户与网关', platform: '安装方网关与代理' },
+  { feature: '运行时日志', cf: 'Cloudflare 实时 tail', platform: '保留的平台日志' },
+  { feature: '应用回滚', cf: 'Worker 版本', platform: '保留的平台部署记录' },
+  { feature: '带类型的 Durable State 与原生 Durable Objects', cf: true, platform: true },
+  { feature: '沙箱', cf: '需要 Workers Paid 与 Docker', platform: '需要平台账户为 Workers Paid' },
+  { feature: '自定义应用域名', cf: true, platform: '核心安装不包含' },
+  { feature: '用户后台与托管的 GitHub 构建', cf: '不需要', platform: '标准安装不包含' },
+];
+---
+
+<Section
+  id="deploy"
+  eyebrow="部署目标"
+  title="部署到**自己的账户**，或**团队平台**"
+  lead="两种目标使用完全相同的应用 API。选择自托管的 Void 平台，可以获得共享访问控制、保留的部署历史与后台管理。"
+>
+  <div class="mt-14 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6">
+    <div class="card card-hover flex flex-col p-6 sm:p-8">
+      <div class="flex items-center gap-3">
+        <span
+          class="grid size-10 place-items-center rounded-xl border"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-amber)"
+        >
+          <Icon name="bolt" class="size-[1.15rem]" />
+        </span>
+        <div>
+          <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+            Cloudflare
+          </h3>
+          <p class="font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">
+            --platform cloudflare
+          </p>
+        </div>
+      </div>
+      <p class="mt-4 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        部署到你自己的 Cloudflare 账户。适合个人项目、独立产品，以及希望完全掌控账户与账单的场景。
+      </p>
+      <div
+        class="mt-5 overflow-hidden rounded-[0.85rem] border p-3.5 font-mono text-[0.76rem] leading-[1.9]"
+        style="border-color:var(--c-line);background:var(--c-bg-sunken);color:var(--c-fg-muted)"
+      >
+        <div>
+          <span style="color:var(--c-fg-subtle)">$</span> void connect --platform cloudflare
+        </div>
+        <div><span style="color:var(--c-fg-subtle)">$</span> void deploy</div>
+      </div>
+      <ul
+        class="mt-5 space-y-2 border-t pt-5 text-[0.86rem]"
+        style="border-color:var(--c-line);color:var(--c-fg-muted)"
+      >
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-amber)"
+          ></span>
+          资源直接开通在你的账户中
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-amber)"
+          ></span>
+          支持自定义应用域名
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-amber)"
+          ></span>
+          日志使用 Cloudflare 实时 tail
+        </li>
+      </ul>
+    </div>
+
+    <div class="card card-hover relative flex flex-col overflow-hidden p-6 sm:p-8">
+      <div
+        class="pointer-events-none absolute inset-x-0 -top-px h-px"
+        style="background:linear-gradient(90deg,transparent,var(--c-violet),transparent)"
+        aria-hidden="true"
+      >
+      </div>
+      <div class="flex items-center gap-3">
+        <span
+          class="grid size-10 place-items-center rounded-xl border"
+          style="border-color:color-mix(in oklab, var(--c-violet) 32%, transparent);background:color-mix(in oklab, var(--c-violet) 11%, transparent);color:var(--c-violet)"
+        >
+          <Icon name="globe" class="size-[1.15rem]" />
+        </span>
+        <div>
+          <h3 class="text-[1.15rem] font-[640] tracking-[-0.02em]" style="color:var(--c-fg)">
+            Void 平台
+          </h3>
+          <p class="font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">--platform void</p>
+        </div>
+        <span
+          class="ml-auto rounded-full border px-2 py-0.5 font-mono text-[0.6rem] uppercase"
+          style="border-color:color-mix(in oklab, var(--c-violet) 35%, transparent);color:var(--c-violet)"
+          >团队</span
+        >
+      </div>
+      <p class="mt-4 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+        在你的 Cloudflare 账户中安装一套共享环境，供团队或客户使用。开发者连接它的
+        URL、登录，然后部署自己的应用。
+      </p>
+      <div
+        class="mt-5 overflow-hidden rounded-[0.85rem] border p-3.5 font-mono text-[0.76rem] leading-[1.9]"
+        style="border-color:var(--c-line);background:var(--c-bg-sunken);color:var(--c-fg-muted)"
+      >
+        <div><span style="color:var(--c-fg-subtle)">$</span> void connect platform.example.com</div>
+        <div>
+          <span style="color:var(--c-fg-subtle)">$</span> void deploy --platform void --project my-app
+        </div>
+      </div>
+      <ul
+        class="mt-5 space-y-2 border-t pt-5 text-[0.86rem]"
+        style="border-color:var(--c-line);color:var(--c-fg-muted)"
+      >
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          ></span>
+          访问控制、资源限额与用量统计
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          ></span>
+          保留的部署历史与平台日志
+        </li>
+        <li class="flex items-start gap-2">
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
+          ></span>
+          关联应用可请求用户授权部署
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 对比表 -->
+  <div
+    class="mt-4 overflow-hidden rounded-[var(--radius-card)] border"
+    style="border-color:var(--c-line)"
+  >
+    <div class="overflow-x-auto scroll-thin">
+      <table class="w-full min-w-[38rem] border-collapse text-left">
+        <thead>
+          <tr style="background:var(--c-surface-2)">
+            <th
+              class="border-b px-4 py-3 text-[0.78rem] font-semibold whitespace-nowrap"
+              style="border-color:var(--c-line);color:var(--c-fg)">能力</th
+            >
+            <th
+              class="border-b px-4 py-3 text-[0.78rem] font-semibold whitespace-nowrap"
+              style="border-color:var(--c-line);color:var(--c-fg)">Cloudflare</th
+            >
+            <th
+              class="border-b px-4 py-3 text-[0.78rem] font-semibold whitespace-nowrap"
+              style="border-color:var(--c-line);color:var(--c-fg)">核心自托管平台</th
+            >
+          </tr>
+        </thead>
+        <tbody>
+          {
+            rows.map((r, i) => (
+              <tr
+                style={
+                  i % 2 ? 'background:color-mix(in oklab, var(--c-fg) 2%, transparent)' : undefined
+                }
+              >
+                <td
+                  class="border-b px-4 py-3 text-[0.86rem]"
+                  style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-muted)' }}
+                >
+                  {r.feature}
+                </td>
+                <td
+                  class="border-b px-4 py-3 text-[0.85rem] whitespace-nowrap"
+                  style="border-color:var(--c-line)"
+                >
+                  {typeof r.cf === 'boolean' ? (
+                    r.cf ? (
+                      <span
+                        class="inline-flex items-center"
+                        style="color:var(--c-violet)"
+                        role="img"
+                        aria-label="支持"
+                        title="支持"
+                      >
+                        <Icon name="check" class="size-4" strokeWidth={2.2} />
+                      </span>
+                    ) : (
+                      <span style="color:var(--c-fg-subtle)">—</span>
+                    )
+                  ) : (
+                    <span style="color:var(--c-fg-muted)">{r.cf}</span>
+                  )}
+                </td>
+                <td
+                  class="border-b px-4 py-3 text-[0.85rem] whitespace-nowrap"
+                  style="border-color:var(--c-line)"
+                >
+                  {typeof r.platform === 'boolean' ? (
+                    r.platform ? (
+                      <span
+                        class="inline-flex items-center"
+                        style="color:var(--c-violet)"
+                        role="img"
+                        aria-label="支持"
+                        title="支持"
+                      >
+                        <Icon name="check" class="size-4" strokeWidth={2.2} />
+                      </span>
+                    ) : (
+                      <span style="color:var(--c-fg-subtle)">—</span>
+                    )
+                  ) : (
+                    <span style="color:var(--c-fg-muted)">{r.platform}</span>
+                  )}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p class="mt-4 text-[0.8rem] leading-relaxed" style="color:var(--c-fg-subtle)">
+    团队平台需要 Workers for Platforms 与相应的基础设施；具体功能取决于安装时的配置。
+    <a href="/docs/platform" class="link-underline" style="color:var(--c-fg-muted)"
+      >阅读平台安装指南 →</a
+    >
+  </p>
+</Section>

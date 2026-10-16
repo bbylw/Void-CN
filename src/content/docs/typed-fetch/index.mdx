@@ -1,0 +1,113 @@
+---
+title: 类型化 fetch
+description: 从 void/client 导入 fetch，获得路由自动补全、请求体检查与推断的响应类型。
+group: 数据
+---
+
+import Callout from '@/components/docs/Callout.astro';
+import ApiTable from '@/components/docs/ApiTable.astro';
+
+## 基本用法
+
+```ts
+import { fetch } from 'void/client';
+
+// GET：返回类型由你的处理器推断
+const users = await fetch('/api/users');
+
+// POST：请求体按处理器的校验器做类型检查
+await fetch('/api/users', {
+  method: 'POST',
+  body: { name: 'Alice', email: 'alice@example.com' },
+});
+
+// 动态参数按路由模式插入
+const user = await fetch('/api/users/:id', {
+  params: { id: '42' },
+});
+```
+
+## 哪些内容会被检查
+
+客户端会约束请求的每一个部分：
+
+- **路径**：只接受 `routes/` 中定义过的路由。拼写错误会在编译期失败。
+- **方法**：只允许路由文件导出的方法。如果文件只导出 `GET`，传入 `method: "POST"` 会报错。
+- **body、query、params**：当处理器使用 `defineHandler.withValidator()` 时，校验器 schema 成为输入类型，客户端会在调用处强制检查。
+- **响应类型**：与处理器经过 JSON 序列化后返回的类型一致。
+
+## 查询参数
+
+GET 请求通过 `query` 传入搜索参数：
+
+```ts title="routes/api/search.ts"
+export const GET = defineHandler.withValidator({
+  query: z.object({ q: z.string(), page: z.string().optional() }),
+})((c, { query }) => {
+  return { results: [], term: query.q };
+});
+```
+
+```ts
+const data = await fetch('/api/search', {
+  query: { q: 'hello' },
+});
+// data: { results: never[]; term: string }
+```
+
+## 错误处理
+
+非 2xx 响应会抛出 `FetchError`：
+
+```ts
+import { fetch, FetchError } from 'void/client';
+
+try {
+  await fetch('/api/users/:id', { params: { id: '999' } });
+} catch (e) {
+  if (e instanceof FetchError) {
+    console.log(e.status); // 404
+    console.log(e.data); // 已解析的响应体
+    console.log(e.response); // 原始 Response
+  }
+}
+```
+
+## 选项
+
+<ApiTable
+  rows={[
+    { name: 'method', type: 'string', description: 'HTTP 方法，默认 GET', default: '"GET"' },
+    { name: 'body', type: 'object', description: '请求体（自动序列化为 JSON）' },
+    { name: 'query', type: 'Record<string, string>', description: '查询字符串参数' },
+    { name: 'params', type: 'Record<string, string>', description: 'URL 路径参数（`:id` 片段）' },
+    { name: 'headers', type: 'HeadersInit', description: '额外的请求头' },
+    { name: 'signal', type: 'AbortSignal', description: '中止信号' },
+    { name: 'baseURL', type: 'string', description: '拼在路径前的 base URL，便于调用外部服务' },
+    { name: 'retry', type: 'number', description: '重试次数（GET 默认重试 1 次）', default: '1' },
+    { name: 'timeout', type: 'number', description: '请求超时时间（毫秒）' },
+  ]}
+/>
+
+## SSR 期间的同构 fetch
+
+`fetch()` 在服务端渲染与路由处理器中同样可用。调用你自己的应用时不会产生 HTTP 往返：
+
+```ts title="src/main.ssr.tsx"
+import { fetch } from 'void/client';
+import { defineRender } from 'void';
+
+export default defineRender(async (c, assetTags) => {
+  // 这里直接调用你的 API 路由，没有任何 HTTP 请求
+  const data = await fetch('/api/users');
+
+  const html = renderToString(<App users={data} />);
+  return new Response(html, {
+    headers: { 'content-type': 'text/html' },
+  });
+});
+```
+
+<Callout type="tip" title="请求头转发">
+  服务端调用会转发传入请求的 cookie 与 authorization 头。显式传入的头优先。
+</Callout>

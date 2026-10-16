@@ -1,0 +1,163 @@
+---
+import Icon from '../components/Icon.astro';
+import DocsSidebar from '../components/docs/DocsSidebar.astro';
+import DocsToc from '../components/docs/DocsToc.astro';
+import DocsPager from '../components/docs/DocsPager.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import BaseLayout from './BaseLayout.astro';
+import { SITE } from '../data/site';
+
+interface Heading {
+  depth: number;
+  slug: string;
+  text: string;
+}
+
+interface Props {
+  title: string;
+  description?: string;
+  headings: Heading[];
+  prev?: { title: string; href: string };
+  next?: { title: string; href: string };
+  badge?: string;
+  readingTime?: string;
+}
+
+const { title, description, headings, prev, next, badge, readingTime } = Astro.props;
+const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
+---
+
+<BaseLayout title={title} description={description ?? SITE.description} type="article">
+  <SiteHeader />
+
+  <div class="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10">
+    <div class="flex gap-10 xl:gap-14">
+      <!-- 侧边栏 -->
+      <aside
+        class="sticky top-16 hidden h-[calc(100dvh-4rem)] w-[16.5rem] shrink-0 overflow-y-auto py-8 pr-1 lg:block scroll-thin"
+        data-docs-sidebar
+      >
+        <DocsSidebar currentPath={Astro.url.pathname} />
+      </aside>
+
+      <!-- 正文 -->
+      <main id="main" class="min-w-0 flex-1 py-10 lg:py-12">
+        <article class="max-w-[46rem]">
+          <nav
+            aria-label="面包屑"
+            class="mb-5 flex items-center gap-1.5 font-mono text-[0.7rem]"
+            style="color:var(--c-fg-subtle)"
+          >
+            <a href="/docs" class="transition-colors hover:text-[color:var(--c-fg)]">文档</a>
+            <Icon name="chevronRight" class="size-3 opacity-50" />
+            <span class="truncate" style="color:var(--c-fg-muted)">{title}</span>
+          </nav>
+
+          <header class="border-b pb-8" style="border-color:var(--c-line)">
+            <div class="flex flex-wrap items-center gap-2.5">
+              <h1
+                class="text-[2.1rem] leading-[1.12] font-[680] tracking-[-0.03em] sm:text-[2.6rem]"
+              >
+                {title}
+              </h1>
+              {
+                badge && (
+                  <span
+                    class="rounded-full border px-2 py-0.5 font-mono text-[0.62rem] leading-none font-medium"
+                    style="border-color:color-mix(in oklab, var(--c-violet) 40%, transparent);color:var(--c-violet)"
+                  >
+                    {badge}
+                  </span>
+                )
+              }
+            </div>
+            {
+              description && (
+                <p class="mt-4 text-[1.05rem] leading-relaxed" style="color:var(--c-fg-muted)">
+                  {description}
+                </p>
+              )
+            }
+            {
+              readingTime && (
+                <p class="mt-4 font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">
+                  预计阅读 {readingTime}
+                </p>
+              )
+            }
+          </header>
+
+          <div class="prose-void pt-2">
+            <slot />
+          </div>
+
+          <DocsPager prev={prev} next={next} />
+        </article>
+      </main>
+
+      <!-- 目录 -->
+      <aside
+        class="sticky top-16 hidden h-[calc(100dvh-4rem)] w-[15rem] shrink-0 overflow-y-auto py-12 xl:block scroll-thin"
+      >
+        <DocsToc headings={tocHeadings} />
+      </aside>
+    </div>
+  </div>
+
+  <!-- 移动端：目录抽屉 -->
+  <div class="fixed bottom-5 left-5 z-40 xl:hidden">
+    <details class="group">
+      <summary
+        class="flex cursor-pointer list-none items-center gap-2 rounded-full border px-3.5 py-2 text-[0.78rem] font-medium shadow-[var(--shadow-card)]"
+        style="border-color:var(--c-line-strong);background:var(--c-surface);color:var(--c-fg);backdrop-filter:blur(12px)"
+      >
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width={1.7}
+          stroke-linecap="round"
+          class="size-3.5"
+          aria-hidden="true"
+        >
+          <path d="M3.5 5.5h13M3.5 10h9M3.5 14.5h13"></path>
+        </svg>
+        目录
+      </summary>
+      <div
+        class="absolute bottom-12 left-0 max-h-[60dvh] w-[min(21rem,calc(100vw-2.5rem))] overflow-y-auto rounded-[var(--radius-card)] border p-3 shadow-[var(--shadow-pop)] scroll-thin"
+        style="border-color:var(--c-line-strong);background:var(--c-surface)"
+      >
+        <p class="eyebrow px-2 pt-1 pb-2">本页目录</p>
+        <DocsToc headings={tocHeadings} nested />
+        <p class="eyebrow px-2 pt-4 pb-2">全部文档</p>
+        <DocsSidebar currentPath={Astro.url.pathname} compact />
+      </div>
+    </details>
+  </div>
+
+  <SiteFooter />
+</BaseLayout>
+
+<style>
+  article :global(h2 > a),
+  article :global(h3 > a) {
+    color: inherit;
+    text-decoration: none;
+  }
+  article :global(h2 > a::before),
+  article :global(h3 > a::before) {
+    content: '#';
+    position: absolute;
+    margin-left: -1.15em;
+    color: var(--c-fg-subtle);
+    opacity: 0;
+    font-weight: 400;
+    transition: opacity 0.2s ease;
+  }
+  article :global(h2:hover > a::before),
+  article :global(h3:hover > a::before) {
+    opacity: 0.7;
+  }
+</style>

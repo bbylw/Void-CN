@@ -1,0 +1,122 @@
+---
+title: 框架集成
+description: Void 可以部署基于 Vite 的元框架应用：框架负责路由与渲染，Void 负责绑定推断、类型化数据库查询、迁移与部署。
+group: 开发与部署
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 识别方式
+
+| 框架            | 通过哪个依赖识别        |
+| --------------- | ----------------------- |
+| TanStack Start  | `@tanstack/react-start` |
+| React Router v7 | `@react-router/dev`     |
+| SvelteKit       | `@sveltejs/kit`         |
+| Nuxt            | `nuxt`                  |
+| Analog          | `@analogjs/platform`    |
+| Astro           | `astro`                 |
+
+把 `voidPlugin()` 加进框架的 Vite 配置即可获得全部能力：
+
+```ts
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  plugins: [voidPlugin()],
+});
+```
+
+## 能力与限制
+
+| 能力                                       | 框架模式             |
+| ------------------------------------------ | -------------------- |
+| 绑定推断（D1、KV、R2、队列、AI…）          | 支持                 |
+| 带类型的数据库代码生成与查询               | 支持                 |
+| 迁移管理（`void db generate` / `migrate`） | 支持                 |
+| 定时任务与队列                             | 支持                 |
+| 缓存与路由规则                             | 支持                 |
+| 部署（Cloudflare 与 Void 平台）            | 支持                 |
+| 页面模式（loaders / actions）              | 不适用 —— 由框架负责 |
+| Void 托管的认证                            | 不支持               |
+
+<Callout type="warn" title="认证">
+  框架模式下不支持 Void 托管的认证。请使用 Better Auth 针对你的框架的官方集成。
+</Callout>
+
+## TanStack Start
+
+由 `@tanstack/react-start` 识别。在 TanStack Start 的 Vite 插件之后加入 `voidPlugin()`：
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+import tsConfigPaths from 'vite-tsconfig-paths';
+
+export default defineConfig({
+  plugins: [tsConfigPaths(), voidPlugin()],
+});
+```
+
+## React Router v7
+
+由 `@react-router/dev` 识别。把 `voidPlugin()` 加进 React Router 的 Vite 配置：
+
+```ts title="vite.config.ts"
+import { reactRouter } from '@react-router/dev/vite';
+import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  plugins: [tailwindcss(), voidPlugin(), reactRouter()],
+});
+```
+
+## SvelteKit
+
+由 `@sveltejs/kit` 识别。SvelteKit 2 在本地开发期间不支持 `cloudflare:workers` 导入，请使用 `void/db` 或框架自己的绑定访问 API；SvelteKit 3 支持这些导入。
+
+## Nuxt
+
+由 `nuxt` 识别。同样需要注意本地开发期间 `cloudflare:workers` 导入的限制，请使用 `void/db` 或框架的绑定访问 API。
+
+## Analog
+
+由 `@analogjs/platform` 识别。把 `voidPlugin()` 加进它的 Vite 配置即可获得绑定推断与迁移管理。
+
+## Astro
+
+由 `astro` 识别。Astro 的 `vite.plugins` 配置支持 `voidPlugin()`：
+
+```ts title="astro.config.mjs"
+import { defineConfig } from 'astro/config';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  vite: {
+    plugins: [voidPlugin()],
+  },
+});
+```
+
+<Callout type="tip" title="你正在读的这个站点">
+  本站本身就是一个使用 Astro + MDX + Tailwind CSS 构建的静态站点 ——
+  可以作为结构组织的参考，但它并不使用 Void 作为运行时。
+</Callout>
+
+## Hono
+
+Hono 不是元框架，而是 Void 路由层的底层。你可以直接使用 Hono 的生态包 —— 任何 `hono/*` 内置中间件或第三方包都能工作：
+
+```ts
+import { defineHandler } from 'void';
+import { cors } from 'hono/cors';
+
+export const GET = defineHandler(cors({ origin: 'https://app.example.com' }), (c) => ({
+  ok: true,
+}));
+```
+
+使用前请在应用中自行安装 `hono`：`npm install hono`。

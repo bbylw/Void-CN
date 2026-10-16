@@ -1,0 +1,236 @@
+---
+title: 服务端路由
+description: 在 routes/ 中新建一个文件即可添加端点。Void 使用 Hono 进行路由与中间件处理。
+group: 路由与渲染
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 路由文件
+
+在 `routes/**/*.ts` 中创建路由处理器。每个文件会根据它在文件系统中的位置映射到一个 URL 路径：
+
+```text title="routes/"
+├── api/
+│   └── hello.ts       → GET|POST /api/hello
+├── users/
+│   ├── index.ts       → GET|POST /api/users
+│   └── [id].ts        → GET|PUT|DELETE /api/users/:id
+└── search/
+    └── [...query].ts  → GET /api/search/*   （catch-all）
+```
+
+动态段使用方括号：`[id]` 会成为路由参数，`[...slug]` 会成为 catch-all。以 `_` 开头的文件或目录会被忽略。像 `(admin)` 这样用括号包裹的目录是路由组 —— 它们帮助整理文件，而不改变 URL。
+
+### 仅限某个环境的路由
+
+在扩展名之前添加 `.dev` 或 `.prod` 后缀，可以让一条路由只在某个环境中存在：
+
+```text title="routes/"
+├── api/
+│   ├── health.ts      → 始终存在
+│   ├── debug.dev.ts   → 仅开发环境
+│   └── metrics.prod.ts → 仅生产环境
+```
+
+`.dev` 路由只在开发时运行；`.prod` 路由会在构建、部署与生产预览中运行。只被 `.dev` 路由使用的资源不会在生产环境中开通。
+
+<Callout type="info" title="后缀的作用域">
+  这些后缀只作用于 `routes/`，不作用于 `pages/`、`middleware/`、`crons/` 或 `queues/`。`void
+  prepare` 会为两个环境都生成类型。
+</Callout>
+
+## 导出的方法
+
+每个文件导出具名的 HTTP 方法常量，用来处理特定方法：
+
+```ts title="routes/api/hello.ts"
+import { defineHandler } from 'void';
+
+export const GET = defineHandler((c) => {
+  return { message: 'Hello!', timestamp: Date.now() };
+});
+```
+
+一个文件可以导出多个方法：
+
+```ts title="routes/api/users/index.ts"
+import { defineHandler } from 'void';
+import { db } from 'void/db';
+import { users } from '@schema';
+
+export const GET = defineHandler(async () => {
+  return await db.select().from(users);
+});
+
+export const POST = defineHandler(async (c) => {
+  const body = await c.req.json();
+  await db.insert(users).values({ name: body.name });
+  return { created: true };
+});
+```
+
+使用 D1、PostgreSQL 或 MySQL 的查询参见[数据库](/docs/database)。
+
+## defineHandler
+
+处理器接收一个 Hono Context，其中 `c.env` 上带有类型化的 Cloudflare 绑定。你可以使用完整的 Hono API（`c.json()`、`c.text()`、`c.header()` 等）。
+
+返回值会被自动转换：
+
+| 返回值                      | 响应                       |
+| --------------------------- | -------------------------- |
+| 对象 / 数组 / 数字 / 布尔值 | JSON 响应                  |
+| 字符串                      | `text/html; charset=utf-8` |
+| `null` / `undefined`        | `204 No Content`           |
+| `Response`                  | 原样返回                   |
+
+## 校验
+
+`defineHandler.withValidator()` 为 `body`、`query` 与 `params` 添加输入校验。推荐的做法是从 Drizzle schema 派生校验器，这样校验规则能始终与数据库保持一致。
+
+```ts title="routes/api/users/index.ts"
+import { defineHandler } from 'void';
+import { db } from 'void/db';
+import { users, insertUserSchema } from '@schema';
+
+export const POST = defineHandler.withValidator({
+  body: insertUserSchema,
+})(async (c, { body }) => {
+  const [created] = await db.insert(users).values(body).returning();
+  return created;
+});
+```
+
+### 手写校验器
+
+对于不对应数据库表的端点，你可以用任何兼容 [Standard Schema](https://standardschema.dev) 的库（Valibot、Zod、ArkType 等）手写校验器：
+
+```ts
+import * as v from 'valibot';
+import { defineHandler } from 'void';
+
+export const POST = defineHandler.withValidator({
+  body: v.object({
+    query: v.pipe(v.string(), v.minLength(1)),
+    limit: v.optional(v.pipe(v.number(), v.maxValue(100)), 10),
+  }),
+})(async (c, { body }) => {
+  // body 的类型是 { query: string; limit: number }
+  return search(body.query, body.limit);
+});
+```
+
+校验失败时会返回 400，并附带结构化的错误详情：
+
+```json
+{
+  "error": "Validation failed",
+  "issues": [
+    {
+      "slot": "body",
+      "issues": [{ "message": "Invalid email", "path": "email" }]
+    }
+  ]
+}
+```
+
+<Callout type="tip">
+  安装你选择的校验库即可；不需要额外的 Standard Schema 依赖。校验器 schema 同时也为[类型化
+  fetch](/docs/typed-fetch) 提供类型，因此 `body`、`query` 与 `params` 的类型会在调用处被强制检查。
+</Callout>
+
+## 中间件
+
+Void 使用 Hono 中间件。`defineMiddleware()` 为常见的 `(c, next)` 函数补上类型，而 `defineHandler()` 也接受原生的 Hono 中间件。
+
+```ts
+import { defineMiddleware } from 'void';
+
+export const addServerTiming = defineMiddleware(async (c, next) => {
+  const start = performance.now();
+  await next();
+  c.header('Server-Timing', `app;dur=${Math.round(performance.now() - start)}`);
+});
+```
+
+任何 `hono/*` 内置中间件、响应助手或第三方 Hono 生态包都可以在 Void 应用中使用。如果你想在应用中从 `hono/*` 导入，请先自行安装 `hono`：
+
+```bash
+npm install hono
+```
+
+```ts
+import { cors } from 'hono/cors';
+
+const allowDashboard = cors({ origin: 'https://app.example.com' });
+```
+
+中间件可以全局应用，也可以按路由应用。
+
+### 全局中间件
+
+全局中间件会在每个请求上运行。把文件放在 `middleware/` 中，并用数字前缀控制顺序：
+
+```text title="middleware/"
+├── 01.logger.ts
+└── 02.auth.ts
+```
+
+```ts
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(async (c, next) => {
+  console.log(c.req.method, c.req.path);
+  await next();
+});
+```
+
+用 `basicAuth()` 可以为预览环境加一个临时的站点门禁。Void 保留的 `/__void` 端点仍然可访问，以支持部署与开发工具。凭据通过回调读取：
+
+```ts title="env.ts"
+import { defineEnv, string } from 'void/env';
+
+export default defineEnv({
+  BASIC_AUTH_USERNAME: string(),
+  BASIC_AUTH_PASSWORD: string(),
+});
+```
+
+```ts title="middleware/01.basic-auth.ts"
+import { basicAuth } from 'void';
+import { env } from 'void/env';
+
+export default basicAuth({
+  username: () => env.BASIC_AUTH_USERNAME,
+  password: () => env.BASIC_AUTH_PASSWORD,
+  realm: 'Preview',
+});
+```
+
+开发时把 `BASIC_AUTH_USERNAME` 与 `BASIC_AUTH_PASSWORD` 作为本地环境变量设置，部署前设置为生产密钥。
+
+对于健康检查或公开 webhook 这类需要绕过的场景，请在自己的中间件中组合好这段逻辑，再调用 `basicAuth()`。
+
+用 `c.set()` 与下游处理器共享数据。为 `c.get()` 补充类型的方式参见[上下文变量](/docs/type-safety#上下文变量)。
+
+### 按路由的中间件
+
+在最终处理器之前把中间件传给 `defineHandler`：
+
+```ts
+defineHandler(middleware1, middleware2, handler);
+```
+
+中间件按顺序运行。每个都可以短路（不调用 `next()` 就直接返回响应），也可以做后处理（`await next()` 之后修改响应）。`defineMiddleware` 包装过的函数与原生 Hono `MiddlewareHandler` 都可以传入。
+
+```ts title="routes/api/stats.ts"
+import { cors } from 'hono/cors';
+import { defineHandler } from 'void';
+
+export const GET = defineHandler(cors({ origin: 'https://app.example.com' }), (c) => ({
+  stats: '...',
+}));
+```
+
+在处理器之前最多可以传入 5 个中间件，每个位置都有完整的类型推断。

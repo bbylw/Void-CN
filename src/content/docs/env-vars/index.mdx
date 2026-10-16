@@ -1,0 +1,122 @@
+---
+title: 环境变量
+description: 在 env.ts 中声明环境变量，再通过 void/env 的 env 读取。本地值放在 .env，生产服务端值用 void secret put 设置。
+group: 数据
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 定义 schema
+
+在项目根目录创建 `env.ts`：
+
+```ts title="env.ts"
+import { defineEnv, number, string, url } from 'void/env';
+
+export default defineEnv({
+  DATABASE_URL: url(),
+  STRIPE_KEY: string(),
+  PORT: number().default(3000),
+  VITE_API_ORIGIN: url(),
+});
+```
+
+在应用中导入带类型的 env 对象：
+
+```ts
+import { env } from 'void/env';
+
+const databaseUrl = env.DATABASE_URL;
+```
+
+内置的辅助函数有 `string()`、`number()`、`boolean()`、`url()`、`email()`、`oneOf([...])` 与 `json<T>()`。它们都支持 `.optional()` 与 `.default(value)`。任何 Standard Schema 校验器也可以直接使用。
+
+<Callout type="warn" title="不要把凭据写进默认值">
+  默认值是源码中的常量，适合用于非敏感的兜底行为；不要把凭据放进 `default`。
+</Callout>
+
+## 本地开发
+
+把本地值放在项目根目录的单个 `.env` 文件中：
+
+```ini title=".env"
+DATABASE_URL=postgres://localhost/my-app
+STRIPE_KEY=sk_test_example
+VITE_API_ORIGIN=http://localhost:5173
+```
+
+<Callout type="info" title="解析规则">
+  未加引号的值在 `#` 处结束，`#` 之后开始注释。如果值本身包含 `#`，请加引号，例如
+  `DATABASE_URL="postgres://user:p#ss@localhost/my-app"`。
+</Callout>
+
+请把 `.env` 排除在 Git 之外。其他 dotenv 文件 —— 包括 `.env.local`、`.env.production`、`.env.example` 以及 Wrangler 的 `.dev.vars*` —— 都不受支持。
+
+以 `__VOID_` 开头的名称为 Void 保留。如果 `.env` 或 `env.ts` 定义了这类名称，Void 会直接报错退出。
+
+随时可以运行本地检查：
+
+```bash
+void env check
+```
+
+本地数据库、迁移、认证与开发服务器工具都读取同一个 `.env` 文件。Shell 中的环境变量优先级更高。
+
+## 生产服务端值
+
+Schema 中每个不是客户端前缀的 key 都是服务端值。在远端设置它们：
+
+```bash
+void secret put DATABASE_URL
+void secret put STRIPE_KEY
+```
+
+批量上传时，准备一个只包含生产服务端值的 dotenv 格式文件：
+
+```bash
+void secret sync production-secrets.txt
+```
+
+Secret 命令在上传前会用 `env.ts` 校验取值。生产值会被加密，并在 Worker 启动时再次校验。
+
+带客户端前缀的 key 会被 secret 命令拒绝。请把本地开发凭据与 `VITE_*` 值排除在生产密钥文件之外。
+
+`void deploy` 要求每个必填的服务端 key 在远端都存在。它绝不会上传 `.env` 中的值。
+
+直接部署到 Cloudflare 时使用同样的 secret 命令。Schema 中声明的服务端值必须是 Worker secret，而不是明文变量。
+
+## 客户端值
+
+以 `VITE_` 开头的 key 是客户端值，即使你的框架自定义了 Vite 的 `envPrefix` 也是如此。
+
+客户端值会被内联进浏览器 JavaScript，因此**永远不是密钥**。通过构建时的 shell 提供，或在 schema 中给出默认值：
+
+```bash
+VITE_API_ORIGIN=https://api.example.com void deploy
+```
+
+```ts
+export default defineEnv({
+  VITE_API_ORIGIN: url().default('https://api.example.com'),
+});
+```
+
+<Callout type="warn" title="构建会忽略 .env 中的客户端值">
+  这是为了防止开发者的本地值在不知情的情况下变成生产配置。
+</Callout>
+
+服务端渲染使用与浏览器相同的公开构建值。
+
+## 校验与脱敏
+
+```bash
+void env check              # 为本地开发校验 .env 与 shell
+void env check --remote     # 校验构建期客户端值与远端服务端名称
+void env types              # 重新生成 .void/env.d.ts
+```
+
+无效值的诊断信息默认会对取值脱敏。只有在有意进行本地调试时才设置 `VOID_ENV_UNMASK=1`；关闭脱敏时 Void 会打印一条提示。
+
+## env.ts 中的导入
+
+在 `env.ts` 内部使用相对导入或包名。TypeScript 路径别名以及需要 Vite 变换的导入不受支持。

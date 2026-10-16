@@ -1,0 +1,59 @@
+---
+import Icon from '../Icon.astro';
+
+interface Props {
+  prev?: { title: string; href: string };
+  next?: { title: string; href: string };
+}
+const { prev, next } = Astro.props;
+---
+
+<nav
+  aria-label="上一页 / 下一页"
+  class="mt-16 grid gap-3 border-t pt-8 sm:grid-cols-2"
+  style="border-color:var(--c-line)"
+>
+  {
+    prev ? (
+      <a href={prev.href} class="card card-hover group flex flex-col gap-1.5 p-4">
+        <span
+          class="flex items-center gap-1.5 font-mono text-[0.68rem] tracking-[0.14em] uppercase"
+          style="color:var(--c-fg-subtle)"
+        >
+          <Icon name="chevronRight" class="size-3 rotate-180" />
+          上一页
+        </span>
+        <span
+          class="text-[0.95rem] font-medium transition-colors group-hover:text-[color:var(--c-violet)]"
+          style="color:var(--c-fg)"
+        >
+          {prev.title}
+        </span>
+      </a>
+    ) : (
+      <div />
+    )
+  }
+  {
+    next && (
+      <a
+        href={next.href}
+        class="card card-hover group flex flex-col items-end gap-1.5 p-4 text-right"
+      >
+        <span
+          class="flex items-center gap-1.5 font-mono text-[0.68rem] tracking-[0.14em] uppercase"
+          style="color:var(--c-fg-subtle)"
+        >
+          下一页
+          <Icon name="chevronRight" class="size-3" />
+        </span>
+        <span
+          class="text-[0.95rem] font-medium transition-colors group-hover:text-[color:var(--c-violet)]"
+          style="color:var(--c-fg)"
+        >
+          {next.title}
+        </span>
+      </a>
+    )
+  }
+</nav>

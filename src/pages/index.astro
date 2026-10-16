@@ -1,0 +1,26 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import Hero from '../components/home/Hero.astro';
+import Marquee from '../components/home/Marquee.astro';
+import Toolchain from '../components/home/Toolchain.astro';
+import Capabilities from '../components/home/Capabilities.astro';
+import DeployTargets from '../components/home/DeployTargets.astro';
+import DocsEntry from '../components/home/DocsEntry.astro';
+import Cta from '../components/home/Cta.astro';
+---
+
+<BaseLayout>
+  <SiteHeader />
+  <main id="main">
+    <Hero />
+    <Marquee />
+    <Toolchain />
+    <Capabilities />
+    <DeployTargets />
+    <DocsEntry />
+    <Cta />
+  </main>
+  <SiteFooter />
+</BaseLayout>

@@ -1,0 +1,238 @@
+---
+import ShikiCode from '../ShikiCode.astro';
+import InstallTabs from '../InstallTabs.astro';
+import Icon from '../Icon.astro';
+import { SITE } from '../../data/site';
+
+const schemaCode = `// db/schema.ts —— 类型的唯一来源
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+});`;
+
+const routeCode = `// routes/api/users.ts → GET /api/users
+export const GET = defineHandler(() => db.select().from(users));
+//                       ↑ 返回类型由 schema 推断`;
+
+const clientCode = `// pages/dashboard/index.tsx
+const users = await fetch('/api/users');
+//    ^ { id: number; name: string; email: string }[]`;
+
+const COMMANDS = {
+  bun: 'bun add -D void && bunx void init',
+  npm: 'npm install -D void && npx void init',
+  pnpm: 'pnpm add -D void && pnpm void init',
+  yarn: 'yarn add -D void && yarn void init',
+};
+---
+
+<div class="aurora relative overflow-hidden" data-hero>
+  <div
+    class="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_85%_70%_at_50%_0%,#000_20%,transparent_72%)]"
+  >
+  </div>
+  <div
+    class="absolute inset-x-0 top-0 h-px"
+    style="background:linear-gradient(90deg,transparent,var(--c-line-strong),transparent)"
+    aria-hidden="true"
+  >
+  </div>
+
+  <div class="relative mx-auto max-w-[88rem] px-4 pt-14 pb-16 sm:px-6 sm:pt-20 lg:px-10 lg:pb-24">
+    <div
+      class="grid items-center gap-14 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:gap-14"
+    >
+      <!-- 左：文案 -->
+      <div class="min-w-0 max-w-[35rem]">
+        <a
+          href={SITE.upstreamGuide}
+          target="_blank"
+          rel="noreferrer noopener"
+          class="group inline-flex items-center gap-2 rounded-full border py-1 pr-3 pl-1.5 text-[0.78rem] transition-colors hover:border-[color:var(--c-line-strong)]"
+          style="border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-muted)"
+        >
+          <span
+            class="rounded-full px-2 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide"
+            style="background:color-mix(in oklab, var(--c-violet) 16%, transparent);color:var(--c-violet)"
+            >新</span
+          >
+          中文文档已上线，翻译自官方指南
+          <Icon
+            name="arrowUpRight"
+            class="size-3 opacity-60 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+          />
+        </a>
+
+        <h1 class="mt-7 text-display font-[700] text-gradient-soft">
+          全栈开发，<br />类型<span class="text-gradient">不断链</span>。
+        </h1>
+
+        <p class="mt-7 max-w-[32rem] text-[1.06rem] leading-[1.85]" style="color:var(--c-fg-muted)">
+          Void 是运行在 Cloudflare Workers 之上、由 <span style="color:var(--c-fg)">Vite</span> 驱动的全栈框架。
+          用 React、Vue、Svelte 或 Solid 构建界面，在同一个项目里编写服务端代码 —— 路由、数据访问与部署连成一条线，类型从数据库查询一路贯穿到
+          UI。
+        </p>
+
+        <div class="mt-9 flex flex-wrap items-center gap-3">
+          <a href="/docs/quickstart" class="btn btn-primary h-11 px-5 text-[0.9rem]">
+            快速开始
+            <Icon name="arrowRight" class="size-4" />
+          </a>
+          <a href="/docs" class="btn btn-ghost h-11 px-5 text-[0.9rem]">
+            <Icon name="book" class="size-4" />
+            阅读文档
+          </a>
+        </div>
+
+        <InstallTabs commands={COMMANDS} class="mt-8 max-w-[32rem]" />
+
+        <ul
+          class="mt-7 flex flex-wrap items-center gap-x-6 gap-y-2 text-[0.8rem]"
+          style="color:var(--c-fg-subtle)"
+        >
+          {
+            ['需要 Node.js 24.21.0+', 'MIT 许可证', '开源 · 本地优先'].map((item) => (
+              <li class="flex items-center gap-1.5">
+                <span
+                  class="size-1 rounded-full"
+                  style="background:var(--c-violet)"
+                  aria-hidden="true"
+                />
+                {item}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <!-- 右：类型管道 -->
+      <div class="relative min-w-0">
+        <div
+          class="card overflow-hidden !rounded-[var(--radius-panel)]"
+          style="box-shadow:var(--shadow-pop)"
+        >
+          <!-- 面板头 -->
+          <div
+            class="flex items-center gap-2.5 border-b px-4 py-2.5"
+            style="border-color:var(--c-line);background:var(--c-surface-2)"
+          >
+            <span class="flex gap-1.5" aria-hidden="true">
+              <i class="size-2 rounded-full" style="background:var(--c-line-strong)"></i>
+              <i class="size-2 rounded-full" style="background:var(--c-line-strong)"></i>
+              <i class="size-2 rounded-full" style="background:var(--c-line-strong)"></i>
+            </span>
+            <span class="font-mono text-[0.72rem] tracking-[0.1em]" style="color:var(--c-fg-muted)">
+              类型管道
+            </span>
+            <span
+              class="ml-auto flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[0.6rem] uppercase"
+              style="border-color:color-mix(in oklab, #3fb950 35%, transparent);color:#3fb950"
+            >
+              <span class="size-1 rounded-full bg-current"></span>
+              0 处手动标注
+            </span>
+          </div>
+
+          <!-- 段 1 -->
+          <section>
+            <header
+              class="flex items-center gap-2 px-4 pt-3.5 pb-1.5 font-mono text-[0.7rem]"
+              style="color:var(--c-fg-subtle)"
+            >
+              <span class="size-1.5 rounded-full" style="background:var(--c-cyan)"></span>
+              db/schema.ts
+              <span
+                class="ml-auto rounded border px-1.5 py-px text-[0.58rem] uppercase"
+                style="border-color:color-mix(in oklab, var(--c-cyan) 32%, transparent);color:var(--c-cyan)"
+                >真相来源</span
+              >
+            </header>
+            <div class="shiki-panel scroll-thin text-[0.755rem] leading-[1.62]">
+              <ShikiCode code={schemaCode} lang="ts" />
+            </div>
+          </section>
+
+          <!-- 连接 -->
+          <div
+            class="flex items-center gap-2.5 border-y px-4 py-1.5 font-mono text-[0.65rem]"
+            style="border-color:var(--c-line);background:color-mix(in oklab, var(--c-violet) 7%, transparent);color:var(--c-fg-subtle)"
+          >
+            <svg
+              viewBox="0 0 12 12"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              class="size-2.5 rotate-90"
+              aria-hidden="true"
+            >
+              <path d="M2 4.5 6 8.5 10 4.5"></path>
+            </svg>
+            类型流经处理器
+          </div>
+
+          <!-- 段 2 -->
+          <section>
+            <header
+              class="flex items-center gap-2 px-4 pt-3.5 pb-1.5 font-mono text-[0.7rem]"
+              style="color:var(--c-fg-subtle)"
+            >
+              <span class="size-1.5 rounded-full" style="background:var(--c-violet)"></span>
+              <span style="color:#7ee787">GET</span>
+              routes/api/users.ts
+            </header>
+            <div class="shiki-panel scroll-thin text-[0.755rem] leading-[1.62]">
+              <ShikiCode code={routeCode} lang="ts" />
+            </div>
+          </section>
+
+          <!-- 连接 -->
+          <div
+            class="flex items-center gap-2.5 border-y px-4 py-1.5 font-mono text-[0.65rem]"
+            style="border-color:var(--c-line);background:color-mix(in oklab, var(--c-cyan) 7%, transparent);color:var(--c-fg-subtle)"
+          >
+            <svg
+              viewBox="0 0 12 12"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              class="size-2.5 rotate-90"
+              aria-hidden="true"
+            >
+              <path d="M2 4.5 6 8.5 10 4.5"></path>
+            </svg>
+            客户端自动获得类型
+          </div>
+
+          <!-- 段 3 -->
+          <section>
+            <header
+              class="flex items-center gap-2 px-4 pt-3.5 pb-1.5 font-mono text-[0.7rem]"
+              style="color:var(--c-fg-subtle)"
+            >
+              <span class="size-1.5 rounded-full" style="background:var(--c-amber)"></span>
+              pages/dashboard/index.tsx
+              <span
+                class="ml-auto rounded border px-1.5 py-px text-[0.58rem] uppercase"
+                style="border-color:color-mix(in oklab, var(--c-amber) 32%, transparent);color:var(--c-amber)"
+                >client</span
+              >
+            </header>
+            <div class="shiki-panel scroll-thin text-[0.755rem] leading-[1.62]">
+              <ShikiCode code={clientCode} lang="ts" />
+            </div>
+          </section>
+        </div>
+
+        <!-- 浮动角标 -->
+        <div
+          class="absolute -bottom-4 -left-3 hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[0.62rem] xl:flex"
+          style="border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-subtle);box-shadow:var(--shadow-card)"
+        >
+          <Icon name="bolt" class="size-3" style="color:var(--c-violet)" />
+          改动字段 → 立即定位到受影响的代码
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

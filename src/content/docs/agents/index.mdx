@@ -1,0 +1,59 @@
+---
+title: 编程智能体
+description: void init 会在新项目中添加一份精简的 AGENTS.md，并为检测到的编程智能体链接打包好的技能。
+group: 开发与部署
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## AGENTS.md
+
+在**新建**项目中，初始化流程会写入一份精简的 `AGENTS.md`，其中包含 Void 的关键约定：
+
+- 项目结构：`routes/`、`pages/`、`db/`、`middleware/`、`crons/`、`queues/`、`env.ts`
+- 类型约定：不要手写接口，类型从 Drizzle schema 与处理器推断
+- 资源约定：导入即启用，不要手写 `wrangler.jsonc`
+- 命令约定：`void db generate`、`void deploy`、`void env check`
+
+在**已有**项目中，Void 不会直接覆盖你的指令文件 —— 它会先征求你的同意，再进行合并或替换。
+
+## 打包的技能
+
+Void 为检测到的编程智能体链接打包好的技能包，让智能体可以直接查询 Void 的 API、CLI 与最佳实践，而不依赖它事先记住这些内容。
+
+<Callout type="tip">
+  如果你使用的智能体不在自动检测范围内，可以手动指向随 `void` 包一起提供的 Markdown 指南与参考，位于
+  `node_modules/void/docs/`。
+</Callout>
+
+## 离线文档
+
+`void` 包自带完整的 Markdown 指南与参考：
+
+```text title="node_modules/void/docs/"
+├── guide/      指南
+└── reference/  参考
+```
+
+这让你可以在没有网络访问的环境中，也能让智能体查到准确的 API 与 CLI 用法。
+
+## 对智能体友好的 API 设计
+
+Void 的很多设计本身就是为了让编程智能体更容易写对：
+
+| 设计                 | 原因                                       |
+| -------------------- | ------------------------------------------ |
+| 文件即路由           | 智能体不需要维护一份路由表，只需创建文件   |
+| 类型从 schema 推断   | 不需要手写 DTO，编译错误会指出不一致的地方 |
+| 导入即启用资源       | 不需要生成或维护基础设施配置               |
+| `void init` 写入约定 | 智能体第一次打开项目就知道规则             |
+
+## 给智能体的建议
+
+在仓库的 `AGENTS.md` 中写清楚以下内容，可以显著提升智能体的产出质量：
+
+1. 项目使用的数据库方言（D1 / PostgreSQL / MySQL）与表结构约定
+2. 页面采用服务端渲染还是客户端渲染（是否导出 `ssr = false`）
+3. 认证方案与 `trustedOrigins` 的范围
+4. 部署目标（Cloudflare 直连还是团队平台）
+5. 提交前需要运行的检查：`void db generate`、`void env check`、`bun run build`

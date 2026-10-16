@@ -1,0 +1,26 @@
+---
+import { Code } from 'astro:components';
+import type { CodeLanguage } from 'astro';
+
+interface Props {
+  code: string;
+  lang?: string;
+  class?: string;
+}
+
+/**
+ * 统一的双主题代码高亮。
+ * - `themes` 由 Shiki 的 dual-theme 生成 `--shiki-light` / `--shiki-dark` 变量
+ * - 深色模式的切换由 global.css 中的 `.dark .astro-code` 规则完成（跟随站点主题而非系统偏好）
+ */
+const { code, lang = 'ts', class: className = '' } = Astro.props;
+---
+
+<Code
+  code={code}
+  lang={lang as CodeLanguage}
+  themes={{ light: 'github-light', dark: 'vesper' }}
+  defaultColor="light"
+  wrap
+  class={className}
+/>

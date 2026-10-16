@@ -1,0 +1,340 @@
+---
+title: 数据库
+description: 用 TypeScript 定义表，然后用 void/db 的 db 查询它们。Void 内置 Drizzle ORM，并为你配置好连接。
+group: 数据
+---
+
+import Callout from '@/components/docs/Callout.astro';
+import ApiTable from '@/components/docs/ApiTable.astro';
+
+```text title="db/"
+├── schema.ts            表定义（唯一真相来源）
+├── schema/              拆分 schema 文件（可选）
+│   ├── users.ts
+│   └── posts.ts
+├── migrations/          生成的 SQL 迁移文件
+│   ├── 20260410161500_create_users.sql
+│   └── 20260410161501_add_posts.sql
+├── seed.ts              程序化种子脚本（可选）
+└── seed.sql             原始 SQL 种子文件（可选替代）
+```
+
+## 选择方言
+
+在 `void init` 期间选择数据库，或在 `void.config.ts` 中设置 `database`：
+
+| 方言         | 配置                  | 托管方     | 连接方式       |
+| ------------ | --------------------- | ---------- | -------------- |
+| D1（SQLite） | 默认                  | Void 托管  | 自动的 D1 绑定 |
+| PostgreSQL   | `"database": "pg"`    | 自带数据库 | Hyperdrive     |
+| MySQL        | `"database": "mysql"` | 自带数据库 | Hyperdrive     |
+
+<Callout type="tip" title="Void 平台会关闭 Hyperdrive 查询缓存">
+  这样读取能反映已完成的写入。已有连接会在项目下一次部署时更新。
+</Callout>
+
+## 定义 schema
+
+在 `db/schema.ts` 中使用来自 `void/schema-d1`、`void/schema-pg` 或 `void/schema-mysql` 的列辅助函数定义表。
+
+```ts title="db/schema.ts (SQLite / D1)"
+import { sql } from 'void/db';
+import { sqliteTable, text, integer } from 'void/schema-d1';
+
+export const users = sqliteTable('users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  role: text('role').notNull().default('user'),
+  createdAt: text('created_at')
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+```
+
+```ts title="db/schema.ts (PostgreSQL)"
+import { pgTable, serial, text, timestamp } from 'void/schema-pg';
+
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  role: text('role').notNull().default('user'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+```
+
+```ts title="db/schema.ts (MySQL)"
+import { int, mysqlTable, text, timestamp } from 'void/schema-mysql';
+
+export const users = mysqlTable('users', {
+  id: int('id').autoincrement().primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+```
+
+schema 辅助函数已随 `void` 提供。你可以直接手写表，也可以用 `void gen model` 生成一个起点。
+
+你也可以把 schema 拆分到 `db/schema/` 下的多个文件，并从 barrel 文件重新导出：
+
+```ts title="db/schema/users.ts"
+export const users = /* ... */;
+```
+
+```ts title="db/schema.ts"
+export * from './schema/users';
+export * from './schema/posts';
+```
+
+## 查询
+
+Void 会从 `void/db` 重新导出所有常用的 Drizzle 查询运算符，因此你不需要单独安装 `drizzle-orm`。从 `void/db` 导入 `db`，从 `@schema` 导入你的表。
+
+<Callout type="info" title="@schema 是什么">
+  `@schema` 是 Void 插件自动配置的 Vite 路径别名，指向你的 `db/schema.ts`（或拆分后的
+  `db/schema/`）。你直接用它导入表定义即可。
+</Callout>
+
+```ts
+import { users } from '@schema';
+import { db } from 'void/db';
+
+const allUsers = await db.select().from(users);
+```
+
+### 筛选
+
+```ts
+import { users } from '@schema';
+import { db, eq, and, or } from 'void/db';
+
+// 单个条件
+const user = await db.select().from(users).where(eq(users.id, 1));
+
+// 多个条件
+const admins = await db
+  .select()
+  .from(users)
+  .where(and(eq(users.role, 'admin'), eq(users.name, 'Alice')));
+
+// 或条件
+const editors = await db
+  .select()
+  .from(users)
+  .where(or(eq(users.role, 'admin'), eq(users.role, 'editor')));
+```
+
+### 插入
+
+```ts
+// 单行
+await db.insert(users).values({
+  name: 'Alice',
+  email: 'alice@example.com',
+});
+
+// 插入并返回新建的行
+const [created] = await db
+  .insert(users)
+  .values({ name: 'Bob', email: 'bob@example.com' })
+  .returning();
+
+// 多行
+await db.insert(users).values([
+  { name: 'Alice', email: 'alice@example.com' },
+  { name: 'Bob', email: 'bob@example.com' },
+]);
+```
+
+### 更新与删除
+
+```ts
+await db.update(users).set({ role: 'admin' }).where(eq(users.id, 1));
+
+const [updated] = await db.update(users).set({ role: 'admin' }).where(eq(users.id, 1)).returning();
+
+await db.delete(users).where(eq(users.id, 1));
+```
+
+### 列选择、排序与分页
+
+```ts
+import { users } from '@schema';
+import { db, desc } from 'void/db';
+
+const names = await db.select({ name: users.name, email: users.email }).from(users);
+// names: { name: string; email: string }[]
+
+const page = await db.select().from(users).orderBy(desc(users.createdAt)).limit(10).offset(20);
+```
+
+### 关联
+
+```ts
+import { users, posts } from '@schema';
+import { db, eq } from 'void/db';
+
+const results = await db
+  .select({
+    id: posts.id,
+    title: posts.title,
+    author: users.name,
+  })
+  .from(posts)
+  .innerJoin(users, eq(posts.userId, users.id));
+```
+
+如果 schema 中定义了 `relations`，还可以使用 Drizzle 的关系查询 API：
+
+```ts
+const usersWithPosts = await db.query.users.findMany({
+  with: { posts: true },
+});
+```
+
+## 种子数据
+
+用 `void db seed` 重置本地数据库、重新应用迁移，然后运行一个种子文件。
+
+用 `db/seed.ts` 做程序化种子，用 `db/seed.sql` 写 SQL。JavaScript 以及 `.mts` / `.mjs` 文件同样可用。如果存在多个种子文件，用 `--file <path>` 选择其中一个。
+
+```ts title="db/seed.ts"
+import { defineSeed } from 'void/seed';
+
+export default defineSeed<typeof import('./schema')>(async ({ db, schema }) => {
+  const rows = Array.from({ length: 100 }, (_, i) => ({
+    text: `Seed message ${i + 1}`,
+  }));
+
+  await db.insert(schema.messages).values(rows);
+});
+```
+
+种子上下文包含：
+
+- `dialect`：`"sqlite"`、`"postgresql"` 或 `"mysql"`
+- `db`：指向本地数据库的 Drizzle 实例
+- `schema`：来自 `db/schema.ts` 或 `db/schema/` 的导出
+
+```sql title="db/seed.sql"
+INSERT INTO messages (text) VALUES ('Hello from SQL');
+```
+
+## 从 schema 派生校验器
+
+用 `void/drizzle-zod`、`void/drizzle-valibot` 或 `void/drizzle-arktype` 从表中派生请求校验器。在表定义之后添加它：
+
+```ts title="db/schema.ts"
+import { createInsertSchema } from 'void/drizzle-zod';
+
+export const insertUserSchema = createInsertSchema(users, {
+  name: (schema) => schema.min(1),
+  email: (schema) => schema.email(),
+});
+```
+
+```ts
+import { pipe, minLength, email } from 'valibot';
+import { createInsertSchema } from 'void/drizzle-valibot';
+
+export const insertUserSchema = createInsertSchema(users, {
+  name: (schema) => pipe(schema, minLength(1)),
+  email: (schema) => pipe(schema, email()),
+});
+```
+
+```ts
+import { type } from 'arktype';
+import { createInsertSchema } from 'void/drizzle-arktype';
+
+export const insertUserSchema = createInsertSchema(users, {
+  name: type('string > 0'),
+  email: type('string.email'),
+});
+```
+
+`createInsertSchema` 会生成与 `$inferInsert` 匹配的校验器：有默认值或自增的列变为可选，`NOT NULL` 列保持必填。可选的第二个参数让你逐列细化 —— 既可以传入一个接收生成 schema 的回调，也可以直接传入一个类型来覆盖某个字段。
+
+在[路由处理器](/docs/server-routing#校验)中用 `withValidator()` 使用派生的 schema。三个可用函数：
+
+| 函数                 | 用途                                             |
+| -------------------- | ------------------------------------------------ |
+| `createInsertSchema` | 校验插入数据，排除自动生成的列并应用默认值       |
+| `createSelectSchema` | 匹配查询结果行的结构                             |
+| `createUpdateSchema` | 与 insert 类似，但所有字段都是可选的（部分更新） |
+
+<Callout type="tip">
+  Void 已经打包了 Drizzle 适配器。如果你在 schema 文件中直接使用校验库自身的 API，请自行安装它：`npm
+  install zod` / `valibot` / `arktype`。
+</Callout>
+
+## CLI 命令
+
+| 命令               | 用途                                   |
+| ------------------ | -------------------------------------- |
+| `void db push`     | 在本地应用 schema 变更，不生成迁移文件 |
+| `void db generate` | 生成 SQL 迁移                          |
+| `void db migrate`  | 在本地应用待处理的迁移                 |
+| `void db status`   | 检查 schema 漂移与待处理迁移           |
+| `void db seed`     | 重置本地数据库并运行种子文件           |
+
+## 脚手架
+
+`void gen model` 会生成适配当前方言的 `sqliteTable`、`pgTable` 或 `mysqlTable` 定义：
+
+```bash
+void gen model posts title:string body:text published:boolean
+```
+
+它会创建：
+
+- `db/schema/posts.ts`：包含 `id`、`createdAt`、`updatedAt` 与你指定列的 Drizzle 表定义
+- 更新 `db/schema.ts`，加入 `export * from "./schema/posts"`
+- `routes/api/posts/index.ts`：列表 GET 与带校验的插入 POST
+- `routes/api/posts/[id].ts`：按 id 查询的 GET，带 404 处理
+
+## 手写迁移
+
+部署时，Void 会把 Drizzle schema 与 `db/migrations/meta/` 中的快照做比较。如果你有 SQL 迁移却没有这份元数据，运行 `void db generate` 会为同样的表再创建一个迁移。
+
+要保留已有的迁移历史：让 Drizzle schema 与你的 SQL 迁移所创建的表保持一致，在项目的一份临时副本中删除 `db/migrations/` 后运行 `void db generate`，再把生成的 `meta/` 目录复制回你的迁移目录。在 `_journal.json` 中，为每个已有的 SQL 文件按顺序替换条目，`idx` 从 0 连续递增，`tag` 为去掉 `.sql` 的文件名，`when` 使用递增的时间戳，`version` 使用生成条目的版本。快照文件重命名为 `<prefix>_snapshot.json`，其中 `<prefix>` 是最后一个迁移 tag 在第一个 `_` 之前的部分。例如 `001_create_users.sql` 对应 `001_snapshot.json`。
+
+<Callout type="warn" title="statement-breakpoint">
+  对于包含触发器的 D1 迁移，以及包含触发器、存储过程、函数或事件的 MySQL 迁移，请在每个完整 SQL
+  语句之后添加一行 `--&gt; statement-breakpoint`，包括触发器结尾的 `END;`。保持触发器主体完整。
+</Callout>
+
+## D1 的特别说明
+
+Void 在开通数据库时会启用 D1 读副本。通过 `void/db` 的 `db` 发出的查询，会为每个 Void 请求使用一个 D1 session，因此读取可以在靠近请求的位置执行，且同一请求中后续的查询能看到至少相同的数据。
+
+<Callout type="warn" title="关于读副本">
+  副本在请求之间可能存在延迟。认证会话检查始终从主库开始，因此被撤销的会话不会因为副本延迟而被接受。如果某次读取必须拿到最新的主库数据，请使用
+  `cloudflare:workers` 中的 `env.DB.withSession('first-primary')`。其他查询库与原生 D1
+  调用需要各自调用 `withSession()` 才能使用副本；裸的 D1 绑定始终从主库读取。
+</Callout>
+
+使用 `cloudflare:workers` 中的 `env.DB` 可以配合其他查询库或原生 D1 API：
+
+```ts title="Kysely"
+import { env } from 'cloudflare:workers';
+import { Kysely } from 'kysely';
+import { D1Dialect } from 'kysely-d1';
+
+const db = new Kysely<Database>({ dialect: new D1Dialect({ database: env.DB }) });
+```
+
+```ts title="原生 D1"
+import { env } from 'cloudflare:workers';
+
+const { results } = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).all();
+```
+
+无论使用哪种查询层，Void 仍然处理绑定推断与部署。
+
+<Callout type="info" title="元框架的限制">
+  Nuxt 与 SvelteKit 2 在本地开发期间不支持 `cloudflare:workers` 导入。请改用 `void/db`
+  或框架自己的绑定访问 API。SvelteKit 3 支持这些导入。
+</Callout>

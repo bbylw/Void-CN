@@ -1,0 +1,141 @@
+---
+title: 队列
+description: 用队列异步处理工作，例如发送邮件或处理上传。在 queues/ 中定义消费者，再从应用中发送带类型的消息。
+group: 后端能力
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 定义队列
+
+在 `queues/` 中创建消费者。支持 TypeScript 与 JavaScript 文件（`.ts`、`.mts`、`.js`、`.mjs`）。它的路径决定队列名：`queues/emails.ts` 创建 `emails`，`queues/order/notifications.ts` 创建 `order-notifications`。每个队列必须有唯一的名字。
+
+生成的队列名必须符合 Cloudflare 的队列命名规则：1–63 个字符，只包含字母、数字与 `-`，且以字母或数字开头和结尾。
+
+导出一个用 `defineQueue<T>` 包装的默认处理器。`T` 为消费者与 `send()` 调用同时定义消息体：
+
+```ts title="queues/emails.ts"
+import { defineQueue } from 'void';
+
+interface Message {
+  to: string;
+  subject: string;
+}
+
+export default defineQueue<Message>(async (batch, env) => {
+  for (const msg of batch.messages) {
+    console.log(`发送给 ${msg.body.to}：${msg.body.subject}`);
+    msg.ack(); // 确认处理成功
+  }
+});
+```
+
+以 `_` 开头的文件或目录会被忽略。
+
+## 发送消息
+
+从 `void/queues` 导入带类型的队列代理来发送消息。每个队列都作为与名字相同的属性提供，其类型完全来自消费者的 `defineQueue<T>` 泛型。
+
+```ts title="routes/api/orders.ts"
+import { defineHandler } from 'void';
+import { queues } from 'void/queues';
+
+export const POST = defineHandler(async (c) => {
+  const order = await c.req.json();
+  // 完全类型安全：body 必须匹配 queues/emails.ts 中的 Message 接口
+  await queues.emails.send({
+    to: order.email,
+    subject: '订单已确认',
+  });
+  return c.json({ ok: true });
+});
+```
+
+## 逐条消息确认
+
+批次中的每条消息都有与 Cloudflare Queues API 对应的 `ack()` 与 `retry()` 方法：
+
+```ts
+export default defineQueue<Message>(async (batch, env) => {
+  for (const msg of batch.messages) {
+    try {
+      await processMessage(msg.body);
+      msg.ack(); // 从队列中移除
+    } catch {
+      msg.retry({ delaySeconds: 30 }); // 30 秒后重新投递
+    }
+  }
+});
+```
+
+| 方法                       | 作用                                   |
+| -------------------------- | -------------------------------------- |
+| `msg.ack()`                | 确认消息并从队列中移除                 |
+| `msg.retry(options?)`      | 重试消息，可选 `{ delaySeconds }` 延迟 |
+| `batch.ackAll()`           | 确认批次中的所有消息                   |
+| `batch.retryAll(options?)` | 重试批次中的所有消息                   |
+
+每条消息以最先调用的为准。在 `retry()` 之后调用 `ack()`（或反过来）不会有任何效果。没有显式处理结果的消息，在处理器成功时会被确认，抛出异常时会被重试。
+
+每条消息的 `timestamp` 字段是一个 `Date` 对象。
+
+## 消费者选项
+
+导出具名常量来配置 Cloudflare 如何向你的消费者投递批次：
+
+```ts title="queues/emails.ts"
+import { defineQueue } from 'void';
+
+interface Message {
+  to: string;
+  subject: string;
+}
+
+export const maxBatchSize = 50;
+export const maxBatchTimeout = 10; // 秒
+export const maxRetries = 5;
+export const retryDelay = 30; // 秒
+
+export default defineQueue<Message>(async (batch, env) => {
+  for (const msg of batch.messages) {
+    console.log(`发送给 ${msg.body.to}：${msg.body.subject}`);
+  }
+});
+```
+
+| 选项              | 说明                           | 默认值 |
+| ----------------- | ------------------------------ | ------ |
+| `maxBatchSize`    | 每个批次的最大消息数           | `10`   |
+| `maxBatchTimeout` | 投递不完整批次前的最长等待秒数 | `5`    |
+| `maxRetries`      | 耗尽投递前的最大重试次数       | `3`    |
+| `retryDelay`      | 重试之间的间隔秒数             | `0`    |
+
+<Callout type="warn" title="死信队列">
+  Void 托管的队列不配置死信队列。没有死信队列时，Cloudflare 会永久删除耗尽重试次数的消息 —— 参见
+  Cloudflare 的死信队列指南。
+</Callout>
+
+部署时，Void 会开通队列并连接它们的生产者与消费者。
+
+## 本地开发
+
+在原生 Void 应用中，通过队列绑定发送消息会自动在 Miniflare 中调用消费者。本地投递使用与生产环境相同的处理器。
+
+你也可以手动派发一个批次，向 Void 暴露的开发端点发送 POST 请求：
+
+```text title="POST /__void/queue"
+Content-Type: application/json
+
+{ "queue": "<queue-name>", "messages": [{ "id": "1", "timestamp": <unix_ms>, "body": <any>, "attempts": 1 }] }
+```
+
+该端点需要一个本地开发触发令牌。Void 会在开发服务器启动时打印一条可直接粘贴的 curl 命令。
+
+```bash
+curl -X POST http://localhost:5173/__void/queue \
+  -H "Content-Type: application/json" \
+  -H "x-void-dev-trigger: <printed-token>" \
+  -d '{"queue":"my-queue","messages":[{"id":"1","timestamp":'$(date +%s000)',"body":{"hello":"world"},"attempts":1}]}'
+```
+
+在受支持的元框架中，可以使用 `/__void/queue` 手动测试消费者。它运行在框架适配器的开发运行时中，使用该适配器的绑定。在这种模式下，向队列绑定发送消息不会自动调用消费者。

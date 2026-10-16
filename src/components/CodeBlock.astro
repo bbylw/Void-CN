@@ -1,0 +1,49 @@
+---
+import ShikiCode from './ShikiCode.astro';
+
+interface Props {
+  code: string;
+  lang?: string;
+  /** 顶部左侧显示的文件名或标题 */
+  title?: string;
+  class?: string;
+}
+
+const { code, lang = 'ts', title, class: className = '' } = Astro.props;
+const cleaned = code.replace(/\n+$/, '');
+const LANG_LABEL: Record<string, string> = {
+  ts: 'TypeScript',
+  tsx: 'TSX',
+  js: 'JavaScript',
+  jsx: 'JSX',
+  bash: 'Shell',
+  sh: 'Shell',
+  json: 'JSON',
+  text: 'Text',
+  css: 'CSS',
+  html: 'HTML',
+  sql: 'SQL',
+};
+---
+
+<figure class:list={['code-block', className]} data-code-block>
+  <figcaption class="code-block__bar">
+    <span class="code-block__title">
+      {
+        title && (
+          <span
+            class="size-1.5 shrink-0 rounded-full"
+            style="background:var(--c-violet)"
+            aria-hidden="true"
+          />
+        )
+      }
+      {title ?? <span style="color:var(--c-fg-subtle)">示例</span>}
+    </span>
+    <span class="code-block__lang">{LANG_LABEL[lang] ?? lang}</span>
+    <span data-copy-slot></span>
+  </figcaption>
+  <div class="code-block__body shiki-panel">
+    <ShikiCode code={cleaned} lang={lang} />
+  </div>
+</figure>

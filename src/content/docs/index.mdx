@@ -1,0 +1,73 @@
+---
+title: 介绍
+description: Void 是运行在 Cloudflare Workers 之上、由 Vite 驱动的全栈框架。用 React、Vue、Svelte 或 Solid 构建界面，在同一个项目里编写服务端代码。
+group: 开始
+---
+
+import CodeBlock from '@/components/CodeBlock.astro';
+import Callout from '@/components/docs/Callout.astro';
+import CardGrid from '@/components/docs/CardGrid.astro';
+import Card from '@/components/docs/Card.astro';
+import Steps from '@/components/docs/Steps.astro';
+
+先从[快速开始](/docs/quickstart)创建并部署一个应用；如果你已经在使用某个元框架，请阅读[框架集成](/docs/frameworks)。
+
+## 服务端路由与页面
+
+文件即路由。`routes/api/users.ts` 中的处理器提供 `/api/users`，`pages/users/index.tsx` 中的组件渲染 `/users`。
+
+每个页面都可以有一个配套的 `.server.ts` 文件。它的 **loader** 读取数据并把带类型的 props 返回给组件，它的 **actions** 处理表单与其他变更，然后更新页面。服务端代码始终留在服务端；组件首次在服务端渲染，随后在浏览器中运行以完成导航与交互。
+
+用[页面路由](/docs/pages-routing)构建全栈 UI，或者保留你自己的客户端路由，用[类型化 fetch](/docs/typed-fetch)调用[服务端路由](/docs/server-routing)。你也可以完全不写前端，只构建一个 API。
+
+```ts title="routes/api/users.ts"
+// GET|POST /api/users
+import { defineHandler } from 'void';
+import { db } from 'void/db';
+import { users } from '@schema';
+
+export const GET = defineHandler(() => db.select().from(users));
+
+export const POST = defineHandler.withValidator({ body: insertUserSchema })(async (c, { body }) => {
+  const [created] = await db.insert(users).values(body).returning();
+  return created;
+});
+```
+
+## 资源来自你的代码
+
+从 `void/db` 导入 `db` 即可查询数据库。开发时 Void 会提供一个本地数据库，部署时会为你开通一个真实资源。同样的导入方式还能启用 [KV](/docs/kv)、[对象存储](/docs/storage)、[队列](/docs/queues)等资源；当需要连接已有资源时，使用配置。
+
+你的 Drizzle schema 定义了数据库类型。处理器推断出响应类型，类型化 fetch 会检查它们的调用方。页面 loader 与 action 把同样的类型带进组件与表单。改动一个字段，TypeScript 就会告诉你应用的哪些部分需要跟着改。
+
+```ts title="routes/api/users.ts"
+import { fetch } from 'void/client';
+
+const users = await fetch('/api/users');
+//    ^ { id: number; name: string; email: string }[]
+```
+
+## 从本地开发到生产
+
+Vite 使用 Cloudflare 的运行时在本地运行你的应用。`void deploy` 会构建应用、开通资源、执行数据库迁移，并发布它。[环境变量](/docs/env-vars)使用 schema、本地值与生产密钥来管理。
+
+你可以[部署到自己的 Cloudflare 账户](/docs/deployment)，也可以连接到由团队运维的 [Void 平台](/docs/platform)。两者使用完全相同的应用 API，平台额外提供共享访问控制、部署历史与后台管理。
+
+Void 也能[部署已有的框架与静态站点](/docs/app-types)：框架保留自己的路由与渲染，Void 负责资源与部署。
+
+## 下一步
+
+<CardGrid cols={2}>
+  <Card href="/docs/quickstart" title="快速开始" icon="rocket">
+    创建并部署你的第一个 Void 应用。
+  </Card>
+  <Card href="/docs/pages-routing" title="页面路由" icon="layers">
+    loaders、布局与表单的完整模式。
+  </Card>
+  <Card href="/docs/database" title="数据库" icon="database">
+    schema、查询与迁移。
+  </Card>
+  <Card href="/docs/type-safety" title="类型安全" icon="check2">
+    类型如何从数据库贯穿到 UI。
+  </Card>
+</CardGrid>

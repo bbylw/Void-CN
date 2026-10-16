@@ -1,0 +1,72 @@
+---
+title: WebSocket
+description: 创建 .ws.ts 路由，在服务端与已连接的客户端之间发送带类型的消息。每个路由实例拥有自己的 Durable Object 用于共享状态。
+group: 后端能力
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+<Callout type="warn" title="仅限 Void 应用">
+  带类型的 WebSocket 路由目前仅在原生 Void 应用中可用，元框架模式下尚未提供。
+</Callout>
+
+每个路由实例拥有自己的 Cloudflare Durable Object 用于共享状态，WebSocket 路由需要 Cloudflare 部署目标。例如 `/rooms/[id]` 会为每个聊天室分配一个独立实例 —— 可用于聊天、在线状态、协同文档或通知。
+
+## 路由文件
+
+在 `routes/` 中使用 `.ws.ts` 后缀创建 WebSocket 路由：
+
+```text title="routes/"
+├── chat/
+│   └── [room].ws.ts
+└── notifications.ws.ts
+```
+
+文件命名规则与常规[服务端路由](/docs/server-routing#路由文件)一致：
+
+- `index.ws.ts` 变为父级路径
+- `[id].ws.ts` 变为 `:id`
+- `[...slug].ws.ts` 变为 catch-all
+- 路由组如 `(marketing)/chat.ws.ts` 不出现在 URL 中
+- `chat.dev.ws.ts` / `chat.prod.ws.ts` 把路由限制在某个环境
+
+<Callout type="info" title="环境后缀的位置">
+  环境后缀放在 `.ws` **之前**。`chat.ws.dev.ts` 不会被识别。
+</Callout>
+
+## defineRoom
+
+当客户端应当共享一个由路由标识的房间或文档时，使用 `defineRoom()`：
+
+```ts title="routes/chat/[room].ws.ts"
+import * as v from 'valibot';
+import { defineRoom } from 'void/ws';
+
+const ClientMessage = v.variant('type', [
+  v.object({ type: v.literal('chat.message'), text: v.string() }),
+]);
+
+const ServerMessage = v.variant('type', [
+  v.object({
+    type: v.literal('chat.message'),
+    id: v.string(),
+    text: v.string(),
+    userId: v.string(),
+  }),
+  v.object({ type: v.literal('chat.joined'), userId: v.string() }),
+]);
+
+export default defineRoom({
+  messages: {
+    client: ClientMessage,
+    server: ServerMessage,
+  },
+});
+```
+
+消息 schema 使用 [Standard Schema](https://standardschema.dev) 校验器编写，因此可以用 Valibot、Zod 或 ArkType。客户端与服务端的方向都有完整类型，非法消息在到达你的处理器之前就会被拒绝。
+
+<Callout type="tip">
+  每个房间背后都是一个由 SQLite 支持的 Durable Object。房间内的共享状态可以使用
+  [`defineDurableState`](/docs/durable-state) 中相同的模式定义。
+</Callout>

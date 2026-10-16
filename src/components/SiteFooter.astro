@@ -1,0 +1,112 @@
+---
+import Logo from './Logo.astro';
+import Icon from './Icon.astro';
+import { DOCS_NAV, SITE } from '../data/site';
+
+const year = new Date().getFullYear();
+const socials = [
+  { label: 'GitHub', href: SITE.social.github },
+  { label: 'X', href: SITE.social.x },
+  { label: 'Bluesky', href: SITE.social.bluesky },
+  { label: 'Discord', href: SITE.social.discord },
+];
+---
+
+<footer
+  class="relative mt-px border-t"
+  style="border-color:var(--c-line);background:var(--c-bg-sunken)"
+>
+  <div class="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10">
+    <div class="grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:gap-8">
+      <div class="max-w-sm">
+        <a href="/" class="inline-flex" aria-label="Void 首页">
+          <Logo class="text-[1.15rem]" />
+        </a>
+        <p class="mt-4 text-[0.85rem] leading-relaxed" style="color:var(--c-fg-muted)">
+          运行在 Cloudflare Workers 之上、由 Vite
+          驱动的全栈框架。把服务端与客户端的代码一同构建，让类型从数据库查询一路贯穿到 UI。
+        </p>
+        <p class="mt-4 font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">
+          本站为 Void 官方文档的中文社区翻译与再编辑版本，内容以
+          <a
+            href={SITE.upstream}
+            target="_blank"
+            rel="noreferrer noopener"
+            class="underline underline-offset-2 transition-colors hover:text-[color:var(--c-fg)]"
+            >英文原站</a
+          > 为准。
+        </p>
+      </div>
+
+      <nav aria-label="文档">
+        <h2 class="eyebrow">文档</h2>
+        <ul class="mt-4 space-y-2.5 text-[0.85rem]">
+          {
+            DOCS_NAV.slice(0, 2).map((g) =>
+              g.items.map((i) => (
+                <li>
+                  <a href={i.href} class="link-underline" style="color:var(--c-fg-muted)">
+                    {i.title}
+                  </a>
+                </li>
+              )),
+            )
+          }
+        </ul>
+      </nav>
+
+      <nav aria-label="数据">
+        <h2 class="eyebrow">数据</h2>
+        <ul class="mt-4 space-y-2.5 text-[0.85rem]">
+          {
+            (DOCS_NAV[2]?.items ?? []).map((i) => (
+              <li>
+                <a href={i.href} class="link-underline" style="color:var(--c-fg-muted)">
+                  {i.title}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </nav>
+
+      <div>
+        <h2 class="eyebrow">生态</h2>
+        <ul class="mt-4 space-y-2.5 text-[0.85rem]">
+          {
+            socials.map((s) => (
+              <li>
+                <a
+                  href={s.href}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  class="link-underline inline-flex items-center gap-1.5"
+                  style="color:var(--c-fg-muted)"
+                >
+                  {s.label}
+                  <Icon name="arrowUpRight" class="size-3 opacity-50" />
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+
+        <div
+          class="mt-6 rounded-[0.7rem] border p-3"
+          style="border-color:var(--c-line);background:var(--c-surface)"
+        >
+          <p class="font-mono text-[0.68rem]" style="color:var(--c-fg-subtle)">许可证</p>
+          <p class="mt-1 text-[0.85rem] font-medium" style="color:var(--c-fg)">MIT</p>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="flex flex-col gap-3 border-t py-6 text-[0.78rem] sm:flex-row sm:items-center sm:justify-between"
+      style="border-color:var(--c-line);color:var(--c-fg-subtle)"
+    >
+      <p>© {year} Void 中文文档 · 基于 <span class="font-mono">voidzero-dev/void</span> 构建</p>
+      <p class="font-mono text-[0.72rem]">Astro · TypeScript · React · MDX · Tailwind CSS · Bun</p>
+    </div>
+  </div>
+</footer>

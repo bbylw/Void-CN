@@ -1,0 +1,166 @@
+---
+title: 类型安全
+description: Void 从数据库 schema、路由处理器与页面 loader 推断类型。改动一个字段，TypeScript 就会告诉你哪些查询、请求与组件需要跟着改。
+group: 路由与渲染
+---
+
+import Callout from '@/components/docs/Callout.astro';
+import ApiTable from '@/components/docs/ApiTable.astro';
+
+## 类型管道
+
+- **数据库类型**来自你的 [Drizzle schema](/docs/database)，列类型在编译期就是已知的。
+- **路由处理器**：返回类型与校验器 schema 会生成 `RouteMap`，类型化 fetch 客户端消费它。
+- **页面 loader**：返回类型通过 `InferProps` 流入页面组件作为 props。
+- **页面 action**：校验器 schema 流入 `useForm` 与 `action()`，提供带类型的数据、错误与 URL 自动补全。
+
+所有生成的类型都位于 `.void/`，并在源文件或 schema 变化时自动更新。
+
+## 数据库 → 处理器 → 客户端
+
+类型从 Drizzle schema 经由处理器流向客户端，全程无需手写标注：
+
+```ts title="routes/api/users.ts"
+export const GET = defineHandler(async (c) => {
+  return db.select({ name: users.name, email: users.email }).from(users);
+  // ↑ 返回类型由 schema 列推断
+});
+
+export const POST = defineHandler.withValidator({
+  body: insertUserSchema, // ← 派生自 Drizzle schema
+})(async (c, { body }) => {
+  return db.insert(users).values(body).returning();
+});
+```
+
+```ts
+// 客户端：类型由上面的处理器推断
+const users = await fetch('/api/users');
+//    ^ { name: string; email: string }[]
+
+await fetch('/api/users', {
+  method: 'POST',
+  body: { name: 'Alice', email: 'alice@example.com' }, // ← 由校验器提供类型
+});
+```
+
+Drizzle schema 一次定义了数据库列、运行时校验、处理器输入类型与客户端类型检查。对于不对应任何表的端点，使用任意 [Standard Schema](https://standardschema.dev) 库即可。
+
+## Loader → 页面 Props
+
+在页面模式中，loader 的返回类型通过 `InferProps` 流入页面组件：
+
+```ts title="pages/users/index.server.ts"
+export type Props = InferProps<typeof loader>;
+
+export const loader = defineHandler(async (c) => {
+  return { users: await db.select().from(users) };
+});
+```
+
+```vue title="pages/users/index.vue"
+<script setup lang="ts">
+import type { Props } from './index.server';
+defineProps<Props>();
+// ← { users: { id: number; name: string; ... }[] }
+</script>
+```
+
+不需要手写 interface，props 会与 loader 的返回值始终保持同步。
+
+## Action → useForm
+
+当页面 action 使用 `withValidator()` 时，body schema 会一路流入 `useForm`，为你带来带类型的数据、带类型的错误键与 URL 自动补全：
+
+```ts title="pages/users/create.server.ts"
+export const action = defineHandler.withValidator({
+  body: insertUserSchema,
+})(async (c, { body }) => {
+  await db.insert(users).values(body);
+});
+```
+
+```ts
+const form = useForm('/users/create', { name: '', email: '' });
+// ^ 自动补全 ^ 必须匹配 body schema
+
+form.errors.email; // ✓ string | undefined
+form.errors.foo; // ✗ TypeScript 报错
+```
+
+具名 action 的工作方式完全相同。`?actionName` 后缀会选择该 action 对应的类型：
+
+```ts
+const updateForm = useForm('/users/:id?update', { name: '' }, { params: { id } });
+const deleteForm = useForm('/users/:id?delete', { id: '' }, { params: { id } });
+// 每个表单的 data 与 errors 都由各自的校验器提供类型
+```
+
+`action()` 辅助函数获得同样的类型检查。
+
+## 哪些内容会被检查
+
+| 层次         | 被类型检查的内容                                         |
+| ------------ | -------------------------------------------------------- |
+| 数据库       | 来自 Drizzle schema 的表列、值类型、insert / update 结构 |
+| 处理器       | `c.env` 绑定、校验器输入、返回类型                       |
+| fetch 客户端 | 路由路径、HTTP 方法、body / query / params、响应类型     |
+| `useForm`    | action URL、数据字段、错误键、`reset()` 参数、params     |
+| `action()`   | action URL、数据负载、params                             |
+
+## 序列化
+
+客户端类型通过 `Serialize<T>` 反映 JSON 序列化：
+
+| 源类型                            | 序列化后的类型                     |
+| --------------------------------- | ---------------------------------- |
+| `string`、`number`、`boolean`     | 不变                               |
+| `Date`                            | `string`                           |
+| `Response`                        | 被排除（运行时原样透传）           |
+| `bigint`、`Function`、`undefined` | 被排除                             |
+| `Array<T>` / `{ key: T }`         | 递归序列化（值为函数的键会被剔除） |
+
+## 上下文变量
+
+中间件与处理器通过 Hono 的上下文变量共享带类型的数据。扩展 `CloudContextVariables` 来定义你自己的变量：
+
+```ts title="middleware/01.auth.ts"
+declare module 'void' {
+  interface CloudContextVariables {
+    requestId: string;
+  }
+}
+
+export default defineMiddleware(async (c, next) => {
+  c.set('requestId', crypto.randomUUID());
+  await next();
+});
+```
+
+此后在任何地方 `c.get("requestId")` 都返回 `string`，无需类型断言。来自多个文件的多次扩展会被合并。
+
+## 配置
+
+在项目中扩展生成的 tsconfig：
+
+```json title="tsconfig.json"
+{
+  "extends": "./.void/tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "react-jsx",
+    "types": ["void/env"]
+  },
+  "include": ["src", "routes", "middleware", "crons", "queues"]
+}
+```
+
+如果你已经有 TypeScript 配置，运行 `void init --tsconfig` 可以在保留现有设置的前提下加入 Void 类型。
+
+<Callout type="tip" title="在 CI 中生成类型">
+  在 CI 中或全新克隆之后运行 `void prepare`，或者让 `vite dev` / `vite build` 在正常的应用流程中生成
+  `.void/` 文件。
+</Callout>

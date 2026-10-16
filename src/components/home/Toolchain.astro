@@ -1,0 +1,113 @@
+---
+import Icon from '../Icon.astro';
+import Section from '../Section.astro';
+
+const items = [
+  {
+    index: '01',
+    icon: 'layers',
+    name: 'Void SDK',
+    en: 'Server + Client in one build',
+    desc: '通过基于文件的 API 路由、服务端渲染页面，以及面向数据库、存储与 AI 的类型化 API，把服务端与客户端的代码一同构建。类型从数据库查询一路贯穿到 UI。',
+    points: [
+      '服务端路由与页面 loader',
+      'Drizzle schema → 处理器 → 客户端',
+      'KV / R2 / 队列 / AI 类型化 API',
+    ],
+    href: '/docs/type-safety',
+  },
+  {
+    index: '02',
+    icon: 'terminal',
+    name: 'Void CLI',
+    en: 'Build · provision · migrate · deploy',
+    desc: '构建应用、开通它所使用的 Cloudflare 资源、执行迁移，并用一条命令完成部署。通过同一个 CLI 管理资源、查看日志以及回滚。',
+    points: [
+      'void init / deploy / connect',
+      'void db generate · migrate · seed',
+      'void project status · logs · rollback',
+    ],
+    href: '/docs/deployment',
+  },
+  {
+    index: '03',
+    icon: 'globe',
+    name: 'Void Platform',
+    en: 'A shared deployment home',
+    desc: '在你的 Cloudflare 账户中安装一套共享的部署环境，供团队或客户使用，具备访问控制、资源限额与用量统计，以及关联应用的授权部署。',
+    points: ['团队共享的部署环境', '访问控制与资源配额', '保留的部署历史与回滚'],
+    href: '/docs/platform',
+  },
+];
+---
+
+<Section
+  id="toolchain"
+  eyebrow="三件套"
+  title="为**你和你的编程智能体**准备"
+  lead="SDK、CLI 与平台各自独立，也可以组合使用 —— 从本地开发到团队规模化部署，都由同一套工具覆盖。"
+>
+  <div class="mt-14 grid gap-4 lg:grid-cols-3">
+    {
+      items.map((item) => (
+        <a
+          href={item.href}
+          class="card card-hover bracket group relative flex flex-col overflow-hidden p-6 sm:p-7"
+        >
+          <div
+            class="pointer-events-none absolute inset-x-0 -top-px h-px opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+            style="background:linear-gradient(90deg,transparent,var(--c-violet),transparent)"
+            aria-hidden="true"
+          />
+
+          <div class="flex items-start justify-between gap-4">
+            <span
+              class="grid size-10 place-items-center rounded-xl border"
+              style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
+            >
+              <Icon name={item.icon as never} class="size-[1.15rem]" />
+            </span>
+            <span class="font-mono text-[0.7rem] tracking-[0.2em]" style="color:var(--c-fg-subtle)">
+              {item.index}
+            </span>
+          </div>
+
+          <h3 class="mt-6 text-[1.4rem] font-[650] tracking-[-0.025em]" style="color:var(--c-fg)">
+            {item.name}
+          </h3>
+          <p class="mt-1 font-mono text-[0.75rem]" style="color:var(--c-fg-subtle)">
+            {item.en}
+          </p>
+
+          <p class="mt-4 text-[0.925rem] leading-[1.8]" style="color:var(--c-fg-muted)">
+            {item.desc}
+          </p>
+
+          <ul class="mt-6 space-y-2 border-t pt-5" style="border-color:var(--c-line)">
+            {item.points.map((p) => (
+              <li class="flex items-start gap-2 text-[0.85rem]" style="color:var(--c-fg-muted)">
+                <span
+                  class="mt-[0.5em] size-1 shrink-0 rounded-full"
+                  style="background:var(--c-violet);opacity:0.7"
+                  aria-hidden="true"
+                />
+                {p}
+              </li>
+            ))}
+          </ul>
+
+          <span
+            class="mt-auto inline-flex items-center gap-1.5 pt-6 text-[0.85rem] font-medium transition-colors group-hover:text-[color:var(--c-violet)]"
+            style="color:var(--c-fg)"
+          >
+            了解详情
+            <Icon
+              name="arrowRight"
+              class="size-3.5 transition-transform duration-300 group-hover:translate-x-1"
+            />
+          </span>
+        </a>
+      ))
+    }
+  </div>
+</Section>

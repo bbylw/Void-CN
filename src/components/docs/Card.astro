@@ -1,0 +1,42 @@
+---
+import Icon from '../Icon.astro';
+
+interface Props {
+  href?: string;
+  title: string;
+  icon?: string;
+}
+const { href, title, icon } = Astro.props;
+const Tag = href ? 'a' : 'div';
+---
+
+<Tag
+  href={href}
+  class="card card-hover bracket group flex flex-col gap-1.5 p-4 no-underline"
+  style="color:inherit"
+>
+  <span class="flex items-center gap-2">
+    {
+      icon && (
+        <span
+          class="grid size-7 shrink-0 place-items-center rounded-lg border"
+          style="border-color:var(--c-line);color:var(--c-violet);background:var(--c-surface-2)"
+        >
+          <Icon name={icon as never} class="size-3.5" />
+        </span>
+      )
+    }
+    <span class="text-[0.95rem] font-semibold" style="color:var(--c-fg)">{title}</span>
+    {
+      href && (
+        <Icon
+          name="arrowUpRight"
+          class="ml-auto size-3.5 opacity-0 transition-all duration-300 group-hover:opacity-60 group-hover:translate-x-0.5"
+        />
+      )
+    }
+  </span>
+  <span class="text-[0.85rem] leading-relaxed" style="color:var(--c-fg-muted)">
+    <slot />
+  </span>
+</Tag>
