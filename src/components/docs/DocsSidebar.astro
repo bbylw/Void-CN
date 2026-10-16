@@ -49,24 +49,6 @@ const current = norm(currentPath);
     </ul>
   ) : (
     <nav aria-label="文档导航" class="pb-4">
-      <div
-        class="mb-5 rounded-[0.7rem] border p-3"
-        style="border-color:var(--c-line);background:var(--c-surface)"
-      >
-        <p class="text-[0.8rem] leading-relaxed" style="color:var(--c-fg-muted)">
-          Void 中文文档，翻译自官方
-          <a
-            href="https://void.cloud/guide/"
-            target="_blank"
-            rel="noreferrer noopener"
-            class="link-underline"
-            style="color:var(--c-fg)"
-          >
-            void.cloud/guide
-          </a>
-        </p>
-      </div>
-
       {DOCS_NAV.map((g) => (
         <div class="mb-5">
           <h2 class="eyebrow px-2 pb-1.5">{g.label}</h2>
