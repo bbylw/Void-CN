@@ -20,7 +20,7 @@ import Callout from '@/components/docs/Callout.astro';
     └── [...query].ts  → GET /api/search/*   （catch-all）
 ```
 
-动态段使用方括号：`[id]` 会成为路由参数，`[...slug]` 会成为 catch-all。以 `_` 开头的文件或目录会被忽略。像 `(admin)` 这样用括号包裹的目录是路由组 —— 它们帮助整理文件，而不改变 URL。
+动态段使用方括号：`[id]` 会成为路由参数，`[...slug]` 会成为 catch-all。以 `_` 开头的文件或目录会被忽略。像 `(admin)` 这样用括号包裹的目录是路由组，它们帮助整理文件，而不改变 URL。
 
 ### 仅限某个环境的路由
 

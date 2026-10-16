@@ -10,8 +10,8 @@
 
 @theme {
   --font-sans:
-    'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
+    'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
   --font-mono:
     'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, 'PingFang SC',
     'Microsoft YaHei', monospace;
@@ -206,7 +206,11 @@
     height: 30rem;
     top: -14rem;
     left: -8rem;
-    background: radial-gradient(closest-side, color-mix(in oklab, var(--c-violet) 40%, transparent), transparent);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklab, var(--c-violet) 40%, transparent),
+      transparent
+    );
     opacity: 0.55;
     animation: var(--animate-drift);
   }
@@ -215,7 +219,11 @@
     height: 26rem;
     top: -10rem;
     right: -10rem;
-    background: radial-gradient(closest-side, color-mix(in oklab, var(--c-cyan) 32%, transparent), transparent);
+    background: radial-gradient(
+      closest-side,
+      color-mix(in oklab, var(--c-violet) 24%, transparent),
+      transparent
+    );
     opacity: 0.45;
     animation: var(--animate-drift);
     animation-delay: -7s;
@@ -232,9 +240,9 @@
     background: linear-gradient(
       104deg,
       var(--c-fg) 0%,
-      var(--c-fg) 34%,
-      color-mix(in oklab, var(--c-violet) 92%, var(--c-fg)) 62%,
-      color-mix(in oklab, var(--c-cyan) 82%, var(--c-fg)) 88%
+      var(--c-fg) 40%,
+      color-mix(in oklab, var(--c-violet) 90%, var(--c-fg)) 74%,
+      color-mix(in oklab, var(--c-violet) 68%, var(--c-cyan)) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
@@ -242,7 +250,11 @@
   }
 
   .text-gradient-soft {
-    background: linear-gradient(180deg, var(--c-fg) 30%, color-mix(in oklab, var(--c-fg-subtle) 85%, var(--c-fg)) 100%);
+    background: linear-gradient(
+      180deg,
+      var(--c-fg) 30%,
+      color-mix(in oklab, var(--c-fg-subtle) 85%, var(--c-fg)) 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

@@ -30,16 +30,16 @@ export default defineConfig({
 
 ## 能力与限制
 
-| 能力                                       | 框架模式             |
-| ------------------------------------------ | -------------------- |
-| 绑定推断（D1、KV、R2、队列、AI…）          | 支持                 |
-| 带类型的数据库代码生成与查询               | 支持                 |
-| 迁移管理（`void db generate` / `migrate`） | 支持                 |
-| 定时任务与队列                             | 支持                 |
-| 缓存与路由规则                             | 支持                 |
-| 部署（Cloudflare 与 Void 平台）            | 支持                 |
-| 页面模式（loaders / actions）              | 不适用 —— 由框架负责 |
-| Void 托管的认证                            | 不支持               |
+| 能力                                       | 框架模式           |
+| ------------------------------------------ | ------------------ |
+| 绑定推断（D1、KV、R2、队列、AI…）          | 支持               |
+| 带类型的数据库代码生成与查询               | 支持               |
+| 迁移管理（`void db generate` / `migrate`） | 支持               |
+| 定时任务与队列                             | 支持               |
+| 缓存与路由规则                             | 支持               |
+| 部署（Cloudflare 与 Void 平台）            | 支持               |
+| 页面模式（loaders / actions）              | 不适用，由框架负责 |
+| Void 托管的认证                            | 不支持             |
 
 <Callout type="warn" title="认证">
   框架模式下不支持 Void 托管的认证。请使用 Better Auth 针对你的框架的官方集成。
@@ -102,13 +102,13 @@ export default defineConfig({
 ```
 
 <Callout type="tip" title="你正在读的这个站点">
-  本站本身就是一个使用 Astro + MDX + Tailwind CSS 构建的静态站点 ——
+  本站本身就是一个使用 Astro + MDX + Tailwind CSS 构建的静态站点 ，
   可以作为结构组织的参考，但它并不使用 Void 作为运行时。
 </Callout>
 
 ## Hono
 
-Hono 不是元框架，而是 Void 路由层的底层。你可以直接使用 Hono 的生态包 —— 任何 `hono/*` 内置中间件或第三方包都能工作：
+Hono 不是元框架，而是 Void 路由层的底层。你可以直接使用 Hono 的生态包，任何 `hono/*` 内置中间件或第三方包都能工作：
 
 ```ts
 import { defineHandler } from 'void';

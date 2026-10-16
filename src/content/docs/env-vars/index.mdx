@@ -50,7 +50,7 @@ VITE_API_ORIGIN=http://localhost:5173
   `DATABASE_URL="postgres://user:p#ss@localhost/my-app"`。
 </Callout>
 
-请把 `.env` 排除在 Git 之外。其他 dotenv 文件 —— 包括 `.env.local`、`.env.production`、`.env.example` 以及 Wrangler 的 `.dev.vars*` —— 都不受支持。
+请把 `.env` 排除在 Git 之外。其他 dotenv 文件，包括 `.env.local`、`.env.production`、`.env.example` 以及 Wrangler 的 `.dev.vars*`，都不受支持。
 
 以 `__VOID_` 开头的名称为 Void 保留。如果 `.env` 或 `env.ts` 定义了这类名称，Void 会直接报错退出。
 

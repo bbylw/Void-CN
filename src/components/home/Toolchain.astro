@@ -4,7 +4,6 @@ import Section from '../Section.astro';
 
 const items = [
   {
-    index: '01',
     icon: 'layers',
     name: 'Void SDK',
     en: 'Server + Client in one build',
@@ -17,7 +16,6 @@ const items = [
     href: '/docs/type-safety',
   },
   {
-    index: '02',
     icon: 'terminal',
     name: 'Void CLI',
     en: 'Build · provision · migrate · deploy',
@@ -30,7 +28,6 @@ const items = [
     href: '/docs/deployment',
   },
   {
-    index: '03',
     icon: 'globe',
     name: 'Void Platform',
     en: 'A shared deployment home',
@@ -45,7 +42,7 @@ const items = [
   id="toolchain"
   eyebrow="三件套"
   title="为**你和你的编程智能体**准备"
-  lead="SDK、CLI 与平台各自独立，也可以组合使用 —— 从本地开发到团队规模化部署，都由同一套工具覆盖。"
+  lead="SDK、CLI 与平台各自独立，也可以组合使用：从本地开发到团队规模化部署，都由同一套工具覆盖。"
 >
   <div class="mt-14 grid gap-4 lg:grid-cols-3">
     {
@@ -60,15 +57,12 @@ const items = [
             aria-hidden="true"
           />
 
-          <div class="flex items-start justify-between gap-4">
+          <div class="flex items-start">
             <span
               class="grid size-10 place-items-center rounded-xl border"
               style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
             >
               <Icon name={item.icon as never} class="size-[1.15rem]" />
-            </span>
-            <span class="font-mono text-[0.7rem] tracking-[0.2em]" style="color:var(--c-fg-subtle)">
-              {item.index}
             </span>
           </div>
 

@@ -127,7 +127,7 @@ Loader 仍然会在第一次请求时运行，它的 props 也会嵌入 HTML 外
 | `ssr = false`                           | 在请求时返回一个客户端挂载的外壳           |
 | `ssr = false` + `prerender = true`      | 预渲染一个内嵌 loader 数据的客户端挂载外壳 |
 | `ssr = false` + `prerender = false`     | 只在请求时返回客户端挂载的外壳，永不预渲染 |
-| 岛屿页面 + `ssr = false`                | 无效 —— 岛屿页面已经使用岛屿渲染器         |
+| 岛屿页面 + `ssr = false`                | 无效，岛屿页面已经使用岛屿渲染器           |
 | `output: "static"` + 未设置 `prerender` | 自动预渲染路径已知的页面，包括纯客户端外壳 |
 
 ## Link 组件

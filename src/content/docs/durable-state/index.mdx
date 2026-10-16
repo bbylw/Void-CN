@@ -60,8 +60,8 @@ Void 会在第一次操作之前加载状态，并一次只运行一个 RPC 方�
 
 每个方法会收到：
 
-- `context.state` —— 可以修改或整体替换
-- `context.env` —— Durable Object 的环境
+- `context.state`，可以修改或整体替换
+- `context.env`，Durable Object 的环境
 - `context.id` 与 `context.storage`
 - `context.setAlarm()` 与 `context.deleteAlarm()`
 
@@ -195,6 +195,6 @@ export default Workspace;
 
 <Callout type="info" title="与之无关的功能">
   自定义 Durable Object 模块在元框架模式下，以及在 Node.js、Bun、Deno 上不受支持。这与[带类型的
-  WebSocket 路由](/docs/websockets)无关 —— 后者同样使用由 SQLite 支持的 Durable
+  WebSocket 路由](/docs/websockets)无关，后者同样使用由 SQLite 支持的 Durable
   Objects，并且在直接部署到 Cloudflare 与托管的 Void 部署上都能工作。
 </Callout>

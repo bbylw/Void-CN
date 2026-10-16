@@ -10,7 +10,7 @@ import Callout from '@/components/docs/Callout.astro';
   带类型的 WebSocket 路由目前仅在原生 Void 应用中可用，元框架模式下尚未提供。
 </Callout>
 
-每个路由实例拥有自己的 Cloudflare Durable Object 用于共享状态，WebSocket 路由需要 Cloudflare 部署目标。例如 `/rooms/[id]` 会为每个聊天室分配一个独立实例 —— 可用于聊天、在线状态、协同文档或通知。
+每个路由实例拥有自己的 Cloudflare Durable Object 用于共享状态，WebSocket 路由需要 Cloudflare 部署目标。例如 `/rooms/[id]` 会为每个聊天室分配一个独立实例，可用于聊天、在线状态、协同文档或通知。
 
 ## 路由文件
 

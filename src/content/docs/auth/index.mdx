@@ -131,7 +131,7 @@ import { getSession, getUser, requireAuth } from 'void/auth';
 
 来自同一个 IP 的所有请求共享同一个计数。以下两种常见设置会触及限制：
 
-- 服务端为你的用户调用认证端点，例如 backend-for-frontend、来自 Vercel 或 nginx 的重写，或另一个 Worker 的 `fetch` —— 这些用户共享该服务器的 IP。
+- 服务端为你的用户调用认证端点，例如 backend-for-frontend、来自 Vercel 或 nginx 的重写，或另一个 Worker 的 `fetch`，这些用户共享该服务器的 IP。
 - 端到端测试对已部署的应用反复注册或登录。
 
 不要改为从 `x-forwarded-for` 读取客户端 IP：任何客户端都能发送该头。给可信调用方一个密钥头，并只对携带该头的请求跳过限制：
@@ -183,4 +183,4 @@ Void 平台会自动创建认证表。直接部署到 Cloudflare 时，请把它
 void db generate
 ```
 
-部署前检查并提交生成的 SQL。Void 会包含你的认证配置与插件表 —— 你不需要在 `db/schema.ts` 中重复它们，也不需要运行 Better Auth 的 CLI。
+部署前检查并提交生成的 SQL。Void 会包含你的认证配置与插件表，你不需要在 `db/schema.ts` 中重复它们，也不需要运行 Better Auth 的 CLI。

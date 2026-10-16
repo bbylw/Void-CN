@@ -2,57 +2,37 @@
 import Icon from '../Icon.astro';
 import Section from '../Section.astro';
 import { DOCS_NAV } from '../../data/site';
-
-const accents = ['var(--c-violet)', 'var(--c-cyan)', 'var(--c-amber)'];
-let i = -1;
 ---
 
 <Section
   id="docs"
-  eyebrow="文档"
   title="从**快速上手**到**生产部署**"
   lead="完整的中文指南，按主题分组。站内搜索支持 Ctrl / ⌘ + K。"
 >
   <div class="mt-14 grid gap-10 lg:grid-cols-[repeat(5,minmax(0,1fr))]">
     {
-      DOCS_NAV.map((group) => {
-        i += 1;
-        const accent = accents[i % accents.length];
-        return (
-          <nav aria-label={group.label}>
-            <div class="flex items-center gap-2 pb-3">
-              <span
-                class="size-1.5 rounded-full"
-                style={{ background: accent }}
-                aria-hidden="true"
-              />
-              <h3 class="text-[0.8rem] font-semibold tracking-[0.02em]" style="color:var(--c-fg)">
-                {group.label}
-              </h3>
-            </div>
-            <ul class="space-y-0.5 border-t pt-2.5" style="border-color:var(--c-line)">
-              {group.items.map((item) => (
-                <li>
-                  <a
-                    href={item.href}
-                    class="group flex items-start gap-1.5 rounded-md py-[0.3rem] text-[0.85rem] leading-snug transition-colors"
-                    style="color:var(--c-fg-muted)"
-                  >
-                    <span
-                      class="mt-[0.55em] size-1 shrink-0 rounded-full opacity-0 transition-opacity group-hover:opacity-100"
-                      style={{ background: accent }}
-                      aria-hidden="true"
-                    />
-                    <span class="transition-colors group-hover:text-[color:var(--c-fg)]">
-                      {item.title}
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        );
-      })
+      DOCS_NAV.map((group) => (
+        <nav aria-label={group.label}>
+          <h3 class="pb-3 text-[0.8rem] font-semibold tracking-[0.02em]" style="color:var(--c-fg)">
+            {group.label}
+          </h3>
+          <ul class="space-y-0.5 border-t pt-2.5" style="border-color:var(--c-line)">
+            {group.items.map((item) => (
+              <li>
+                <a
+                  href={item.href}
+                  class="group flex items-start rounded-md py-[0.3rem] text-[0.85rem] leading-snug transition-colors"
+                  style="color:var(--c-fg-muted)"
+                >
+                  <span class="transition-colors group-hover:text-[color:var(--c-fg)]">
+                    {item.title}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      ))
     }
   </div>
 

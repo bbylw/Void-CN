@@ -255,7 +255,7 @@ export const insertUserSchema = createInsertSchema(users, {
 });
 ```
 
-`createInsertSchema` 会生成与 `$inferInsert` 匹配的校验器：有默认值或自增的列变为可选，`NOT NULL` 列保持必填。可选的第二个参数让你逐列细化 —— 既可以传入一个接收生成 schema 的回调，也可以直接传入一个类型来覆盖某个字段。
+`createInsertSchema` 会生成与 `$inferInsert` 匹配的校验器：有默认值或自增的列变为可选，`NOT NULL` 列保持必填。可选的第二个参数让你逐列细化，既可以传入一个接收生成 schema 的回调，也可以直接传入一个类型来覆盖某个字段。
 
 在[路由处理器](/docs/server-routing#校验)中用 `withValidator()` 使用派生的 schema。三个可用函数：
 

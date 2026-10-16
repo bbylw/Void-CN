@@ -18,7 +18,6 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
 
 <Section
   id="deploy"
-  eyebrow="部署目标"
   title="部署到**自己的账户**，或**团队平台**"
   lead="两种目标使用完全相同的应用 API。选择自托管的 Void 平台，可以获得共享访问控制、保留的部署历史与后台管理。"
 >
@@ -27,7 +26,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
       <div class="flex items-center gap-3">
         <span
           class="grid size-10 place-items-center rounded-xl border"
-          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-amber)"
+          style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-violet)"
         >
           <Icon name="bolt" class="size-[1.15rem]" />
         </span>
@@ -57,17 +56,17 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
         style="border-color:var(--c-line);color:var(--c-fg-muted)"
       >
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-amber)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
           ></span>
           资源直接开通在你的账户中
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-amber)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
           ></span>
           支持自定义应用域名
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-amber)"
+          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-violet)"
           ></span>
           日志使用 Cloudflare 实时 tail
         </li>
@@ -189,7 +188,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
                         <Icon name="check" class="size-4" strokeWidth={2.2} />
                       </span>
                     ) : (
-                      <span style="color:var(--c-fg-subtle)">—</span>
+                      <span style="color:var(--c-fg-subtle)">-</span>
                     )
                   ) : (
                     <span style="color:var(--c-fg-muted)">{r.cf}</span>
@@ -211,7 +210,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
                         <Icon name="check" class="size-4" strokeWidth={2.2} />
                       </span>
                     ) : (
-                      <span style="color:var(--c-fg-subtle)">—</span>
+                      <span style="color:var(--c-fg-subtle)">-</span>
                     )
                   ) : (
                     <span style="color:var(--c-fg-muted)">{r.platform}</span>

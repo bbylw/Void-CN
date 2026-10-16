@@ -10,7 +10,7 @@ import Callout from '@/components/docs/Callout.astro';
 
 在 `queues/` 中创建消费者。支持 TypeScript 与 JavaScript 文件（`.ts`、`.mts`、`.js`、`.mjs`）。它的路径决定队列名：`queues/emails.ts` 创建 `emails`，`queues/order/notifications.ts` 创建 `order-notifications`。每个队列必须有唯一的名字。
 
-生成的队列名必须符合 Cloudflare 的队列命名规则：1–63 个字符，只包含字母、数字与 `-`，且以字母或数字开头和结尾。
+生成的队列名必须符合 Cloudflare 的队列命名规则：1-63 个字符，只包含字母、数字与 `-`，且以字母或数字开头和结尾。
 
 导出一个用 `defineQueue<T>` 包装的默认处理器。`T` 为消费者与 `send()` 调用同时定义消息体：
 
@@ -111,7 +111,7 @@ export default defineQueue<Message>(async (batch, env) => {
 | `retryDelay`      | 重试之间的间隔秒数             | `0`    |
 
 <Callout type="warn" title="死信队列">
-  Void 托管的队列不配置死信队列。没有死信队列时，Cloudflare 会永久删除耗尽重试次数的消息 —— 参见
+  Void 托管的队列不配置死信队列。没有死信队列时，Cloudflare 会永久删除耗尽重试次数的消息，参见
   Cloudflare 的死信队列指南。
 </Callout>
 
