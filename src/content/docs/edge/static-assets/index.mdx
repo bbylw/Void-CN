@@ -1,0 +1,97 @@
+---
+title: 静态资源缓存
+description: 在 Cloudflare 边缘缓存静态资源；带哈希的构建产物可以跨部署复用。
+---
+
+Void 会在 Cloudflare 边缘网络上缓存静态资源。带哈希的构建文件可以跨部署复用，其他文件则使用与部署绑定的缓存键。
+
+## 带哈希的资源
+
+Vite 的 `build.assetsDir`（默认 `assets/`）中的文件在产出时文件名会带上内容哈希，例如 `assets/app-Ab3xK9.js`。这些文件是不可变的：内容一变文件名就变，因此会得到激进缓存：
+
+```text
+Cache-Control: public, max-age=31536000, immutable
+```
+
+浏览器和边缘节点可以把这些文件缓存一年，并在多次部署之间复用。
+
+如果你在 Vite 配置里改过 `build.assetsDir`，Void 会自动检测到，并对该目录应用不可变优化：
+
+```ts title="vite.config.ts"
+export default defineConfig({
+  build: {
+    assetsDir: 'static', // 带哈希的资源位于 dist/client/static/
+  },
+});
+```
+
+如果 `build.assetsDir` 设为 `""`，也就是带哈希的文件位于根目录，那么优化会被跳过，因为没有基于目录的办法区分哪些文件带哈希。
+
+受支持的元框架会自动使用它们自己的资源目录。
+
+### 直连 Cloudflare 部署
+
+对于使用 Void 路由的应用，`void deploy --platform cloudflare` 会给生成的、带内容指纹的 JavaScript 产物加上不可变缓存。框架集成则使用各自的资源配置与 `_headers` 文件。从 `public/` 复制过来的文件，以及文件名稳定的自定义构建产物，仍保持普通的重验证，即使它们就位于资源目录内。CSS 与其他资源沿用 Cloudflare 的默认值，或你配置的 `Cache-Control`。
+
+请用[自定义响应头](/docs/edge/headers)为其他文件选择缓存策略。只对内容变化时 URL 也会变化的地址使用 immutable 缓存。
+
+## 不带哈希的资源
+
+其他静态文件，例如 `index.html` 和 `favicon.ico`，会一直缓存到下一次部署，你不需要手动清理它们。
+
+```text
+Cache-Control: public, s-maxage=31536000, max-age=0, must-revalidate
+```
+
+浏览器会在每次请求时重新校验这些文件。
+
+**会被缓存的：**
+
+- SPA、静态站点等非 SSR 项目的所有 `GET` 请求
+- SSR 项目中带文件扩展名（`.ico`、`.png`、`.css` 等）的 GET 请求
+
+**不会被缓存的：**
+
+- `/api/*` 路由，它们总是打到 worker
+- SSR 渲染的页面（SSR 项目中没有文件扩展名的路径）
+- 非 GET 请求
+- 携带 `Cookie`、`Authorization` 或 `Cf-Access-Jwt-Assertion` 凭据的请求
+- 完整的 `200` 之外的响应
+
+### 退出缓存
+
+如果你的 worker 在一个看起来是静态的 URL 上服务动态内容（例如动态生成的 `/avatar.jpg`），可以在响应头里设置 `Cache-Control: private` 或 `Cache-Control: no-store` 来阻止缓存。任何 `Cache-Control` 含 `private`、`no-store` 或 `no-cache` 的响应，或带 `Set-Cookie` 头部的响应，都会绕过边缘缓存。
+
+## ETag 与 304 Not Modified
+
+静态资源带有 `ETag` 头部。当浏览器校验一个未改变的文件时，Void 返回 `304 Not Modified`，不再重新下载它。无需任何配置。
+
+## 自定义头部
+
+你可以用[自定义响应头](/docs/edge/headers)为任意静态资源路径覆盖缓存头部，或添加自己的头部。
+
+## 导航与中间件
+
+Void 会直接服务静态文件，除非应用代码需要先处理该请求。API 请求会到达你的 Worker。带中间件、`/api` 之外的路由、Pages 或 SSR 的应用，会在服务 fallback HTML 之前先运行应用代码。
+
+SPA 会为未匹配的 HTML 导航返回 `index.html`，让客户端路由正常工作。静态站点如果有一个 `404.html` 页面，请设置 [`routing.notFound`](/docs/config)：
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  routing: { notFound: '404-page' },
+});
+```
+
+可选 `single-page-application`、`404-page` 或 `none`。这些设置会保持哪些请求进入中间件和 API 处理器的行为不变。API 主动返回的 `404` 会保留其状态码与响应体。
+
+SvelteKit、Nuxt、Analog 和 Astro 自己处理错误页面，会忽略 `routing.notFound`。如果要把 TanStack Start、React Router 或 vinext 直接部署到 Cloudflare，请通过框架的 Cloudflare 配置来设置资源绑定、目录与路由策略。
+
+在直连 Cloudflare 的部署上，SvelteKit、Nuxt、Analog 和 Astro 会直接服务构建产物与预渲染页面，不运行 Worker，其他请求才交给框架。
+
+如果要在服务某个资源之前先运行服务端代码，请在 `void.config.ts` 的 `cloudflare.assets` 下设置 [`run_worker_first`](https://developers.cloudflare.com/workers/static-assets/binding/#run_worker_first)。设为 `true` 会让每个请求都运行 Worker，并计入 Worker 请求用量。
+
+## API 路由与 SSR 页面
+
+API 响应和 SSR 页面不会作为静态资源被缓存。要缓存公开的渲染页面，请使用[重新验证](/docs/edge/revalidation)。

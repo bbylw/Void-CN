@@ -1,0 +1,346 @@
+---
+title: Islands
+description: 在服务端渲染的页面上加入可交互组件。只有被标记为岛屿的组件才会向浏览器发送 JavaScript。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+Islands 让你在整体保持静态的页面上添加可交互组件：服务端把页面渲染为 HTML，只有被标记为岛屿的组件才向浏览器发送 JavaScript。这一思路受 [Astro](https://docs.astro.build/en/concepts/islands/) 启发。
+
+例如，一篇博客文章可以让正文保持静态，只为评论表单或音频播放器加载 JavaScript。
+
+<Callout type="tip" title="前置条件">
+
+  Islands 模式建立在[页面路由](/docs/pages-routing)之上。使用前需要先有可用的页面配置（已安装框架适配器、存在 `pages/` 目录、配好 Vite 插件）。
+
+</Callout>
+
+## 何时使用 Islands
+
+博客、营销页或只有少量交互组件的文档站适合用 islands。仪表盘这类需要共享客户端状态的应用，请直接用常规[页面路由](/docs/pages-routing)。
+
+## 创建岛屿页面
+
+给页面文件名加上 `.island` 后缀：
+
+```text title="pages/（以 React 为例）"
+└── blog/
+    ├── index.island.tsx    ← 岛屿页面
+    ├── index.server.ts
+    ├── _Counter.tsx        普通组件，作为岛屿使用
+    └── _PostForm.tsx
+```
+
+扩展名随你的框架而变（`.tsx`、`.vue`、`.svelte`）。
+
+岛屿页面渲染为 HTML，只对你标记为岛屿的组件做 hydration。导航使用整页加载。
+
+没有 loader 也没有动态参数的页面会自动[预渲染](/docs/edge/prerendering)。想退出预渲染，在配套的 `.server.ts` 文件里写 `export const prerender = false`。
+
+## 把组件标记为岛屿
+
+用[导入属性（import attributes）](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/import/with)标记哪些组件在客户端保持交互：
+
+```tsx title="React"
+// pages/blog/index.island.tsx
+import Counter from './_Counter' with { island: 'load' };
+import PostForm from './_PostForm' with { island: 'visible' };
+
+export default function BlogIndex({ posts }) {
+  return (
+    <div>
+      <h1>Blog</h1>
+      <Counter />
+      {posts.map((post) => (
+        <a key={post.slug} href={`/blog/${post.slug}`}>
+          {post.title}
+        </a>
+      ))}
+      <PostForm />
+    </div>
+  );
+}
+```
+
+```vue title="Vue"
+<!-- pages/blog/index.island.vue -->
+<script setup lang="ts">
+import Counter from './_Counter.vue' with { island: 'load' };
+import PostForm from './_PostForm.vue' with { island: 'visible' };
+
+const { posts } = defineProps<{ posts: { slug: string; title: string }[] }>();
+</script>
+
+<template>
+  <div>
+    <h1>Blog</h1>
+    <Counter />
+    <a v-for="post in posts" :key="post.slug" :href="`/blog/${post.slug}`">
+      {{ post.title }}
+    </a>
+    <PostForm />
+  </div>
+</template>
+```
+
+```svelte title="Svelte"
+<!-- pages/blog/index.island.svelte -->
+<script>
+import Counter from "./_Counter.svelte" with { island: "load" };
+import PostForm from "./_PostForm.svelte" with { island: "visible" };
+
+let { posts } = $props();
+</script>
+
+<div>
+  <h1>Blog</h1>
+  <Counter />
+  {#each posts as post}
+    <a href="/blog/{post.slug}">{post.title}</a>
+  {/each}
+  <PostForm />
+</div>
+```
+
+```tsx title="Solid"
+// pages/blog/index.island.tsx
+import { For } from 'solid-js';
+import Counter from './_Counter' with { island: 'load' };
+import PostForm from './_PostForm' with { island: 'visible' };
+
+export default function BlogIndex(props) {
+  return (
+    <div>
+      <h1>Blog</h1>
+      <Counter />
+      <For each={props.posts}>{(post) => <a href={`/blog/${post.slug}`}>{post.title}</a>}</For>
+      <PostForm />
+    </div>
+  );
+}
+```
+
+不带 `island` 属性导入的组件只渲染为静态 HTML，不会为它们向浏览器发送任何 JavaScript。
+
+<Callout type="warn" title="TypeScript 配置">
+
+  导入属性要求 `tsconfig.json` 中设置 `"module": "ESNext"`：
+
+  ```json
+  {
+    "compilerOptions": {
+      "module": "ESNext"
+    }
+  }
+  ```
+
+</Callout>
+
+## Hydration 策略
+
+`island` 属性的取值控制组件在何时完成 hydration：
+
+| 策略              | 何时 hydration           | 适用场景                       |
+| ----------------- | ------------------------ | ------------------------------ |
+| `"load"`          | 页面加载时               | 关键的交互 UI（表单、导航菜单）|
+| `"visible"`       | 元素进入视区时           | 首屏以下的内容                 |
+| `"idle"`          | 浏览器空闲时             | 非关键的增强功能               |
+| `"media:(query)"` | CSS 媒体查询匹配时       | 响应式组件（如仅移动端）       |
+
+```tsx
+import Comments from './_Comments' with { island: 'visible' };
+import CookieBanner from './_CookieBanner' with { island: 'idle' };
+import MobileMenu from './_MobileMenu' with { island: 'media:(max-width: 768px)' };
+```
+
+## 服务端处理器
+
+岛屿页面与常规页面使用相同的 `loader` 与 `action` 模式，配套的 `.server.ts` 文件用法完全一致：
+
+```ts title="pages/blog/index.server.ts"
+// pages/blog/index.server.ts
+import { defineHandler } from 'void';
+
+export const loader = defineHandler((c) => {
+  return c.json({ posts: getAllPosts() });
+});
+
+export const action = defineHandler(async (c) => {
+  const body = await c.req.json();
+  // 校验、创建文章……
+  return c.json({ success: true });
+});
+```
+
+action 成功后，岛屿页面会通过 `window.location` 重新加载或跳转。常规页面路由则使用 Void Router 获取新的 props。
+
+## 表单
+
+岛屿组件里的表单用 `useIslandForm`。它提供与 `useForm` 相同的表单状态，提交方法接收 action URL：
+
+```tsx title="React"
+import { useIslandForm } from '@void/react';
+
+export default function PostForm() {
+  const form = useIslandForm({ title: '', body: '' });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        return form.post('/blog');
+      }}
+    >
+      <label htmlFor="title">Title:</label>
+      <input
+        id="title"
+        value={form.data.title}
+        onChange={(e) => form.setData('title', e.target.value)}
+      />
+      {form.errors.title && <span>{form.errors.title}</span>}
+
+      <label htmlFor="body">Body:</label>
+      <textarea
+        id="body"
+        value={form.data.body}
+        onChange={(e) => form.setData('body', e.target.value)}
+      />
+      {form.errors.body && <span>{form.errors.body}</span>}
+
+      <button disabled={form.pending}>{form.pending ? 'Saving...' : 'Add Post'}</button>
+    </form>
+  );
+}
+```
+
+```vue title="Vue"
+<script setup lang="ts">
+import { useIslandForm } from '@void/vue';
+
+const form = useIslandForm({ title: '', body: '' });
+
+function submit() {
+  return form.post('/blog');
+}
+</script>
+
+<template>
+  <form @submit.prevent="submit">
+    <label for="title">Title:</label>
+    <input id="title" v-model="form.data.title" />
+    <span v-if="form.errors.title">{{ form.errors.title }}</span>
+
+    <label for="body">Body:</label>
+    <textarea id="body" v-model="form.data.body" />
+    <span v-if="form.errors.body">{{ form.errors.body }}</span>
+
+    <button :disabled="form.pending">
+      {{ form.pending ? 'Saving...' : 'Add Post' }}
+    </button>
+  </form>
+</template>
+```
+
+```svelte title="Svelte"
+<script>
+import { useIslandForm } from "@void/svelte";
+
+const form = useIslandForm({ title: "", body: "" });
+
+function submit() {
+  return form.post("/blog");
+}
+</script>
+
+<form on:submit|preventDefault={submit}>
+  <label for="title">Title:</label>
+  <input id="title" bind:value={form.data.title} />
+  {#if form.errors.title}<span>{form.errors.title}</span>{/if}
+
+  <label for="body">Body:</label>
+  <textarea id="body" bind:value={form.data.body} />
+  {#if form.errors.body}<span>{form.errors.body}</span>{/if}
+
+  <button disabled={form.pending}>
+    {form.pending ? "Saving..." : "Add Post"}
+  </button>
+</form>
+```
+
+```tsx title="Solid"
+import { useIslandForm } from '@void/solid';
+import { Show } from 'solid-js';
+
+export default function PostForm() {
+  const form = useIslandForm({ title: '', body: '' });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        return form.post('/blog');
+      }}
+    >
+      <label for="title">Title:</label>
+      <input
+        id="title"
+        value={form.data.title}
+        onInput={(e) => form.setData('title', e.target.value)}
+      />
+      <Show when={form.errors.title}>
+        <span>{form.errors.title}</span>
+      </Show>
+
+      <label for="body">Body:</label>
+      <textarea
+        id="body"
+        value={form.data.body}
+        onInput={(e) => form.setData('body', e.target.value)}
+      />
+      <Show when={form.errors.body}>
+        <span>{form.errors.body}</span>
+      </Show>
+
+      <button disabled={form.pending}>{form.pending ? 'Saving...' : 'Add Post'}</button>
+    </form>
+  );
+}
+```
+
+`useIslandForm` 提供与 [`useForm`](/docs/pages-routing/actions-and-forms) 相同的表单状态。向 `post`、`put`、`patch` 或 `delete` 传入 action URL 即可提交。
+
+启用 [`routing.typedRoutes`](/docs/type-safety) 后，该 URL 必须匹配你的某条路由。用 `routeUrl()` 构造；对你自己在运行时校验的 URL 使用 `as RouteUrl`。
+
+提交成功会重新加载页面；重定向会导航到目标。`422` 响应会从 `{ errors: { field: "message" } }` 填充 `errors`。提交方法返回 `Promise<void>`。
+
+## 导航
+
+岛屿页面没有 Void Router。导航请直接用普通的 `<a>` 标签：
+
+```tsx
+// ✅ 在岛屿页面里使用普通链接
+<a href="/blog/my-post">Read more</a>
+
+// ❌ 不要用 <Link>；没有 Void Router 来处理它
+<Link href="/blog/my-post">Read more</Link>
+```
+
+从常规页面导航到岛屿页面时（例如通过 `<Link>`），router 会识别目标是岛屿页面，自动退回整页导航。
+
+## 布局
+
+岛屿页面与常规页面一样支持[布局](/docs/pages-routing/layouts)。布局在服务端渲染时包裹页面。岛屿页面中的布局组件是**纯静态的**，不会在客户端 hydration。
+
+## 混用岛屿与常规页面
+
+岛屿页面与常规页面可以在同一个应用中共存：
+
+```text title="pages/（以 React 为例）"
+├── index.tsx              常规页面（完整 hydration，Void Router）
+├── about.tsx              常规页面
+└── blog/
+    ├── index.island.tsx   岛屿页面（部分 hydration，静态 HTML）
+    └── [slug].island.tsx  岛屿页面
+```
+
+常规页面之间的导航由 Void Router 处理。进入或离开岛屿页面的导航会触发整页加载。

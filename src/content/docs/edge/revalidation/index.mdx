@@ -1,0 +1,138 @@
+---
+title: 重新验证（ISR）
+description: 缓存渲染好的页面并在后台刷新它，访客可以继续阅读旧版本，同时新版本正在渲染。
+---
+
+重新验证会缓存渲染好的页面，并在后台刷新它们。当缓存的页面过期时，Worker 会渲染更新后的版本，而访客仍然可以继续读旧页面。这套机制通常被称为 [Incremental Static Regeneration（ISR）](https://vercel.com/docs/incremental-static-regeneration)。
+
+请配合 [Void SSR](/docs/ssr)、[Pages 模式](/docs/pages-routing)或[受支持的 SSR 框架](/docs/frameworks)使用。对于框架应用，Void 缓存的是公开的 HTML 文档响应，而不是框架的数据请求。
+
+如果想在全应用范围内关闭 Void 的 ISR 缓存、同时保留各页面的设置，请在 `void.config.ts` 中设置 `"routing": { "isr": false }`，这会覆盖各页面的 revalidate 与 prerender 策略；把 `isr` 改回 `true` 即可重新启用这些策略。`output: "static"` 的构建期 HTML 生成不受影响。
+
+## 开启重新验证
+
+在 `void.config.ts` 中添加 `routing.revalidate` 字段，值为以秒为单位的 TTL：
+
+```json
+{
+  "routing": {
+    "revalidate": 60
+  }
+}
+```
+
+把 `revalidate` 设为 `0` 会关闭重新验证（等价于普通 SSR）。
+
+## 按路径重新验证
+
+可以用对象为不同的 URL 模式设置不同的 TTL：
+
+```json
+{
+  "routing": {
+    "revalidate": {
+      "/": 60,
+      "/docs/*": 31536000,
+      "/user/*": 0,
+      "*": 30
+    }
+  }
+}
+```
+
+规则按顺序匹配，第一条命中的生效。`*` 匹配任意字符，包括 `/`。
+
+特殊取值：
+
+- `31536000`（一年）：实际上会一直缓存到下一次部署，因为部署会清空 ISR 缓存
+- `0`：永不缓存，始终由 worker 渲染，对该路径而言等价于普通 SSR
+
+## 按页面重新验证（Pages 模式）
+
+在 [Pages 模式](/docs/pages-routing)中，可以从 `.server.ts` 文件导出 `revalidate`，为该页面覆盖全局配置：
+
+```ts title="pages/products/index.server.ts"
+export const revalidate = 120; // 缓存 2 分钟
+
+export const loader = defineHandler(async (c) => {
+  // ...
+});
+```
+
+导出值请直接写 `3600` 这样的整数；`60 * 60` 这类表达式和再导出会被忽略并给出警告。
+
+页面级的取值优先于 `void.config.ts` 中的模式。
+
+页面的 `revalidate` 导出同样作用于 URL 与该页面模式匹配的 `routes/` 处理器。例如 `pages/[...slug].server.ts` 导出了 `revalidate`，Void 也可以缓存 `routes/now.ts` 的 `GET` 响应。Void 从不缓存 `/api` 下的路径。要让某个路由处理器的响应不进缓存，请给它设置 `x-revalidate: 0`，参见[按响应覆盖 TTL](#按响应覆盖-ttl)。
+
+## 优先级
+
+当多个来源都设置了 revalidate TTL 时，越具体的越优先：
+
+1. `x-revalidate` 响应头（按响应）
+2. `.server.ts` 导出（按页面，仅 Pages 模式）
+3. `void.config.ts` 中 `routing.revalidate` 的路径模式匹配
+4. `void.config.ts` 中 `routing.revalidate` 的全局数字或 `"*"` 兜底值
+
+## 重新验证的工作方式
+
+第一个请求会渲染并缓存页面。缓存仍然新鲜时，访客会直接拿到它。一旦过期，Void 一边把旧页面继续返回，一边在后台渲染更新后的版本。
+
+没有缓存条目的请求会等待页面渲染完成。
+
+## 按响应覆盖 TTL
+
+路由处理器可以设置 `x-revalidate` 响应头，为某个具体响应覆盖 TTL：
+
+```ts
+export const GET = defineHandler(async (c) => {
+  // 这个响应不缓存
+  c.header('x-revalidate', '0');
+
+  return c.html('...');
+});
+```
+
+- `x-revalidate: 0`：本次响应跳过缓存
+- `x-revalidate: 300`：改为缓存 5 分钟
+
+只有完整的 `200` 响应会被缓存。带 `Cache-Control: private`、`no-store` 或 `no-cache` 的响应，或任何带 `Set-Cookie` 头部的响应，都只属于该次请求。如果原本公开的页面开始返回这些头部之一，Void 会移除它的缓存响应。
+
+会随请求头部变化的响应，例如 `Vary: Accept-Language` 或 `Vary: Origin`，会实时渲染；`Vary: *` 同样会关闭共享缓存。Void 的 `X-VoidPages` 头部受支持，因为 HTML 与 Pages JSON 各有独立的缓存响应。
+
+## 绕过缓存
+
+带 `Cookie`、`Authorization` 或 Cloudflare Access 的 `Cf-Access-Jwt-Assertion` 头部的请求会完全绕过 ISR 缓存，始终派发到 worker。已认证的响应不会在不同用户之间共享，即使 Access 认证没有给出 cookie 也是如此。
+
+如果请求协商出与缓存的 HTML 文档不同的表示形式，也会绕过缓存，因为每个路径只保存一份缓存响应体。`Accept: text/event-stream` 与 `Accept: text/markdown` 就属于这种情况，因此用其他格式应答这些请求的中间件会在每个请求上运行。
+
+## 缓存键与 rewrite
+
+对于 dispatch rewrite，缓存键同时包含目标地址和原始 pathname。因此直接请求 `/en/docs/foo` 与 `/docs/foo` rewrite 到该地址用的是不同的缓存条目。
+
+查询参数默认被排除。当某些参数应当产生独立的缓存响应时，请添加 `routing.revalidateQueryAllowlist`。带其他查询参数的请求会拿到缓存页面；如果还没有缓存，它们会实时渲染且不会被存储，所以请把页面读取到的每个参数都加入 `routing.revalidateQueryAllowlist`。中间件里的 `c.rewrite()` 在 ISR 查找之后执行，因此不会额外生成一个缓存变体。
+
+请用 `revalidate({ paths })` 清理目标 pathname。清理 `/en/docs/foo` 会同时清除直接访问与 rewrite 两种变体；只清理 `/docs/foo` 清不掉它们，因为条目是存在目标地址下的。
+
+## 按需重新验证
+
+你可以在路由处理器中以编程方式清理 ISR 缓存条目：
+
+```ts
+import { defineHandler } from 'void';
+import { revalidate } from 'void/isr';
+
+export const POST = defineHandler(async (c) => {
+  // ... 在数据库中更新内容 ...
+
+  // 清理指定页面
+  await revalidate({ paths: ['/', '/blog/hello-world'] });
+
+  // 或者清理所有缓存页面
+  await revalidate({ all: true });
+
+  return c.json({ ok: true });
+});
+```
+
+开启 [`routing.typedRoutes`](/docs/config) 后，TypeScript 会把每个路径与你的路由做比对。对于运行时才校验的路径，请使用 `void/routes` 的 `as RouteUrl` 跳过类型检查。

@@ -1,0 +1,115 @@
+---
+title: 代码生成命令
+description: 生成 Drizzle 数据表，以及用于列表、创建与按 ID 取回单行的路由。
+---
+
+## `void gen model`
+
+```sh
+void gen model <name> [columns...]
+```
+
+生成一张 Drizzle 数据表、列表与创建路由，以及一个按 ID 取回单行的路由。
+
+```sh
+void gen model posts title:string body:text published:boolean
+```
+
+会创建：
+
+- `db/schema/posts.ts`：一张包含 `id`、`createdAt`、`updatedAt` 以及你所给列的表
+- `db/schema.ts` 中的一处导出
+- `routes/api/posts/index.ts`：`GET` 返回列表，`POST` 带校验地插入
+- `routes/api/posts/[id].ts`：按 id 的 `GET`，并处理 `404`
+- `.void/` 中重新生成的类型与 TypeScript 配置
+
+生成的路由会从 `package.json` 自动识别你的校验库（`valibot`、`zod` 或 `arktype`）。都找不到时会提示你选择一个，或跳过校验。运行 `void db push` 在本地应用 schema，或在部署之前用 `void db generate` 生成迁移。
+
+列的写法：`name:type` 或 `name:type?`（可空）。可用类型：`string`、`text`、`datetime`、`integer`、`boolean`、`real`、`blob`。
+
+模型名必须由小写字母、数字与下划线组成（例如 `posts`、`user_roles`）。已有文件永远不会被覆盖。
+
+## `void gen migration`
+
+```sh
+void gen migration <name>
+```
+
+创建一个带时间戳前缀（`YYYYMMDDHHMMSS`）的空迁移文件。
+
+```sh
+void gen migration add_avatar_to_users
+# → db/migrations/20260410161500_add_avatar_to_users.sql
+```
+
+仍在使用旧数字前缀（`0001_`、`0002_` ……）的项目，可以用 `void db rename-migrations` 重命名。
+
+## `void gen route`
+
+```sh
+void gen route <path> [--methods get,post,...]
+```
+
+创建一个以 `defineHandler` 导出的路由文件。默认为 GET。
+
+```sh
+void gen route api/health
+void gen route api/users --methods get,post,delete
+```
+
+生成 `routes/<path>.ts`，为每个方法各导出一个处理器。支持的方法：`get`、`post`、`put`、`patch`、`delete`。
+
+## `void gen middleware`
+
+```sh
+void gen middleware <name>
+```
+
+创建一个带编号的中间件文件，默认导出 `defineMiddleware`。
+
+```sh
+void gen middleware auth
+# → middleware/01.auth.ts（或 02、03 等）
+```
+
+编号前缀会根据已有的中间件文件自动推算。
+
+## `void gen ssr`
+
+```sh
+void gen ssr [--react | --vue | --svelte | --solid]
+```
+
+为你的框架生成 SSR 入口与一个最简 App 组件。
+
+会创建三个文件：
+
+- `src/main.ssr.{tsx,ts}`：服务端入口，使用 `defineRender`
+- `src/main.client.{tsx,ts}`：客户端入口，带 hydration
+- `src/App.{tsx,vue,svelte}`：最小的可交互组件
+
+不传 flag 时，框架会从 `package.json` 的依赖自动识别。
+
+## `void gen cron`
+
+```sh
+void gen cron <name>
+```
+
+在 `crons/` 中创建一个 cron 任务文件，包含 `defineScheduled` 与一个占位的 cron 表达式。
+
+```sh
+void gen cron hourly-sync
+```
+
+## `void gen queue`
+
+```sh
+void gen queue <name>
+```
+
+在 `queues/` 中创建一个队列消费者文件，包含 `defineQueue`、一个 `Message` 类型，以及注释掉的批次选项。
+
+```sh
+void gen queue emails
+```

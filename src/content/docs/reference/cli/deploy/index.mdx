@@ -1,0 +1,108 @@
+---
+title: 部署命令
+description: 构建应用、开通资源、应用迁移并发布上线。
+---
+
+## `void deploy`
+
+```sh
+void deploy [--project <name>] [--dir <path>] [--spa] [--skip-build] [--skip-migrations] [--debug]
+void deploy [--platform <cloudflare|void>] [--require-email]
+void deploy --platform cloudflare --atomic
+void deploy --platform cloudflare --provision
+```
+
+自动检测项目类型并选择合适的流水线。细节见[支持的应用类型](/docs/app-types)与[部署](/docs/deployment)。
+
+部署到 Void 平台要求先用 `void connect <url>` 建立显式连接。仅有保存的项目 URL 或 `VOID_API_URL` 并不构成连接。在全新 CI 环境里，先运行 `void connect "$VOID_API_URL" --no-login`。
+
+在 Void 平台上，一次已被接受的部署即使 CLI 断开也会继续。CLI 会自动重连并跟进进度。按下 Ctrl+C 只是停止观察；用 `void project cancel` 请求取消，用 `void project status` 查看结果。如果被中断的执行需要恢复，请等它出结果后再部署。
+
+CLI 会报告进度停滞与自动恢复，并在部署被接受后最多等待 30 分钟。如果超时，部署仍可能继续；在尝试下一次部署之前先用 `void project status` 检查。
+
+对于已存在的 Void Worker，`void deploy` 可以关联该 Worker 并迁移其根目录的 Cloudflare 配置。第一次部署请只聚焦于已有应用本身。要求与 ISR 缓存的选择见[部署已有的 Worker](/docs/integrations/cloudflare)。
+
+对 Drizzle 项目，部署会执行一次只读的 schema 漂移检查。如果此时应当生成新迁移，部署会停止并提示你运行 `void db generate`、检查迁移、自行提交，然后重新执行 `void deploy`。
+
+| Flag                            | 用途                                                                                                           |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `--platform <cloudflare\|void>` | 覆盖 `.void/project.json` 中保存的平台                                                                         |
+| `--project <name>`              | 按 slug 指定某个 Void 项目；与 `--platform cloudflare` 不能同时使用                                            |
+| `--dir <path>`                  | 部署一个预先构建好的静态目录（跳过构建）                                                                       |
+| `--spa`                         | 静态部署时使用 SPA 模式而非 SSG                                                                                |
+| `--skip-build`                  | 跳过构建步骤；在 Cloudflare 上仅静态/SPA/SSG 部署支持                                                          |
+| `--skip-migrations`             | 部署时不应用应用或认证的 SQL 迁移；Cloudflare 与 Void 平台均支持                                               |
+| `--require-email`               | 邮件无法配置时直接失败，而不是不带邮件部署；需要 `--platform cloudflare`                                       |
+| `--provision`                   | 即使所有资源都已存在也重新执行资源开通；需要 `--platform cloudflare`                                           |
+| `--atomic`                      | 直接发布已有的 Durable Object Worker；流量切换之后再检查就绪状态                                               |
+| `--debug`                       | 把结构化部署日志同步输出到 stderr（日志本身也会写入 `~/.void/logs/`）                                          |
+
+`--atomic` 只作用于单次部署。如果一个已有的 Durable Object Worker 持续无法进入 staged 阶段，请在 `void.config.ts` 里设置 `deploy: { cloudflare: { mode: 'atomic' } }`，这样普通的 `void deploy` 就会使用原子发布。默认值是 `staged`。
+
+当你单独执行迁移，或与预览环境共用同一个数据库时，使用 `--skip-migrations`。代码必须能在数据库当前 schema 上工作。下一次不带该 flag 的部署会应用待处理迁移。
+
+请继续保留迁移文件与 schema 校验。这个选项跳过的只是应用与认证的 SQL；发布代码时 Durable Object 类迁移仍会执行。如果某个 Void 平台不支持该 flag，请先升级平台。
+
+每次部署都会向 `~/.void/logs/` 写入一份 JSONL 日志。失败时会打印日志路径与相关信息。用 `--debug` 或 `VOID_DEPLOY_DEBUG=1` 把它同步到 stderr。
+
+不要让凭据出现在构建命令里，请把它们登记为 CI secrets，这样 CI 提供方才能在日志中打码。
+
+平台解析优先级：
+
+1. `--platform <cloudflare|void>`
+2. `.void/project.json` 中的 `platform`
+3. 对于由旧版 SDK 初始化、且没有保存平台的项目，使用 Void
+
+选择「跳过部署配置」会写入 `"platform": "none"`；之后运行 `void deploy` 会停止并给出指引，直到你提供平台覆盖。
+
+在 Void 平台上，项目解析优先级为：
+
+1. `--project <name>`
+2. `VOID_PROJECT`
+3. `.void/project.json` 中关联的项目
+
+如果没有关联项目也没给出覆盖值，CLI 会提示你关联或新建一个。在 CI（非 TTY）中，`void deploy` 会直接报错——请设置 `VOID_PROJECT` 或传入 `--project <slug>`。
+
+若要在某次调用中部署到另一个已连接的 Void 平台：
+
+```sh
+void connect second.example.com
+VOID_API_URL=https://second.example.com void deploy --platform void --project my-app
+```
+
+`VOID_API_URL` 决定平台，`--project` 决定该平台的项目。当覆盖的是另一个平台已保存的关联时，必须显式写出项目名。已有的项目关联与部署偏好都不会被改动，即使目标项目是新创建的。`VOID_PROJECT` 以及当前平台上的其他项目同理。在未配置目标的情况下，首次部署仍会关联项目。见[部署到另一个 Void 平台](/docs/deployment)。
+
+## `void deploy --platform cloudflare`
+
+按 `void.config.ts` 构建并部署到你的 Cloudflare 账户：
+
+```sh
+void deploy --platform cloudflare
+void deploy --platform cloudflare --require-email   # 邮件配置不了就失败，而不是不带邮件部署
+```
+
+Void 会在需要时通过浏览器让你登录，并保存所选账户。在 CI 中请设置 `CLOUDFLARE_API_TOKEN`；如果该 token 能访问多个账户，还要设置 `CLOUDFLARE_ACCOUNT_ID`。
+
+| 选项或配置                     | Cloudflare 行为                                                                                                                             |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--dir`、`--spa`               | 通过一个很小的 Worker 与 Workers Assets 部署静态产物                                                                                        |
+| `--skip-build`                 | 复用已有的静态、SPA 或 SSG 产物；Worker 应用不可用                                                                                          |
+| `--skip-migrations`            | 跳过数据库迁移；已有的 PostgreSQL/MySQL Hyperdrive 绑定不会仅因跳过 SQL 就要求 `DATABASE_URL`                                               |
+| `--project`                    | 不可用；Worker 与账户来自 `void.config.ts` 与 `void.lock.json`                                                                              |
+| 具名环境                       | 不可用；请使用顶层的 `cloudflare` 配置                                                                                                      |
+| `CLOUDFLARE_WORKERS_SUBDOMAIN` | 当 workers.dev 的 Worker 没有预览 URL 时，全新 CI 需要它；部署后会缓存在本地。当 `workers_dev` 为 false 时不生效                          |
+| `CF_ACCESS_READINESS_ORIGIN`   | 让 Access 凭据能够访问路由或 Custom Domain 上的就绪检查，例如 `https://app.example.com`                                                     |
+| `--require-email`              | 当邮件步骤无法执行时（例如 CI 中）宁可失败，也不要在没有邮件的情况下部署                                                                    |
+| `DATABASE_URL`                 | PostgreSQL 或 MySQL 的开通与迁移要求在部署环境中提供                                                                                        |
+
+使用过 `--skip-migrations` 之后，直连 Cloudflare 的部署历史会把已应用的迁移状态显示为 unknown。回滚代码不会逆转数据库变更。
+
+token 需要 Workers Scripts: Edit、对绑定资源的读取权限，以及对 Void 所要开通产品的编辑权限。第一次部署后请提交 `void.lock.json`，之后才能在其他机器或 CI 上使用。
+
+生产环境的服务端值请用 `void secret put <NAME>` 设置。本地 `.env` 的值永远不会被部署。部署前请运行 `void db generate` 并提交 schema 变更。
+
+Sandbox 需要 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans)、Docker 以及 Containers 访问权限。API token 需要 Account / Containers: Edit 与 Account / Cloudchamber: Edit。
+
+邮件方面，请设置 `email.from` 并在本地运行 `void email setup --platform cloudflare`。提交 lock 文件，并在 CI 中传入 `--require-email`。见[邮件配置](/docs/email/domains)。
+
+Access 凭据、Hyperdrive 权限、就绪检查与回滚，见 [Cloudflare 部署](/docs/integrations/cloudflare)。

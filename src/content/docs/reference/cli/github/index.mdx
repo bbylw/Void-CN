@@ -1,0 +1,178 @@
+---
+title: GitHub 与构建命令
+description: 连接 GitHub，让推送触发构建与部署——无论你用哪种方式登录 Void。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+基于 GitHub 的部署在**任意** Void 登录方式下都可用——Google、GitHub 或其他 SSO。第一次连接 GitHub 时，Void 会把你的 GitHub 身份关联到当前账户（一次性步骤，与登录方式无关），绝不会创建第二个账户。
+
+项目级的 `github` 与 `build` 命令按与 deploy 相同的顺序解析项目：先看 `[project]` 参数或 `--project`，再看 `VOID_PROJECT`，最后是已关联的项目（`.void/project.json`）。
+
+## `void github link`
+
+```sh
+void github link
+```
+
+通过浏览器把已登录的 Void 账户与 GitHub 关联起来。`void github install` 在需要时会自动完成这一步。
+
+<Callout type="warn" title="已有 GitHub 登录">
+  一个 GitHub 身份只能属于一个 Void 账户。如果它已经关联到其他账户，请登录那个 Void 账户，或者授权另一个 GitHub 身份。
+</Callout>
+
+## `void github install`
+
+```sh
+void github install
+```
+
+在浏览器中打开 GitHub App 的安装页面。如果你的账户还没有关联 GitHub 身份，`void github install` 会先自动执行关联流程（浏览器授权），再继续。安装完成后，运行 `void github connect` 把仓库与项目关联起来。
+
+## `void github installations`
+
+```sh
+void github installations
+```
+
+列出与你账户关联的全部 GitHub App installation。每条都带有 `[id: <installation_id>]`，非交互使用时 `--installation` 需要它。
+
+## `void github join`
+
+```sh
+void github join
+```
+
+通过浏览器加入一个已存在的组织级 installation。在交互式终端里，`void github connect` 可以自动完成。需要非交互配置时，请先在本地运行 `join`。
+
+前提是已登录 Void 账户，并且你的平台开启了组织 installation 共享。可用 `void github installations` 查找 installation ID。
+
+## `void github connect`
+
+```sh
+void github connect [project] [options]
+```
+
+把 GitHub 仓库关联到某个 Void 项目以实现自动部署。此后每次推送到配置的分支，Void 都会自动构建并部署你的项目。
+
+需要 GitHub 授权时 CLI 会打开浏览器。如果没有可用的 installation，请运行 `void github install`。
+
+**选项**
+
+| Flag                  | 说明                                                                             |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `--project <name>`    | 项目名（位置参数的别名）                                                         |
+| `--installation <id>` | GitHub App installation ID（你有多个 installation 时必填）                       |
+| `--repo <owner/repo>` | 仓库全名——除非该 installation 恰好只授权一个仓库，否则必填                       |
+| `--branch <name>`     | 部署来源分支——**非交互模式下必填**                                               |
+| `--executor <type>`   | 构建执行器：`container`（默认）或 `github_actions`                               |
+| `--workflow <path>`   | 被授权的部署 workflow 文件——默认为 `.github/workflows/void-deploy.yml`          |
+
+平台构建选择 `container`，部署 workflow 选择 `github_actions`。CLI 会询问执行器，以及 GitHub Actions 对应的 workflow 文件；传入相应 flag 即可跳过这些询问。
+
+workflow 必须是 `.github/workflows/` 下的 `.yml` 或 `.yaml` 文件。只有该 workflow 能拿到项目的 OIDC 部署 token。建议使用专门的部署 workflow。
+
+在 CI 中，请提供项目与分支，以及在无法自动选择时的 installation 与仓库。组织级连接需要先在本地浏览器中完成仓库授权。
+
+```sh
+void github connect my-app \
+  --installation 42 \
+  --repo owner/my-app \
+  --branch main
+```
+
+你只能关联自己 GitHub 账户有权访问的仓库。
+
+一个项目只有一个 GitHub 连接。对已连接的项目再次运行 `void github connect` 会失败。要改连其他仓库，请先运行 `void github disconnect`。
+
+## `void github update`
+
+```sh
+void github update [project] [options]
+```
+
+修改已有连接的分支、执行器或 workflow。要更换仓库，请先断开再重新连接。
+
+**选项**
+
+| Flag                | 说明                                                           |
+| ------------------- | -------------------------------------------------------------- |
+| `--project <name>`  | 项目名（位置参数的别名）                                       |
+| `--branch <name>`   | 新的部署来源分支                                               |
+| `--executor <type>` | 新的构建执行器：`container` 或 `github_actions`                |
+| `--workflow <path>` | 新的被授权部署 workflow 文件（位于 `.github/workflows/` 下）   |
+
+CLI 会以当前值为默认逐项询问新设置。在 CI 中，请至少传入 `--branch`、`--executor` 或 `--workflow` 之一。
+
+```sh
+void github update my-app --executor github_actions
+```
+
+## `void github status`
+
+```sh
+void github status [project]
+```
+
+显示已关联的仓库、分支、执行器与 workflow。container 构建不使用 workflow 文件。
+
+**选项**
+
+| Flag               | 说明                                     |
+| ------------------ | ---------------------------------------- |
+| `--project <name>` | 项目名（位置参数的别名）                 |
+
+```sh
+void github status my-app
+```
+
+## `void github disconnect`
+
+```sh
+void github disconnect [project]
+```
+
+断开项目与其 GitHub 仓库的关联，停止自动部署。连接移除之前，该项目正在进行的构建会被取消。如果项目本来就没有连接，命令会说明这一点并成功退出。要把项目指向另一个仓库，请先断开，再运行 `void github connect`。
+
+删除任何内容之前会先请求确认。传 `--yes` 跳过确认；在非交互 shell（CI）中 `--yes` 是**必需**的，因为那里无人回答问题。
+
+**选项**
+
+| Flag               | 说明                                                |
+| ------------------ | --------------------------------------------------- |
+| `--project <name>` | 项目名（位置参数的别名）                            |
+| `--yes`            | 跳过确认提示（非交互 shell 中必需）                 |
+
+```sh
+void github disconnect my-app --yes
+```
+
+## 构建
+
+查看基于 GitHub 的部署构建。
+
+### `void build logs`
+
+```sh
+void build logs [build] [--follow] [--output <file>] [--project <slug>]
+```
+
+流式输出、截尾查看或下载一次 **container** 构建的构建日志。不带 `[build]` 参数时，目标是该项目最近一次构建。
+
+| Flag                     | 用途                                                                 | 默认值 |
+| ------------------------ | -------------------------------------------------------------------- | ------ |
+| `--follow`, `-f`         | 实时跟踪：轮询直到构建结束并取到最终日志。                           | 关闭   |
+| `--output <file>`, `-o`  | 把日志写入文件而不是 stdout（跟踪模式下以追加方式写入）。            | stdout |
+| `--project <slug>`, `-p` | 目标项目。                                                           | 已关联 |
+
+运行在 **GitHub Actions** 上的构建把日志留在 GitHub——该命令会打印 Actions run 的 URL 而不是做流式输出。container 构建只保留最后 10000 行日志。
+
+跟踪模式会等待平台确认最终的日志结尾。如果平台无法确认，请升级平台运行时，或者不加 `--follow` 读取已保留的日志。未完成的最终日志尾巴会在两分钟后报错，重试即可取回。
+
+示例：
+
+```sh
+void build logs                       # 打印最近一次构建的日志
+void build logs -f                    # 跟踪最近一次构建直到结束
+void build logs bld_123 -o build.log  # 下载指定构建的日志
+```

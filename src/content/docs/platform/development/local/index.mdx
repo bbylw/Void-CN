@@ -1,0 +1,107 @@
+---
+title: 本地开发
+description: 克隆仓库、安装工作区依赖，并用 Vite+ 在本地运行平台。
+---
+
+## 准备仓库
+
+克隆你的 fork，并用 Vite+ 安装工作区依赖：
+
+```sh
+git clone https://github.com/your-org/void.git
+cd void
+vp install
+vpr install:void-dev
+void-dev --help
+```
+
+使用 `.node-version` 中记录的 Node.js 版本。
+
+`install:void-dev` 会构建 CLI、共享包与平台运行时，然后把本次 checkout 构建出的 CLI 以 `void-dev` 的名字全局可用。公共包导出的是它们的构建产物，因此后续改动源码后要运行 `vp run build:core` 来刷新这个别名。安装器不会替换一个无关的全局命令。要移除仅属于本次 checkout 的别名，运行 `vpr uninstall:void-dev`。本开发页面中的命令都在仓库根目录执行。
+
+## 定位实现
+
+| 目录                                                 | 用途                                                                 |
+| ---------------------------------------------------- | -------------------------------------------------------------------- |
+| `packages/void`                                      | 框架、应用运行时与 CLI                                               |
+| `packages/platform`                                  | 安装器契约、打包的 Worker 与平台迁移                                 |
+| `packages/deploy-core`、`packages/deploy-cloudflare` | 共享部署契约与 Cloudflare 上传代码                                   |
+| `platform/packages/api`                              | 用户、项目、部署、资源开通与管理端 API/UI                            |
+| `platform/packages/dispatch`                         | 应用路由与静态资源                                                   |
+| `platform/packages/proxy`                            | AI、远程绑定与重新校验                                               |
+| `platform/packages/email-gateway`                    | 入站邮件路由与租户投递                                               |
+| `platform/packages/tail`                             | 运行时日志摄取                                                       |
+| `platform/packages/dashboard`                        | Dashboard 源码与 `ui/` 中的本地 UI 组件                              |
+
+`@voidcloud/*` 命名标识工作区的实现包，它们的 `private: true` 标记会阻止这些包发布到 npm。可部署的核心 Worker 会被打包进公共的 `@void/platform` 包。
+
+核心安装器会创建 API、dispatch、proxy、tail 与 email gateway 这些 Worker。Dashboard 与托管 GitHub 构建服务在源码树中可用，但不包含在这套安装里。新增一个可选服务，需要同时准备好它的基础设施、绑定、认证与能力配置。
+
+## 在本地运行 API
+
+先启动一个本地 PostgreSQL 服务，并让 `psql` 与 `pg_isready` 在你的 path 上可用。然后创建开发数据库、应用它的迁移并写入一个管理员：
+
+```sh
+vp run --filter @voidcloud/api setup --admin-email dev@example.com
+vp run --filter @voidcloud/api dev:admin
+```
+
+该命令会关闭可选的构建容器，因此基础的 API 与管理端工作不需要 Docker。要开发托管构建功能，请安装 Docker 并在启用容器的情况下运行 API。
+
+打开 `http://localhost:8787/admin/`。Setup 会把 API 的本地数据库连接与开发态认证绕过写入 `platform/packages/api/.dev.vars`，并为独立的 dashboard 配置 `platform/packages/dashboard/.env`。这两个文件都被 Git 忽略。生产安装在通过安装器获得各自独立的凭据。
+
+API 的开发态绕过让你无需配置 OAuth 就能在浏览器里开发管理 UI。Operator CLI 会话仍然需要管理员认证，它们不走这个浏览器绕过。
+
+`dev:admin` 会监听源文件，并在编辑后自动重新加载浏览器。在修改 admin dashboard 的 React 组件与样式时让它保持运行即可，不需要部署平台。setup 还会准备示例用户、项目与部署，方便你在本地体验每个视图。
+
+## 在本地运行 Dashboard
+
+Dashboard 是一个独立的源码应用。完成 API setup 后，在另一个终端里启动它：
+
+```sh
+vp run --filter @voidcloud/dashboard dev
+```
+
+Setup 会把 dashboard 的本地 `.env` 指向你启动的 API：
+
+```dotenv
+API_URL=http://localhost:8787
+SITE_DOMAIN=apps.example.com
+```
+
+打开 Vite 给出的地址，选择 **Dev login (local API)**。只有当 API 是 localhost 时这个按钮才会出现，它使用本地的开发登录端点。
+
+你也可以让 dashboard 指向一个由你自己运维的 API。如果那个 API 受 Cloudflare Access 保护，请安装 `cloudflared`，并通过保持一致的 origin 启用 dashboard 的本地令牌助手：
+
+```dotenv
+API_URL=https://platform.example.com
+CF_ACCESS_APP_URL=https://platform.example.com
+SITE_DOMAIN=apps.example.com
+```
+
+这个助手会在 dev server 启动前刷新一次 Access 会话。人的 dashboard 请求既需要用户的 Access 会话，也需要他的 Void 登录；service token 并不代表该用户。service token 键值对用于受限范围的机器操作。这属于 dashboard 的开发配置，Access 凭据与平台登录凭据是分开的。
+
+对于已部署的 dashboard，把它的 `API` 服务绑定到你的平台 API，在 dashboard 与 API 两侧都配置 `DASHBOARD_URL`，并在平台的 Access 保护应用中包含这个确切的 dashboard origin。Dashboard 通过该 service binding 把浏览器的企业身份传给 API。它的登录页会展示平台当前启用的登录方式，**Account** 页面支持添加额外的登录身份。
+
+## 测试改动
+
+在开发过程中，运行与你改动区域相关的测试：
+
+```sh
+vp test run platform/packages/api/test/integration/operator-auth.test.ts
+vp check
+```
+
+在准备发布之前，构建所有包并执行完整检查：
+
+```sh
+vp run build:all
+vp check
+vp run check:types
+vp test run
+vp run build:docs
+```
+
+平台集成测试默认使用它们的本地测试数据库。要针对 PostgreSQL 测试，把 `VOID_TEST_DATABASE_URL` 指向一个可随意丢弃的数据库：这些测试会在用例之间清空表。
+
+要验证一个已部署的应用，部署一份 `playground/kitchen-sink` 的可丢弃副本，并把它的 URL 作为 `SMOKE_URL` 传给 `platform/scripts/kitchen-sink-smoke-test.md` 中描述的冒烟测试。该测试会创建并删除应用数据。

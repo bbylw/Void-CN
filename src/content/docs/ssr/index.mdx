@@ -1,0 +1,70 @@
+---
+title: 自定义 SSR
+description: 自己决定路由、数据加载、HTML 外壳与水合方式，或者改用 Pages Routing 让 Void 代劳。
+---
+
+用自定义 SSR 可以选择自己的路由、数据加载、HTML 外壳与 hydration 代码。如果希望 Void 代劳这些，请使用 [Pages Routing](/docs/pages-routing)。
+
+## 创建应用
+
+从一个根组件开始。下面这个 React 示例根据请求路径渲染页面：
+
+```tsx title="src/App.tsx"
+export default function App({ url }: { url: string }) {
+  return url === '/about' ? <main>About</main> : <main>Home</main>;
+}
+```
+
+## 必需的入口
+
+两个入口文件都要创建：
+
+- `src/main.ssr.ts` 或 `src/main.ssr.tsx`
+- `src/main.client.ts` 或 `src/main.client.tsx`
+
+服务端与客户端各用一个入口，两者都是必需的。
+
+## 渲染 API
+
+用 `defineRender()` 包装你的服务端渲染器并返回 HTML 响应。把 `assetTags.css` 与 `assetTags.preloads` 插进 `<head>`，把 `assetTags.body` 放在 `</body>` 之前：
+
+```tsx title="src/main.ssr.tsx"
+import { renderToString } from 'react-dom/server';
+import { defineRender } from 'void';
+import App from './App';
+
+export default defineRender(async (c, assetTags) => {
+  const url = new URL(c.req.raw.url);
+  const html = renderToString(<App url={url.pathname} />);
+  return new Response(
+    `<!doctype html>
+<html>
+  <head>${assetTags.css}${assetTags.preloads}</head>
+  <body>
+    <div id="root">${html}</div>
+    ${assetTags.body}
+  </body>
+</html>`,
+    { headers: { 'content-type': 'text/html; charset=utf-8' } },
+  );
+});
+```
+
+你也可以导出签名相同的具名函数 `render(c, assetTags)`。类型定义见 [`defineRender`](/docs/reference/api/handlers)。
+
+## 在浏览器中 hydration
+
+在客户端入口里 hydration 同一个组件：
+
+```tsx title="src/main.client.tsx"
+import { hydrateRoot } from 'react-dom/client';
+import App from './App';
+
+hydrateRoot(document.getElementById('root')!, <App url={window.location.pathname} />);
+```
+
+## 缓存
+
+SSR 页面的 stale-while-revalidate 缓存见[重新验证](/docs/edge/revalidation)。
+
+API 路由与静态文件会在自定义渲染之前被处理。未匹配的非 API 请求会走 `render(c, assetTags)`。

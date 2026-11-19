@@ -5,6 +5,8 @@ description: 把 UI 组件放进 pages/ 即可得到路由。页面的服务端 
 
 import Callout from '@/components/docs/Callout.astro';
 
+把 UI 组件放进 `pages/` 就得到了一条路由。页面的服务端 loader 返回数据，组件把它作为 props 接收。这一模式受 [Inertia.js](https://inertiajs.com/) 启发，支持 React、Vue、Svelte 与 Solid。
+
 存在 `pages/` 目录时即进入页面模式。它可以与 `routes/` 并存：页面负责 UI，`routes/` 负责 API。页面组件通常在首次请求时于服务端渲染，随后在浏览器中运行以完成导航与交互。
 
 你也可以保留自己的客户端路由，用[类型化 fetch](/docs/typed-fetch)调用 Void 的 API。页面模式是可选的。
@@ -77,7 +79,7 @@ export default defineConfig({
 
 ## 目录结构
 
-页面既可以是 `about.vue` 这样的扁平文件，也可以是 `about/index.vue` 这样的目录式路由，两者映射到同一个 URL。每个环境中，一个 URL 只对应一个页面文件。
+布局与共享数据见[布局与共享数据](/docs/pages-routing/layouts)。页面既可以是 `about.vue` 这样的扁平文件，也可以是 `about/index.vue` 这样的目录式路由，两者映射到同一个 URL。每个环境中，一个 URL 只对应一个页面文件。
 
 ```text title="pages/"
 ├── layout.tsx           根布局（包裹所有页面）
@@ -92,15 +94,15 @@ export default defineConfig({
     └── hello.md         → /blog/hello（Markdown 页面）
 ```
 
-每个页面都可以有一个配套的 `.server.ts` 文件，它只在服务端运行，可以导出：
+给页面配一个 `.server.ts` 文件来承载服务端代码，例如 `about.vue` 对应 `about.server.ts`。配套文件只在服务端运行，可以导出：
 
-- **loader**：在 GET 上运行，返回成为页面组件 props 的数据。
-- **actions**：处理来自表单与程序化调用的变更。一个页面可以导出单个 action，也可以导出多个具名 action。
+- [**loader**](/docs/pages-routing/loaders)：在 GET 上运行，返回成为页面组件 props 的数据。
+- [**actions**](/docs/pages-routing/actions-and-forms)：处理来自表单与程序化调用的变更。可以导出单个 `action`，页面有多个变更时导出多个[具名 action](/docs/pages-routing/actions-and-forms)。
 - `ssr = false`：让某条路由退出服务端渲染的组件 HTML，同时保留服务端 loader 与客户端路由。
 
-配套文件同样支持 `.js`、`.mts` 与 `.mjs`，也可以用 `.tsx` / `.jsx` 写含 [JSX 的处理器](/docs/server-routing#jsx-处理器)。
+配套文件同样支持 `.js`、`.mts`、`.mjs`，也可以用 `.tsx` / `.jsx` 写含 [JSX 的处理器](/docs/server-routing#jsx-处理器)。
 
-基于文件的路由规则与服务端路由相同：`[param]` 是动态段，`[...param]` 是 catch-all，`(group)/` 是路由组，`.dev` / `.prod` 后缀决定页面只在某个环境中可用。
+基于文件的路由规则与[服务端路由](/docs/server-routing)相同：`[param]` 是动态段，`[...param]` 是 catch-all，`(group)/` 是路由组，`.dev` / `.prod` 后缀决定页面只在某个[环境](#仅限某个环境的页面)中可用。
 
 ### 仅限某个环境的页面
 
@@ -114,7 +116,7 @@ export default defineConfig({
 └── home.prod.tsx   → 生产环境的 /home
 ```
 
-`.dev` 页面只在 dev server 上运行；`.prod` 页面在构建、部署与生产预览中运行。后缀要保留在配套文件名中（`home.dev.server.ts`），岛屿页面则放在 `.island` 之前（`chart.dev.island.tsx`）。布局在所有环境中共享。
+`.dev` 页面只在 dev server 上运行；`.prod` 页面在构建、部署与生产预览中运行。后缀要保留在配套文件名中（`home.dev.server.ts`），[岛屿](/docs/pages-routing/islands)页面则放在 `.island` 之前（`chart.dev.island.tsx`）。[布局](/docs/pages-routing/layouts)在所有环境中共享。
 
 生产部署会排除只被 `.dev` 页面及其配套文件使用的资源。运行 `void prepare` 会为两个环境生成类型。
 
@@ -151,7 +153,7 @@ Loader 仍然会在第一次请求时运行，它的 props 也会嵌入 HTML 外
 
 ## Loader 与响应状态
 
-直接从 loader 返回数据可以保留 `Date`、`Map`、`Set`、`bigint`、`RegExp`、`URL` 与 `undefined` 这类更丰富的值，重复引用与循环引用也能跨渲染、hydration、导航与 deferred 加载保持类型。返回 `Response.json()` 则改用 JSON 转换；函数与自定义类实例不能作为页面数据。
+完整说明见 [Loader 与 Props](/docs/pages-routing/loaders)。直接从 loader 返回数据可以保留 `Date`、`Map`、`Set`、`bigint`、`RegExp`、`URL` 与 `undefined` 这类更丰富的值，重复引用与循环引用也能跨渲染、hydration、导航与 deferred 加载保持类型。返回 `Response.json()` 则改用 JSON 转换；函数与自定义类实例不能作为页面数据。
 
 如果要在返回正常 props 的同时带上 HTTP 错误状态（例如维护页），用 `c.status()`：
 
@@ -171,7 +173,7 @@ export const loader = defineHandler((c) => {
 
 页面之间使用 `Link` 组件做 SPA 导航。它渲染一个 `<a>` 标签，拦截点击并导航，不触发整页重新加载。动态 URL 用 `routeUrl()` 构造，路由模式与参数都会被检查：
 
-```tsx
+```tsx title="React"
 import { Link } from '@void/react';
 import { routeUrl } from 'void/routes';
 
@@ -179,7 +181,7 @@ import { routeUrl } from 'void/routes';
 <Link href={routeUrl('/users/[id]', { params: { id } })}>查看</Link>
 ```
 
-```vue
+```vue title="Vue"
 <script setup lang="ts">
 import { Link } from '@void/vue';
 import { routeUrl } from 'void/routes';
@@ -191,7 +193,7 @@ import { routeUrl } from 'void/routes';
 </template>
 ```
 
-```svelte
+```svelte title="Svelte"
 <script>
   import { Link } from '@void/svelte';
   import { routeUrl } from 'void/routes';
@@ -201,7 +203,7 @@ import { routeUrl } from 'void/routes';
 <Link href={routeUrl('/users/[id]', { params: { id } })}>查看</Link>
 ```
 
-```tsx
+```tsx title="Solid"
 import { Link } from '@void/solid';
 import { routeUrl } from 'void/routes';
 
@@ -209,12 +211,73 @@ import { routeUrl } from 'void/routes';
 <Link href={routeUrl('/users/[id]', { params: { id } })}>查看</Link>
 ```
 
-启用 [`routing.typedRoutes`](/docs/type-safety#检查-url-字符串) 后，链接与 router 调用里的 URL 字符串同样会被检查，错拼的 `/abuot` 在编译期就会报错。
+启用 [`routing.typedRoutes`](/docs/type-safety#检查-url-字符串) 后，链接与 router 调用里的 URL 字符串同样会被检查，错拼的 `/abuot` 在编译期就会报错。用 `void init` 创建的应用已经启用了它。
 
 `Link` 还支持查询数据、替换历史记录、整页导航与取消导航：
 
-```tsx
+```tsx title="React"
 import { Link } from '@void/react';
+
+<Link href="/users" data={{ page: 2, tag: ['active', 'new'] }}>
+  筛选用户
+</Link>
+
+<Link href="/users" replace>用户</Link>
+
+<Link href="/logout" reloadDocument>退出登录</Link>
+
+<Link
+  href="/settings"
+  onNavigate={(event) => {
+    if (!confirm('确定离开当前页面？')) event.preventDefault();
+  }}
+>
+  设置
+</Link>
+```
+
+```vue title="Vue"
+<script setup lang="ts">
+import { Link } from '@void/vue';
+
+function onNavigate(event: { preventDefault(): void }) {
+  if (!confirm('确定离开当前页面？')) {
+    event.preventDefault();
+  }
+}
+</script>
+
+<template>
+  <Link href="/users" :data="{ page: 2, tag: ['active', 'new'] }">筛选用户</Link>
+  <Link href="/users" replace>用户</Link>
+  <Link href="/logout" reload-document>退出登录</Link>
+  <Link href="/settings" :on-navigate="onNavigate">设置</Link>
+</template>
+```
+
+```svelte title="Svelte"
+<script lang="ts">
+  import { Link } from '@void/svelte';
+</script>
+
+<Link href="/users" data={{ page: 2, tag: ['active', 'new'] }}>筛选用户</Link>
+
+<Link href="/users" replace>用户</Link>
+
+<Link href="/logout" reloadDocument>退出登录</Link>
+
+<Link
+  href="/settings"
+  onNavigate={(event) => {
+    if (!confirm('确定离开当前页面？')) event.preventDefault();
+  }}
+>
+  设置
+</Link>
+```
+
+```tsx title="Solid"
+import { Link } from '@void/solid';
 
 <Link href="/users" data={{ page: 2, tag: ['active', 'new'] }}>
   筛选用户
@@ -248,7 +311,30 @@ nav a[data-void-active] {
 
 默认只在链接自己的路径上激活。设置 `activeMatch="prefix"` 可以让它在子页面保持激活：
 
-```tsx
+```tsx title="React"
+<nav>
+  <Link href="/">首页</Link>
+  <Link href="/users" activeMatch="prefix">
+    用户
+  </Link>
+</nav>
+```
+
+```vue title="Vue"
+<nav>
+  <Link href="/">首页</Link>
+  <Link href="/users" active-match="prefix">用户</Link>
+</nav>
+```
+
+```svelte title="Svelte"
+<nav>
+  <Link href="/">首页</Link>
+  <Link href="/users" activeMatch="prefix">用户</Link>
+</nav>
+```
+
+```tsx title="Solid"
 <nav>
   <Link href="/">首页</Link>
   <Link href="/users" activeMatch="prefix">
@@ -293,7 +379,7 @@ a[data-void-pending] {
 
 待处理状态匹配目标的路径、query 与 hash：正在加载第 3 页时，指向 `/users?page=2` 的链接不会显示为待处理。非 GET 链接还要匹配请求方法。`router.refresh()` 期间，指向当前页的链接处于待处理状态。
 
-你自己传给 `Link` 的 `data-void-pending` 会替代计算值。要做覆盖整页的加载指示器，请使用 `useNavigation()`。
+你自己传给 `Link` 的 `data-void-pending` 会替代计算值。要做覆盖整页的加载指示器，请使用 [`useNavigation()`](/docs/reference/api/pages)。
 
 ### 预取
 
@@ -317,11 +403,13 @@ a[data-void-pending] {
 
 想为整个应用设置默认策略，在适配器插件选项里配置 `prefetch.defaultStrategy`（例如 `voidReact({ prefetch: { defaultStrategy: 'hover' } })`），链接自身的 `prefetch` 会覆盖它，`prefetch={false}` 则关闭。默认值是 `false`，`hoverDelay` 默认 75 ms，`cacheFor` 默认 `'30s'`。建议优先选择 `'hover'` 或 `'click'`——`'mount'` 与 `'visible'` 在长列表里会一次加载很多页面。
 
+全部策略与缓存选项见 [Pages API](/docs/reference/api/pages)。
+
 只有同源的 GET 链接会预取；带非 GET `method` 或 `reloadDocument` 的链接不使用默认策略，而显式调用 `router.prefetch()` 仍会加载页面。浏览器报告省流量模式（Save-Data）或 2G 连接时，`Link` 会跳过预取（只有 Chromium 系浏览器会报告这些设置）。预取会运行目标页面的 loader，因此 loader 里不要做统计浏览量这类副作用。
 
 ## 程序化导航
 
-使用 `useRouter()`。可以给它传类型化的目标对象：
+程序化导航使用 `useRouter()`。可以给 `visit()`、`prefetch()` 与 `flush()` 传类型化的目标对象：
 
 ```ts
 import { useRouter } from '@void/react'; // 或 "@void/vue"、"@void/svelte"、"@void/solid"
@@ -341,13 +429,14 @@ router.refresh(); // 重新获取当前页面 props，保持同一条历史记�
 router.visit('/logout', { method: 'POST' }); // 非 GET 导航
 ```
 
-这些方法同样接受 URL 字符串或 `URL` 实例。参数取值与编码规则见[类型化 URL 与导航](/docs/type-safety#类型化-url-与导航)。
+这些方法同样接受 URL 字符串或 `URL` 实例。查询取值、fragment 与 catch-all 路由的规则见[类型化 URL 与导航](/docs/type-safety#类型化-url-与导航)。
 
 `router.visit()` 对同源 URL 会就地更新页面。其他源上的 http(s) URL 会触发整页加载，`javascript:` 等其他协议则会被拒绝。
 
 对于动态路由参数，从同一个适配器包中导入 `useParams()`，并把页面的路由模式作为类型参数传入：
 
-```tsx
+```tsx title="React"
+// pages/posts/[id].tsx
 import { useParams } from '@void/react';
 
 export default function PostPage() {
@@ -356,11 +445,45 @@ export default function PostPage() {
 }
 ```
 
+```vue title="Vue"
+<!-- pages/posts/[id].vue -->
+<script setup lang="ts">
+import { useParams } from '@void/vue';
+
+const params = useParams<'/posts/[id]'>(); // { id: string }
+</script>
+
+<template>
+  <h1>文章 {{ params.id }}</h1>
+</template>
+```
+
+```svelte title="Svelte"
+<!-- pages/posts/[id].svelte -->
+<script lang="ts">
+  import { useParams } from '@void/svelte';
+
+  const params = useParams<'/posts/[id]'>(); // { id: string }
+</script>
+
+<h1>文章 {params.id}</h1>
+```
+
+```tsx title="Solid"
+// pages/posts/[id].tsx
+import { useParams } from '@void/solid';
+
+export default function PostPage() {
+  const params = useParams<'/posts/[id]'>(); // { id: string }
+  return <h1>文章 {params.id}</h1>;
+}
+```
+
 模式如何被检查参见[页面参数](/docs/type-safety#页面参数)。
 
 ## Action 与表单
 
-从配套的 `.server.ts` 导出 `action`，配合 `withValidator()` 校验请求体：
+完整说明见 [Action 与表单](/docs/pages-routing/actions-and-forms)。从配套的 `.server.ts` 导出 `action`，配合 `withValidator()` 校验请求体：
 
 ```ts title="pages/users/index.server.ts"
 export const action = defineHandler.withValidator({
@@ -461,7 +584,7 @@ function describeError(error: unknown) {
 
 ## 未找到与错误边界
 
-在 `pages/` 中添加 `_not-found` 与 `_error` 组件，页面缺失或出错时依然保留应用的导航与布局。两者都会收到带 `status` 与 `message` 的 `error` prop：
+完整说明见[未找到与错误](/docs/pages-routing/errors)。在 `pages/` 中添加 `_not-found` 与 `_error` 组件，页面缺失或出错时依然保留应用的导航与布局。两者都会收到带 `status` 与 `message` 的 `error` prop：
 
 ```tsx title="pages/_error.tsx（也可以是 pages/_not-found.tsx）"
 import type { ErrorPageProps } from '@void/react';
@@ -487,7 +610,7 @@ export default function ErrorPage({ error }: ErrorPageProps) {
 
 ## Head 与元数据
 
-从 `.server.ts` 导出 `head()` 设置标题与元数据；`title` 由页面优先，`meta` 按 `name` / `property` 去重，`link`、`script` 与 `htmlAttrs` / `bodyAttrs` 依次合并。
+完整说明见 [Head 管理](/docs/pages-routing/head)。从 `.server.ts` 导出 `head()` 设置标题与元数据；`title` 由页面优先，`meta` 按 `name` / `property` 去重，`link`、`script` 与 `htmlAttrs` / `bodyAttrs` 依次合并。
 
 中间件的 `headDefaults` 也接受 `titleTemplate`，会覆盖配置里的模板，用来给站点某个板块加上自己的标题后缀：
 

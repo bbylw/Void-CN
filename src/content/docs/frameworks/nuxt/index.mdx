@@ -1,0 +1,114 @@
+---
+title: Nuxt
+description: 在 Nuxt 应用里接入 Void，获得资源探测、带类型的数据库查询、迁移与部署能力。
+---
+
+把 Void 用在 [Nuxt](https://nuxt.com/) 应用里，可以获得资源探测、带类型的数据库查询以及迁移能力。Nuxt 保留自己的构建流程和 Cloudflare 集成，Void 则接入它的 Vite 配置。
+
+## 接入步骤
+
+### 1. 创建新项目
+
+```bash
+npm create nuxt@latest my-app
+cd my-app
+```
+
+### 2. 安装依赖
+
+```bash
+npm install -D void
+```
+
+Void 自带 Nuxt 开发期 platform 代理所使用的 Cloudflare 工具链。
+
+### 3. 配置 `nuxt.config.ts`
+
+```ts
+import { resolve } from 'node:path';
+import { voidPlugin } from 'void';
+
+export default defineNuxtConfig({
+  alias: {
+    '@schema': resolve(import.meta.dirname, 'db/schema.ts'),
+  },
+  nitro: {
+    preset: 'cloudflare-module',
+    modules: ['void/nitro'],
+    cloudflare: { dev: { configPath: './.void-wrangler.jsonc' } },
+    // Nuxt 4.6.0 在 Windows 上必需。
+    externals: {
+      inline: [/[\\/]node_modules[\\/]nuxt[\\/]dist[\\/]/],
+    },
+  },
+  vite: { plugins: [voidPlugin()] },
+});
+```
+
+`void/nitro` 模块让 Nuxt 的 server route 能够使用你应用里的 `void/db` 与 `@schema`。顶层的 `alias` 让 `nuxi typecheck` 能解析 `@schema`，因为 Nuxt 也会用应用的类型检查 server route。`cloudflare.dev` 把 Void 生成的 Cloudflare 配置中的绑定交给开发服务器；当 `compatibilityDate` 不早于 `2025-07-15` 时，Nuxt 在开发阶段就会使用它。
+
+数据库模块同时支持 Nitro 2 与 Nitro 3 预览版。请按你的 Nuxt 版本选用对应的 Cloudflare 开发配置；Nitro 3 使用自己的 Worker runner。
+
+### 4. 创建 `void.config.ts`
+
+Void 会生成 Nuxt 开发运行时所使用的 Cloudflare 配置：
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  cloudflare: {
+    name: 'my-app',
+    compatibility_date: '2026-02-24',
+    compatibility_flags: ['nodejs_compat', 'nodejs_als'],
+  },
+});
+```
+
+### 5. 部署
+
+```bash
+void auth login
+void deploy
+```
+
+## 使用 Void 能力
+
+多数 [Void 平台能力](/docs/app-types)都可以在 Nuxt 中使用。把它们用在 server route、API 处理器与中间件里。
+
+Void 托管的认证暂不支持框架模式，目前请直接使用 Better Auth 官方的 Nuxt 集成。
+
+### 数据库
+
+```ts
+// server/api/users.get.ts
+import { users } from '@schema';
+import { db } from 'void/db';
+
+export default defineEventHandler(async () => {
+  return db.select().from(users);
+});
+```
+
+### 其他资源
+
+在服务端代码中使用 [KV](/docs/kv)、[对象存储](/docs/storage) 与 [AI](/docs/ai)，导入方式和 Void 应用完全相同。在 `crons/` 中添加 [cron 任务](/docs/jobs)，在 `queues/` 中添加[队列消费者](/docs/queues)。
+
+### 环境变量
+
+在 `env.ts` 中声明变量，用 `import { env } from "void/env"` 读取。本地取值、生产密钥以及公开的 `VITE_*` 值参见[环境变量](/docs/env-vars)。
+
+访问环境变量时，`void/env` 取代 `useRuntimeConfig()` 和 `event.context.cloudflare.env`。需要直接访问原始绑定（D1、KV、R2 等）时继续用 `event.context.cloudflare.env`；需要 env 之外的运行时配置时继续用 `useRuntimeConfig()`。
+
+## 直接访问绑定
+
+你也可以通过 Nitro 的 event context 访问原始的 Cloudflare 绑定：
+
+```ts
+// server/api/users.get.ts
+export default defineEventHandler(async (event) => {
+  const { DB } = event.context.cloudflare.env;
+  const { results } = await DB.prepare('SELECT * FROM users').all();
+  return results;
+});
+```

@@ -1,0 +1,255 @@
+---
+title: 处理器与中间件
+description: 定义 HTTP 处理器、中间件、输入校验、定时任务、队列消费者与 SSR 渲染入口。
+---
+
+从 `"void"` 或 `"void/handler"` 导入。
+
+## `defineHandler(handler)`
+
+包装一个路由处理器函数。处理器接收一个 [`CloudContext`](/docs/reference/api/types)，既可以返回普通值（自动转换为 Response），也可以直接使用 Hono 的 `c.json()` / `c.text()` API。
+
+```ts
+import { defineHandler } from 'void';
+
+export const GET = defineHandler((c) => {
+  return { message: 'hello' };
+});
+```
+
+**签名：**
+
+```ts
+function defineHandler<R>(handler: (c: CloudContext) => R): TypedHandler<{}, R>;
+```
+
+## `defineHandler(middleware..., handler)`
+
+把最多 5 个路由级中间件与最后一个处理器组合起来。中间件按顺序在处理器之前执行。
+
+```ts
+export const GET = defineHandler(authMiddleware, rateLimiter, (c) => {
+  return { ok: true };
+});
+```
+
+## `defineHandler.withValidator(validators)`
+
+使用任意兼容 [Standard Schema](https://github.com/standard-schema/standard-schema) 的库（zod、valibot、arktype 等）创建带输入校验的处理器。返回一个柯里化函数，由它接收处理器。
+
+校验后的输入会作为第二个参数传给处理器。
+
+```ts
+import * as v from 'valibot';
+import { defineHandler } from 'void';
+
+export const POST = defineHandler.withValidator({
+  body: v.object({
+    name: v.pipe(v.string(), v.minLength(1)),
+    email: v.pipe(v.string(), v.email()),
+  }),
+})((c, { body }) => {
+  return { received: body.name };
+});
+```
+
+**签名：**
+
+```ts
+function withValidator<V extends ValidatorSlots>(
+  validators: V,
+): <R>(handler: (c: CloudContext, input: HandlerInput<V>) => R) => TypedHandler<V, R>;
+```
+
+**类型：`ValidatorSlots`**
+
+```ts
+interface ValidatorSlots {
+  body?: StandardSchemaV1;
+  query?: StandardSchemaV1;
+  params?: StandardSchemaV1;
+}
+```
+
+**类型：`HandlerInput<V>`**
+
+每个校验槽位推断出的输出类型。如果一个 `ValidatorSlots` 包含 `body` 与 `query`，输入对象就是 `{ body: ..., query: ... }`，其类型由 schema 的输出推导。
+
+## `defineMiddleware(handler)`
+
+Hono 中间件的类型安全包装。
+
+```ts
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(async (c, next) => {
+  console.log(`${c.req.method} ${c.req.path}`);
+  await next();
+});
+```
+
+**签名：**
+
+```ts
+function defineMiddleware(handler: MiddlewareHandler<CloudEnv>): MiddlewareHandler<CloudEnv>;
+```
+
+## `basicAuth(options)`
+
+内置的 Basic 认证中间件，用于临时站点门禁与上线前保护。在 `middleware/` 中配合来自 `void/env` 的凭据保护整个应用，或把它传给 `defineHandler()` 只保护单个路由。
+
+Void 保留的 `/__void` 端点使用它们自己的认证方式，不受 Basic 认证影响。
+
+当凭据来自 `void/env` 时，把读取操作包在函数里，这样它们会在 Void 绑定运行时 env 之后按请求解析。
+
+如果 `password` 解析为空值，请求会以服务端错误失败，而不是通过门禁。
+
+若需要应用专属的豁免，例如健康检查或公开 webhook，请在调用 `basicAuth()` 之前把这段逻辑组合在你自己的中间件里。
+
+```ts title="env.ts"
+import { defineEnv, string } from 'void/env';
+
+export default defineEnv({
+  BASIC_AUTH_USERNAME: string(),
+  BASIC_AUTH_PASSWORD: string(),
+});
+```
+
+```ts title="middleware/01.basic-auth.ts"
+import { basicAuth } from 'void';
+import { env } from 'void/env';
+
+export default basicAuth({
+  username: () => env.BASIC_AUTH_USERNAME,
+  password: () => env.BASIC_AUTH_PASSWORD,
+  realm: 'Preview',
+});
+```
+
+**签名：**
+
+```ts
+function basicAuth(options: {
+  username: string | (() => string);
+  password: string | (() => string);
+  realm?: string | (() => string);
+  message?: string | (() => string);
+}): MiddlewareHandler<CloudEnv>;
+```
+
+## `defineScheduled(handler)`
+
+用类型推断包装 Cloudflare 的 [Scheduled handler](https://developers.cloudflare.com/workers/runtime-apis/handlers/scheduled/)。
+
+```ts
+import { defineScheduled } from 'void';
+
+export default defineScheduled(async (controller, env, ctx) => {
+  const { results } = await env.DB.prepare('SELECT * FROM stale').all();
+  // ...
+});
+```
+
+**签名：**
+
+```ts
+function defineScheduled(
+  handler: (
+    controller: ScheduledController,
+    env: CloudEnv['Bindings'],
+    ctx: ExecutionContext,
+  ) => unknown | Promise<unknown>,
+): ScheduledFn;
+```
+
+## `defineQueue<T>(handler)`
+
+用带类型的消息体包装[队列](/docs/queues)消费者处理器。泛型 `<T>` 定义消息体类型，它会一路流到带类型的 `queues` 代理，供 `send()` 调用使用。
+
+```ts
+import { defineQueue } from 'void';
+
+export default defineQueue<{ to: string; subject: string }>(async (batch, env) => {
+  for (const msg of batch.messages) {
+    console.log(`发送给 ${msg.body.to}：${msg.body.subject}`);
+  }
+});
+```
+
+**签名：**
+
+```ts
+function defineQueue<T>(
+  handler: (batch: QueueBatch<T>, env: CloudEnv['Bindings']) => void | Promise<void>,
+): TypedQueueHandler<T>;
+```
+
+## `defineRender(handler)`
+
+包装一个 SSR 渲染入口。第二个参数提供预先构建好的 `<head>` 与 `<body>` 资源标签，用于注入客户端脚本与样式。
+
+```tsx
+import { defineRender } from "void";
+import { renderToString } from "react-dom/server";
+
+export default defineRender((c, assetTags) => {
+  const html = renderToString(<App />);
+  return c.html(`<!DOCTYPE html>
+    <html><head>${assetTags.css}${assetTags.preloads}</head>
+    <body><div id="root">${html}</div>${assetTags.body}</body></html>`);
+});
+```
+
+**签名：**
+
+```ts
+function defineRender(
+  handler: (c: CloudContext, assetTags: RenderAssetTags) => Response | Promise<Response>,
+): RenderFn;
+```
+
+**类型：`RenderAssetTags`**
+
+```ts
+interface RenderAssetTags {
+  css: string; // <head> 中的样式表 link
+  preloads: string; // <head> 中的 modulepreload 与开发客户端标签
+  body: string; // 放在 </body> 之前的 script 标签
+}
+```
+
+## `defineHead<P>(handler)`
+
+为 `.server.ts` 文件里的页面 `head()` 导出提供类型安全包装。第一个参数获得 [`CloudContext`](/docs/reference/api/types) 类型，第二个参数通过泛型获得 props 类型。
+
+```ts
+import { defineHandler, defineHead } from 'void';
+import type { InferProps } from 'void';
+import type { PageParams } from 'void/routes';
+
+export type Props = InferProps<typeof loader>;
+
+export const loader = defineHandler(async (c) => {
+  const { slug } = c.req.param() as PageParams<'/posts/[slug]'>;
+  const post = await getPost(slug);
+  return { post };
+});
+
+export const head = defineHead<Props>((c, props) => {
+  return {
+    title: props.post.title,
+    meta: [
+      { name: 'description', content: props.post.excerpt },
+      { property: 'og:title', content: props.post.title },
+    ],
+  };
+});
+```
+
+**签名：**
+
+```ts
+function defineHead<P = Record<string, unknown>>(
+  handler: (c: CloudContext, props: P) => HeadDescriptor | undefined,
+): (c: CloudContext, props: P) => HeadDescriptor | undefined;
+```

@@ -1,0 +1,114 @@
+---
+title: URL 重写
+description: 在不改变浏览器地址栏的情况下提供另一个路由的内容，并读取最初被请求的 URL。
+---
+
+URL 重写会在另一个内部路径上重新派发当前请求，而浏览器地址栏保持不变。`c.rewrite()`、`c.originalUrl()` 与 `c.isRewritten()` 在 Void 运行时交给你的每个 Hono `Context` 上都可用。完整概览见[重写指南](/docs/edge/rewrites)，其中也包括 [`void.config.ts`](/docs/config) 里静态的 `routing.rewrites` / `routing.fallbacks`。
+
+## `c.rewrite(destination)`
+
+在 `destination` 上重新派发当前请求并返回得到的 `Response`。浏览器地址栏不会变化——这是一次服务端内部的跳转。如果 `destination` 不带查询字符串，原始请求的查询串会被保留；如果 `destination` 自带查询字符串，它会替换原始查询串。`destination` 必须以 `/` 开头；已生成的路由会通过 `RewriteDestination` 类型自动补全，而任意字符串仍然可用于动态路径。
+
+传入一个 [`RouteDestination`](/docs/reference/api/types) 对象，可以同时检查路由模式与其参数：
+
+```ts
+return c.rewrite({
+  pathname: '/users/[id]',
+  params: { id: 42 },
+  query: { tab: 'activity' },
+});
+```
+
+开启 [`routing.typedRoutes`](/docs/config) 后，字符串形式的 destination 必须是 [`RouteUrl`](/docs/reference/api/types)：匹配你某条路由的 URL。对于运行时拼接出的路径，请做断言，例如 ``c.rewrite(`/${locale}${path}` as RouteUrl)``。
+
+开启 [`routing.typedRoutes`](/docs/config) 后，`c.redirect()` 会像检查链接一样检查字符串：路由 URL、同页的查询串与 hash，以及 `http://`、`https://`、`mailto:`、`tel:` 开头的 URL。它同样接受 `URL` 对象或带类型的目标对象。
+
+对于 TypeScript 无法检查的字符串，例如支付服务商的收银台 URL，请使用 `as Href`：
+
+```ts
+import { routeUrl, type Href } from 'void/routes';
+
+declare const checkoutUrl: string;
+
+return c.redirect(routeUrl('/users/[id]', { params: { id: 42 } }));
+return c.redirect({ pathname: '/users/[id]', params: { id: 42 } });
+return c.redirect('https://example.com/login');
+return c.redirect(checkoutUrl as Href);
+```
+
+断言会跳过类型检查；Void 不会在运行时校验 redirect 的目标。对于来自请求的值，例如 `?redirectTo=`，在跳转之前先检查来源：
+
+```ts
+const requested = new URL(c.req.query('redirectTo') ?? '/', c.req.url);
+return c.redirect(requested.origin === new URL(c.req.url).origin ? requested : '/');
+```
+
+`c.redirect()` 按你给出的 location 发送响应，不会附加请求的查询串。从 `/sign-in?redirectTo=/notes` 调用 `c.redirect('/notes')` 会去 `/notes`。而配置了 [`routing.redirects`](/docs/edge/redirects) 时则会合并查询参数。
+
+[具名 action](/docs/pages-routing/actions-and-forms) 会保留它自己的查询参数。例如 `POST /users/42?delete&tab=profile` 配合 `c.redirect('/users/42')` 会重定向到 `/users/42?tab=profile`。当重定向把方法改为 GET 时，action 键会被移除。
+
+保留方法的跳转会继续带上 action 键：`307` 与 `308`，或者 `PUT`、`PATCH`、`DELETE` 之后的 `301` 与 `302`。来自[提交后当前页面查询串](/docs/pages-routing/actions-and-forms)的参数不会被带入重定向。
+
+```ts
+import { defineHandler } from 'void';
+
+export const GET = defineHandler((c) => {
+  const locale = c.req.header('accept-language')?.startsWith('de') ? 'de' : 'en';
+  return c.rewrite(`/${locale}${new URL(c.req.url).pathname}`);
+});
+```
+
+**签名：**
+
+```ts
+interface CloudContext {
+  // 开启 routing.typedRoutes 时这里是 RouteUrl，而不是 RewriteDestination
+  rewrite(destination: RewriteDestination | RouteDestination): Promise<Response>;
+}
+```
+
+**注意事项：**
+
+- `destination` 必须以单个 `/` 开头，并指向一个内部路径。外部 URL、协议相对写法（`//host/...`）以及任何非路径绝对形式的值都会立即抛错——跨源调用请使用 `fetch()`。
+- 若目标路径的最后一段以已知的静态资源扩展名结尾（例如 `/hero.png`、`/app.css`、`/data.json`），在重新派发之前会抛出 `VoidAssetRewriteError`（从 `"void"` 导出）。运行时重写无法访问静态资源——请改用静态的 `routing.rewrites` 规则，或 `_redirects` 中的 `200!` 条目。`.html` 有意不在这条限制内，因为 `.html` 路径可能是合法的路由处理器。见[重写](/docs/edge/rewrites)。
+- 中间件会在每一次重写跳转上重新执行。请用 `c.isRewritten()` 守卫副作用。
+- 通过 `Link` 进行的客户端 SPA 导航不会触发服务端重写，只有完整的 HTTP 请求才会。
+- 要清除被重写过的 [ISR 缓存条目](/docs/edge/revalidation)，请对目标路径做一次缓存清除。
+
+## `c.originalUrl()` / `c.isRewritten()`
+
+用于查看重写状态的 Context 方法。`c.originalUrl()` 返回重写之前的 URL，类型是 `URL` 对象；在第一次、未被重写的派发上返回 `null`。`c.isRewritten()` 在任何被重新派发的 context 上返回 `true`，在原始请求上返回 `false`。静态重写与中间件重写都可以使用它们。
+
+```ts
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(async (c, next) => {
+  if (!c.isRewritten()) {
+    // 只记录用户可见的请求，不记录内部的重写跳转。
+    console.log(`${c.req.method} ${c.req.path}`);
+  }
+  await next();
+});
+```
+
+**签名：**
+
+```ts
+interface CloudContext {
+  originalUrl(): URL | null;
+  isRewritten(): boolean;
+}
+```
+
+## `RewriteDestination`
+
+```ts
+import type { RewriteDestination } from 'void/routes';
+```
+
+在编辑器中提示已知的路由模式，同时接受动态字符串。它的用途：
+
+- 作为 `c.rewrite()` 的参数类型，除非开启了 `routing.typedRoutes`。
+- 作为 [`void.config.ts`](/docs/config) 里 `routing.rewrites` 与 `routing.fallbacks` 中 `destination` 条目的类型。
+
+与 [`RouteMap`](/docs/reference/api/types) 一样，`RewriteDestination` 位于虚拟模块 `void/routes` 中，并在路由变化时刷新。

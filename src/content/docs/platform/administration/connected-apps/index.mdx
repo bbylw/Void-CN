@@ -1,0 +1,83 @@
+---
+title: 关联应用
+description: 让用户用 Void 账户登录另一个应用，并批准把改动部署到自己的项目。
+---
+
+关联应用是在你的 Void 安装上注册为 OAuth 客户端的独立应用。用户在 Void 上登录，再决定是否连接它。应用的运营者可以不是平台管理员。
+
+## 注册应用
+
+打开 **Admin → Connected apps**。填入应用名称、它的运营者，以及每一个精确的 HTTPS 回调 URL（每行一个）。不支持通配符，也不支持回调 URL 上的 query string。如果该应用会构建并部署项目，请启用逐个发布批准。要启用私有预览，则在发布前运行 checkpoint。已有的客户端有一个 **Enable private previews** 按钮；用户必须重新连接一次以同意这项权限。
+
+把返回的 client ID 与 client secret 保存在应用的服务端。Void 只显示一次 secret。client secret 用于认证这个应用本身；它不会授予访问用户账户的权限。如果需要更换凭据，注册一个新的客户端，然后禁用旧的。
+
+**Disable and revoke access** 会让该客户端的授权、待处理的登录以及发布批准全部失效。注册与禁用都会记录在运营者审计日志中。
+
+当平台显式开启开发态认证绕过时，本地开发允许使用 localhost 上精确的 HTTP 回调。生产环境的客户端要求 HTTPS。
+
+## 连接与断开
+
+应用把用户引导到 Void 的授权页，页面上会显示应用注册名称、运营者、回调 origin 以及申请的权限。登录授权应用读取用户的 ID 与用户名，不提供账户令牌，也不给项目管理权限。
+
+用户可以在 `<平台 API URL>/oauth/connections` 断开应用。访问令牌有效期一小时；应用可以用 refresh token 在用户最初登录后的 30 天内续期。撤销那次登录或停用账户会提前结束访问，应用必须重新请用户登录。
+
+## 私有预览
+
+当管理员已启用该权限时，登录可以用 `scope=profile preview:deploy` 申请。用户同意后，应用可以为每个 checkpoint 构建私有预览而无需逐个批准。生产发布仍然要求单独批准。
+
+用获得的 bearer token 依次：
+
+1. 向 `/oauth/previews` POST `{ workspace: externalWorkspaceId }`。响应中会给出该 client、owner 与 workspace 对应的稳定 `project_id` 与预览 `url`。
+2. 向 `/oauth/preview-deployment-requests` POST `{ project_id, checkpoint, artifact: prepared.artifact }`。用响应里的 `access_token` 与 `approval_id`，按与生产发布相同的资源上传与部署协议继续。
+3. 部署完成后，向 `/oauth/previews/:id/launch` POST，并打开返回的 URL。启动 URL 一分钟后过期且只能使用一次。打开之后需要重新加载预览的 origin。
+
+每个 workspace 都有独立的预览 origin 与资源，且不含生产密钥。预览支持 HTTP 应用，并使用隔离的 D1、KV、R2、AI 与原生 Durable Objects。认证、外部数据库、邮件、定时任务、队列与容器需要走生产发布。查看预览需要当前的用户授权；断开连接或禁用应用会让后续请求被拒绝。预览的写入必须来自该预览自身的 origin。
+
+Account Access 策略必须允许发往生成的预览 origin 的请求抵达 Void。阻止新 Workers 主机名的策略同样会阻止预览。即便主机名可达，Void 仍然要求有效的预览授权。
+
+每位 owner 可以有十个预览 workspace。每个 workspace 每小时允许六十次构建，并与 owner 共享平台的资源与用量限额。不活跃的预览七天后过期，Void 会移除其资源。通过 `/oauth/previews` 打开 workspace 会刷新这个过期时间。禁用预览权限会让它的预览立即过期。
+
+## 批准一次发布
+
+应用先构建，再带着准备好的 artifact 把用户送回 Void。Void 会显示项目名、checkpoint 标签、资源、manifest 与 artifact 摘要。用户必须在 Void 上显式批准。
+
+批准只授权一次部署到该用户选定的项目。项目不存在时，Void 会在批准过程中创建；项目已存在则要求所有权。应用获得的凭据有效期最长十五分钟，只能用于该 artifact 的资源上传、部署与回执。重试使用同一个回执。
+
+已发布的代码可以使用该项目已有的密钥与资源。在为已有项目批准代码之前，请先核对应用运营者与部署详情。批准过的 manifest 中的迁移与资源变更会在部署时生效。
+
+禁用应用或断开它的授权会停止后续操作的授权，并且在排队的部署真正发布前还会再检查一次。断开连接不会移除已经发布的应用；那样的项目要在 Void 里管理。
+
+## 实现一个 OAuth 客户端
+
+在平台 API origin 上通过 `/.well-known/oauth-authorization-server` 发现端点。使用授权码流程，带 `scope=profile`、一个随机的 `state` 与 S256 PKCE。令牌交换用 HTTP Basic 客户端认证。访问令牌以 Bearer 凭据发给 `/oauth/userinfo`，其响应包含 `sub`、`preferred_username` 与已同意的 `scope`。
+
+交换授权码时还会返回 refresh token。续期访问权限的步骤：
+
+1. 用客户端 Basic 认证，向 `/oauth/token` POST `grant_type=refresh_token` 与 `refresh_token`。
+2. 安全地保存返回的访问令牌与 refresh token，替换旧的一对。
+
+每个连接一次只发送一个 refresh。每个 refresh token 只能使用一次；重复使用会撤销该连接，需要用户重新授权。
+
+想要更少的权限，传入以空格分隔的 `scope`。之后的 refresh 无法恢复你放弃的权限。发布用的令牌（`deploy:approve`）没有 refresh token：每次发布都要单独批准。
+
+要发布，先用 [`prepareDeployArtifact`](/docs/reference/api/deploy) 打包构建好的应用，再用 profile 令牌 POST 到 `/oauth/deployment-requests`：
+
+```ts
+{
+  redirect_uri: registeredCallback,
+  state: publishState,
+  code_challenge: publishChallenge,
+  code_challenge_method: 'S256',
+  slug: projectSlug,
+  checkpoint: checkpointLabel,
+  artifact: prepared.artifact
+}
+```
+
+把浏览器重定向到返回的 `authorization_url`。用发布的 verifier 与同一个已注册的回调交换它返回的 code。响应包含 `project_id`、`approval_id` 与一个 `deploy:approve` 访问令牌。这一发布流程是 Void 的扩展；在普通登录中申请该 scope 并不会授权部署。
+
+用这个令牌从 `POST /projects/:id/deploy/upload-urls` 获取上传 URL，上传 manifest 中声明的资源，再把 artifact 发给 `POST /projects/:id/deploy`。把 `x-void-deploy-idempotency-key` 设为 `approval_id`。部署使用 Void 的托管部署协议，需要平台部署 Queue。该凭据不能读取密钥、签发项目令牌、删除项目，也不能部署不同的字节。
+
+以客户端身份调用 `POST /oauth/revoke`，用该连接的访问令牌或 refresh token 即可撤销连接。Void 不签发 OpenID Connect ID token。
+
+如果 API 受 Cloudflare Access 保护，应用运营者还必须配置一个被该 Access 应用策略允许的服务身份。服务端的 OAuth 端点与已批准的部署请求仍会校验自己的 client、授权与项目权限；浏览器端的同意则需要用户的公司身份。

@@ -6,13 +6,13 @@ description: Void 平台让团队把应用部署到一个共享的 Cloudflare �
 import Callout from '@/components/docs/Callout.astro';
 
 <Callout type="tip">
-  如果只是给自己部署，直接[部署到 Cloudflare](/docs/deployment#部署到-cloudflare)即可，
+  如果只是给自己部署，直接[部署到 Cloudflare](/docs/deployment)即可，
   你不需要先安装平台。
 </Callout>
 
 核心平台支持 GitHub、Google、通用 OIDC 与 Cloudflare Access 登录，支持 CLI 部署、D1、KV、R2、队列、定时任务、Workers AI、WebSocket、SSE、ISR、路由、日志与回滚。
 
-核心安装包含托管的沙箱与邮件网关；配置共享邮件域名与 zone 后即启用邮件。项目自定义域名用 `--custom-domains` 开启；用户后台与托管的 GitHub 构建需要自定义的平台构建，不属于标准安装。
+核心安装还包含托管的沙箱与邮件网关。配置共享邮件域名与 zone 后即启用邮件，加 `--custom-domains` 可开启[项目自定义域名](/docs/platform/installation/domains)。用户后台与托管的 GitHub 构建需要[自定义平台构建](/docs/platform/development)。
 
 ## 部署能力对比
 
@@ -33,21 +33,21 @@ import Callout from '@/components/docs/Callout.astro';
 | 用户后台与托管的 GitHub 构建                  | 不需要                      | 标准安装不包含                   |
 
 <Callout type="info">
-  团队平台需要 Workers for Platforms 与配套基础设施。具体功能取决于安装时的配置。
+  团队平台需要 Workers for Platforms 与[文档所述的配套基础设施](/docs/platform/installation/domains)。具体功能取决于安装时的配置。
 </Callout>
 
 ## 安装指南
 
 完整的安装流程由以下文档组成：
 
-1. **前置条件**，所需的账户、套餐与权限
-2. **凭据**，Cloudflare API 令牌与密钥的申请
-3. **安装与配置登录**，部署平台并接入 GitHub、Google、OIDC 或 Cloudflare Access
-4. **首次部署**，用一个示例应用验证整条链路
-5. **域名与资源**，配置共享域名、数据库与存储
-6. **维护与恢复**，备份、升级与故障恢复
-7. **从 CI 安装**，在 CI 环境中自动化平台安装
-8. **停用与卸载**，安全地移除平台
+1. [前置条件](/docs/platform/installation/prerequisites)，所需的账户、套餐与权限
+2. [凭据](/docs/platform/installation/credentials)，Cloudflare API 令牌与密钥的申请
+3. [安装与配置登录](/docs/platform/installation/setup)，部署平台并接入 GitHub、Google、OIDC 或 Cloudflare Access
+4. [首次部署](/docs/platform/installation/first-deployment)，用一个示例应用验证整条链路
+5. [域名与资源](/docs/platform/installation/domains)，配置共享域名、数据库与存储
+6. [维护与恢复](/docs/platform/installation/maintenance)，备份、升级与故障恢复
+7. [从 CI 安装](/docs/platform/installation/ci)，在 CI 环境中自动化平台安装
+8. [停用与卸载](/docs/platform/installation/uninstall)，安全地移除平台
 
 ## 安装与升级要点
 
@@ -77,6 +77,6 @@ void deploy --platform void --project my-app
 
 ## 关联应用
 
-平台可以安装[关联应用](https://github.com/voidzero-dev/void/blob/main/docs/guide/platform/administration/connected-apps.md)：这些应用可以请求用户授权后为其执行部署，让你的用户在应用内直接把改动部署到你的 Cloudflare 账户。
+平台可以安装[关联应用](/docs/platform/administration/connected-apps)：这些应用可以请求用户授权后为其执行部署，让你的用户在应用内直接把改动部署到你的 Cloudflare 账户。
 
 访问令牌有效期一小时；关联应用可以用 refresh token 在用户最初登录后的 30 天内续期。每个 refresh token 只能使用一次，重复使用会撤销该连接，需要用户重新授权；一次只为一个连接发送一个 refresh。发布用的令牌（`deploy:approve`）没有 refresh token，每次发布都要单独批准。`POST /oauth/revoke` 可以用访问令牌或 refresh token 撤销连接。

@@ -1,0 +1,81 @@
+---
+title: 项目初始化命令
+description: 用 void init 创建项目，用 void prepare 生成文件，用 void info 查看推断出的资源。
+---
+
+## `void info`
+
+```sh
+void info
+void info --json
+```
+
+逐条列出每个 Durable State 与 WebSocket 定义的来源文件、推断出的或显式声明的名称、Worker 类与绑定。JSON 输出里 WebSocket 条目还会带上它的路由。该命令在本地运行，不需要登录、不发起网络请求，也不会生成文件。
+
+在移动一个已部署的定义之前，把提示的 `name` 抄进 `defineDurableState()`、`defineRoom()` 或 `defineWebSocket()`。移动文件之后保留这个名字，资源才能延续。迁移流程（包括 WebSocket 参数重命名）见 [Durable State](/docs/durable-state) 与 [WebSockets](/docs/websockets)。
+
+`void.lock.json` 中记录了、但已找不到对应定义的资源会单独列出。只有在确认那是你要移动的资源之后，才采用提示的名字。如果 Void 给不出建议名字，请先恢复它原来的源文件，检查过之后再移动。
+
+`--json` 返回 `resources` 与 `recordedResources`。当前条目包含 `file`、`definition`、`name`、`nameSource`（`inferred` 或 `explicit`）、`className`、`bindingName`，以及可选的 `route`。已记录条目包含 `className` 与 `bindingName`，在有可用名称时还包含 `name` 与 `definition`。
+
+## `void migrate`
+
+`void migrate` 会把旧的 `void.json` 以及根目录的 `wrangler.jsonc` 或 `wrangler.json` 转换成 `void.config.ts`。它也接受被受支持框架适配器引用的、根目录下的单个 `wrangler*.json(c)` 文件。Void 会把备份存进 `.void/config-migration/`，把资源 ID 记录进 `void.lock.json`，并更新受支持的适配器以使用它生成的 Cloudflare 配置。
+
+该命令会按需把生成的 `.cloudflare/` 与 `.void-wrangler.jsonc` 加入 `.gitignore`。请检查并提交 `void.config.ts`、`void.lock.json` 和 `.gitignore`。`void init` 与 `void deploy` 会自动迁移旧文件。请先解决相互冲突的 Cloudflare 配置，并让项目里的 `void` 包与 CLI 保持同一版本。
+
+## `void init`
+
+```sh
+void init [--tsconfig] [--github] [--git | --no-git]
+          [--toolchain <name>] [--framework <name>] [--starter <name>] [--deploy <target>]
+```
+
+为一个新项目或已有的 Void 项目做初始化配置。在空目录里，可以选择 Vite+ 或 Vite、一个框架，以及 D1、PostgreSQL、MySQL 或 Static Pages 起手模板。新应用的 `void.config.ts` 会开启 [`routing.typedRoutes`](/docs/config)。
+
+用脚本或编码 agent 生成脚手架时，可以把你的选择写成 flag：
+
+| Flag          | 取值                                      |
+| ------------- | ----------------------------------------- |
+| `--toolchain` | `vite-plus`、`vite`                       |
+| `--framework` | `react`、`vue`、`svelte`、`solid`         |
+| `--starter`   | `sqlite`、`postgresql`、`mysql`、`static` |
+| `--deploy`    | `cloudflare`、`void`、`none`              |
+
+```sh
+void init --toolchain vite-plus --framework react --starter sqlite --deploy none
+npm create void@latest my-app -- --toolchain vite-plus --framework react --starter sqlite --deploy none
+```
+
+非交互式脚手架请选择 `--deploy none`，之后再运行 `void connect` 登录。
+
+Vite+ 项目通过 `vp install` 安装依赖，无需全局安装 Vite+。Void 会保留已有的包管理器版本与 lockfile。没有包管理器配置的新 Vite+ 项目使用 pnpm，且不锁定版本。
+
+在已有应用中，Void 会补上缺失的依赖与 scripts，并更新 Vite 配置。如果无法修改你的配置，它会打印出需要添加的代码片段。
+
+向导同时会配置 TypeScript、agent 指令、环境变量声明和部署目标。可以选择 Cloudflare、某个 Void 平台，或跳过部署配置。如果跳过了登录，等需要时再运行 `void connect`。见[快速开始](/docs/quickstart)。
+
+每次 `void init` 都会配置编码 agent。新项目会得到一个精简的 `AGENTS.md`，指向 `node_modules/void/docs/`。已有项目在创建、追加或更新该文件之前会先询问；CI 与非交互运行不会改动已有项目的 agent 指令。检测到的 agent 会关联对应的 Skills。见[编码 Agent](/docs/agents)。
+
+在已有仓库或工作区包之外，Void 会询问是否初始化 Git。用 `--git` 直接初始化而不询问，或用 `--no-git` 跳过。CI 中需要初始化时必须带 `--git`。工作区包不接受这些 flag。
+
+只运行其中某些配置步骤：
+
+| Flag         | 用途                                                       |
+| ------------ | ---------------------------------------------------------- |
+| `--tsconfig` | 更新 TypeScript 配置，保留已有设置。                       |
+| `--github`   | 创建 GitHub Actions 部署工作流。                           |
+
+这些 flag 可以组合使用，并会跳过向导的其余步骤。编码 agent 的配置仍会执行。如果还想初始化 Git，请加上 `--git`。
+
+使用 Cloudflare 流程时，请在仓库里添加 `CLOUDFLARE_API_TOKEN` secret。PostgreSQL 与 MySQL 应用还需要 `DATABASE_URL`。
+
+支持 GitHub Actions 的 Void 平台使用短时效的 OIDC 凭据。用 `void github connect <project> --repo <owner/repo> --executor github_actions` 为仓库授权。Core 自托管平台不支持该集成。见[部署](/docs/deployment)。
+
+## `void prepare`
+
+```sh
+void prepare
+```
+
+生成 Void 的类型与 TypeScript 配置，但不启动开发服务器、也不构建应用。适合在刚克隆完仓库之后，或在 CI 里做类型检查之前运行。

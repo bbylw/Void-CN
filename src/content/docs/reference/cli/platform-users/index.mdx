@@ -1,0 +1,167 @@
+---
+title: 平台用户与项目
+description: 管理平台用户、他们的项目，以及分配给其账户的套餐。
+---
+
+这些命令使用你的 administrator 会话。平台选择、预览与确认规则见[平台管理](/docs/reference/cli/platform)。
+
+按登录名、邮箱或 ID 查找用户，然后查看他们的项目与用量：
+
+```sh
+void platform user list [--search <text>] [--page <n>] [--limit <n>]
+void platform user show <id>
+```
+
+用同一个 ID 变更套餐、停用或恢复账户，或者删除它：
+
+```sh
+void platform user plan <id> <plan-id>
+void platform user suspend <id> [--reason <text>]
+void platform user restore <id>
+void platform user delete <id>
+```
+
+更改用户套餐会更新他们的资源限额，以及其项目的 [AI Gateway 日志默认值](#ai-gateway-日志)。由 administrator 发起的停用会持续生效。该命令每次运行最多更新 100 个项目的 AI 日志设置；如果它报告还有未完成的工作，请重复同一条命令继续。
+
+停用用户会阻断他们的应用、定时任务与队列消费者。停用期间，每条队列消息大约每小时重试一次，每次消耗该队列的一次 retry。retry 用尽后消息会被丢弃：默认 3 次 retry 时约 3 小时后，`maxRetries: 0` 时立即。误停用的账户请尽快恢复，投递会在约一小时内继续。
+
+删除用户也会删除他们的项目资源。
+
+最后一位处于活跃状态的 administrator 无法被删除或停用。预览与实际变更都会强制这条规则，浏览器管理界面也一样。被允许的 administrator 移除会先吊销其 administrator 权限再做资源清理；如果清理失败，权限保持已吊销，部分完成的结果会说明这一点。
+
+## 项目
+
+跨平台列出项目、按所有者过滤，或查看某个项目的资源：
+
+```sh
+void platform project list [--user <user-id>] [--search <text>] [--page <n>] [--limit <n>]
+void platform project show <id>
+void platform project normalize <id> [--plan | --yes]
+void platform project delete <id>
+void platform project owner <project-id> <user-id>
+void platform project ai-logging <project-id> <inherit|off|metadata|full> [--plan | --yes]
+```
+
+搜索会匹配项目的 slug、ID 或所有者的登录名。`show` 包含资源、域名、最近 10 次部署与最近 20 次构建。`delete` 会删除项目及其资源。
+
+如果部署报告某个项目需要 normalize，operator 可以先 `normalize <id> --plan` 预览，再用 `--yes` 应用。它会在更新项目记录之前校验承接流量的部署与所有已记录的队列名。它保持流量与 Cloudflare 资源原样不动，并在有部署或恢复正在进行时拒绝变更。如果已校验的队列名与预期的投递路由名不同，normalize 会拒绝这次变更；请先对齐该队列的路由再重试。如果无法校验承接流量的部署，请先排查报告中提到的路由。对于当前部署缺失的项目，在升级之前请先用先前兼容的平台 runtime 完成被打断的部署恢复。
+
+`owner` 把项目转移给另一位已注册用户。用 `--plan` 预览；随后交互式执行或带 `--yes` 应用。预览会报告正在进行的任务造成的阻塞，以及将要生效的账户套餐。原所有者会变成项目管理员，已有的项目级 CI 部署凭据会被吊销，已经产生的用量仍记在原所有者名下。
+
+### AI Gateway 日志
+
+为项目选择 AI Gateway 记录什么。例如只保留请求元数据，而不存储提示与响应：
+
+```sh
+void platform project ai-logging <project-id> metadata --plan
+void platform project ai-logging <project-id> metadata --yes
+```
+
+只有平台 administrators 能改这个设置。应用无法覆盖它。
+
+| 模式       | 日志行为                                                                          |
+| ---------- | --------------------------------------------------------------------------------- |
+| `inherit`  | 跟随所有者所在套餐的默认值，其次是 gateway 自身的设置。这是默认值。               |
+| `off`      | 不写日志条目。                                                                    |
+| `metadata` | 模型、提供方、状态、token 数、花费与耗时，但不含提示与响应。                      |
+| `full`     | 带提示与响应的日志条目。                                                          |
+
+每个项目采用第一条适用的设置：
+
+1. 项目自己的 `off`、`metadata` 或 `full` 设置。
+2. [所有者所在套餐的默认值](/docs/platform/administration/plans)。如果该套餐已从目录中移除，使用注册默认套餐。
+3. 安装所用 gateway 自身的日志设置。
+
+把项目设为 `inherit` 即可移除它的覆盖值并按上述顺序取值。新安装默认启用 gateway 日志，因此在项目、套餐或 gateway 设置显式关闭之前，提示与响应都会被存储。Void 不会去读取 gateway 自身的设置。
+
+#### 检查一次变更
+
+变更会应用到新请求，无需重新部署，通常在发布后 2 分钟内生效。命令会报告实际生效的设置、它的来源与预计时间：
+
+```txt
+AI logging for <project-id>: metadata (set on project; plan "pro" default: inherit)
+New AI requests are expected to follow it by 14:03:20 UTC (normally within 2 minutes).
+```
+
+运行 `void platform project show <project-id>` 查看进度：
+
+```txt
+AI Gateway logging: metadata (from plan "pro") — applied
+```
+
+| `state`                | 含义                                                                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `applied`              | 设置已发布且传播期已过。新请求遵循它。                                                                                      |
+| `pending`              | 已发布；等待到达显示的预计时间。                                                                                            |
+| `pending_plan_publish` | 套餐默认值尚未到达该项目。运行 `void platform config plans sync --yes`，或重复执行那次用户套餐变更。                        |
+| `drift`                | 已发布的设置与保存的不一致。重复执行 `project ai-logging` 重新发布，或等每小时的修复。                                      |
+| `unknown`              | Void 读不到已发布的设置。请稍后再查一次。                                                                                   |
+
+在变更发布完成之前，请求仍沿用之前的日志行为。`show` 以文字打印状态，例如 `pending (expected by 14:03:20 UTC)`。带 `--json` 时，`aiLogging` 对象包含：
+
+| 字段                                             | 含义                                                                                 |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| `mode`                                           | 项目的覆盖值，或 `inherit`                                                           |
+| `planId`、`planKnown`、`defaultPlanId`、`planMode` | 所有者的套餐、它是否存在、兜底套餐，以及该套餐的日志默认值                          |
+| `effective`、`source`                            | 解析出的模式及其来源：`project`、`plan` 或 `gateway`                                 |
+| `published`、`publishedAt`、`state`              | 已发布的模式、发布时间与进度                                                         |
+
+#### 这个设置覆盖哪些内容
+
+该设置覆盖经平台发起的新 Workers AI、Markdown 转换与提供方请求，包括已部署应用以及关联项目运行 `void dev` 时发出的请求。当应用自带提供方 key 时同样适用。
+
+它不会改变已经在运行的请求、此前的日志、单独配置的 Logpush 导出、Cloudflare 的 Unified Billing 记录，也不会改变 gateway 日志的保留期。在所有模式下 AI 用量限额仍然生效。见 [Cloudflare 的日志控制](https://developers.cloudflare.com/ai-gateway/observability/logging/)。
+
+#### 从失败的变更中恢复
+
+| 错误                            | 处理方式                                                                                                    |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `ai_logging_publish_failed`     | 变更未保存。请对照错误信息检查之前的设置，然后重试该命令。                                                  |
+| `ai_logging_publish_pending`    | 变更已保存但尚未生效。重试以发布它。                                                                        |
+| `ai_logging_policy_unavailable` | 某次 AI 请求返回 HTTP `503`，因为平台读不到该设置。请重试该请求。                                           |
+| `ai_logging_policy_invalid`     | 某次 AI 请求返回 HTTP `503`，因为已发布的设置不合法。请重新设置项目的日志模式。                             |
+
+平台每小时还会修复一次未发布的设置。要取消一个已保存但仍 pending 的变更，请再次设置为之前的值；放任它 pending 会让它在之后生效。对于被打断的套餐变更，请[继续完成套餐更新](/docs/platform/administration/plans)。
+
+项目级设置要求平台 1.8.0 或更高。如果 CLI 报告平台不支持这些设置，请运行 `void platform upgrade`。
+
+## 注册权限
+
+查看注册限制、向所有人开放注册，或要求命中白名单：
+
+```sh
+void platform signup show
+void platform signup open
+void platform signup restrict
+```
+
+按类型与模式添加、移除 GitHub 或邮箱条目：
+
+```sh
+void platform signup allow <github|email> <pattern> [--note <text>]
+void platform signup disallow <github|email> <pattern>
+void platform signup remove <github|email> <pattern>
+```
+
+`remove` 作为别名保留，供已有脚本使用。GitHub 条目匹配登录名。邮箱条目跨登录提供方匹配地址或像 `*@example.com` 这样的域名模式。请在 shell 中为通配符模式加上引号。
+
+对于没有已验证邮箱的 OIDC 身份，请用其配置的连接 ID 与稳定的提供方 subject 授予权限：
+
+```sh
+void platform signup allow identity <connection-id> <subject> [--note <text>]
+void platform signup disallow identity <connection-id> <subject>
+```
+
+连接 ID 由 `void platform config auth list` 显示。Identity subject 精确且区分大小写地匹配；不支持通配符、邮箱推断与账户关联。登录方式自身的域名或分组限制仍须通过，且新被准入的账户是普通用户角色。在「仅邀请/白名单」注册下，空白名单会阻止所有新账户。在「公司审批」注册下，显式授权是在公司规则之外额外放行人员。
+
+## 邀请
+
+按邮箱邀请人员，并跟踪他们是否已加入：
+
+```sh
+void platform invitation list [--page <n>] [--limit <n>]
+void platform invitation send <email[,email...]>
+void platform invitation revoke <id>
+```
+
+send 最多接受 100 个以逗号分隔的地址。即使邮件不可投递或投递失败，邀请也会赋予注册权限；投递情况会单独报告。在没有发送邮件时，请自行分享平台的 `/invite` 页面或 `void connect '<platform URL>'` 命令。吊销一个 pending 的邀请会移除它那条精确的邮箱授权。更宽泛的域名条目仍然可能允许此人注册。

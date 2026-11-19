@@ -1,0 +1,149 @@
+---
+title: SvelteKit
+description: 在 SvelteKit 应用里接入 Void，获得资源探测、带类型的数据库查询、迁移与部署能力。
+---
+
+把 Void 用在 [SvelteKit](https://svelte.dev/docs/kit) 应用里，可以获得资源探测、带类型的数据库查询以及迁移能力。SvelteKit 保留自己的构建流程和 Cloudflare 集成，Void 则接入它的 Vite 配置。
+
+Void 支持 SvelteKit 3 以及 SvelteKit 2.62 及以后版本。下面的配置使用 SvelteKit 3 与 `@sveltejs/adapter-cloudflare` 8。
+
+## 接入步骤
+
+### 1. 创建新项目
+
+```bash
+npx sv create my-app
+cd my-app
+```
+
+### 2. 安装依赖
+
+```bash
+npm install -D @sveltejs/adapter-cloudflare void
+```
+
+### 3. 配置 `vite.config.ts`
+
+```ts
+import adapter from '@sveltejs/adapter-cloudflare';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { voidPlugin } from 'void';
+
+export default {
+  plugins: [
+    voidPlugin(),
+    sveltekit({
+      adapter: adapter({
+        config: './.void-wrangler.jsonc',
+        platformProxy: { configPath: './.void-wrangler.jsonc' },
+      }),
+    }),
+  ],
+};
+```
+
+### 4. 创建 `void.config.ts`
+
+按上面的配置把 SvelteKit 的适配器指向 Void 生成的 Cloudflare 配置，并把你的 Cloudflare 设置写进 `void.config.ts`：
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  cloudflare: {
+    name: 'my-app',
+    compatibility_date: '2026-02-24',
+    compatibility_flags: ['nodejs_compat'],
+  },
+});
+```
+
+### 5. 配置 `tsconfig.json`
+
+继承 SvelteKit 生成的配置，以及 Void 生成的类型与数据库别名：
+
+```json
+{
+  "extends": ["$app/tsconfig", "./.void/tsconfig.json"],
+  "compilerOptions": {
+    "types": ["$app/types", "void/env"]
+  },
+  "include": ["src", "db", "crons", "queues", "*.ts"]
+}
+```
+
+全新克隆仓库之后、或在 CI 里做类型检查之前，先运行 `void prepare`，这样在 SvelteKit 同步配置时 `.void/tsconfig.json` 已经存在。像 SvelteKit 3 的 `#lib` 这类别名，请使用 `package.json` 的 subpath imports。
+
+### 6. 部署
+
+```bash
+void auth login
+void deploy
+```
+
+## 使用 Void 能力
+
+多数 [Void 平台能力](/docs/app-types)都可以在 SvelteKit 中使用。把它们用在 server load 函数、action 与 API 路由里。
+
+Void 托管的认证暂不支持框架模式，目前请直接使用 Better Auth 官方的 SvelteKit 集成。
+
+### 数据库
+
+```ts
+// src/routes/users/+page.server.ts
+import { users } from '@schema';
+import { db } from 'void/db';
+
+export async function load() {
+  return { users: await db.select().from(users) };
+}
+```
+
+### 其他资源
+
+在服务端代码中使用 [KV](/docs/kv)、[对象存储](/docs/storage) 与 [AI](/docs/ai)，导入方式和 Void 应用完全相同。在 `crons/` 中添加 [cron 任务](/docs/jobs)，在 `queues/` 中添加[队列消费者](/docs/queues)。
+
+### 环境变量
+
+在 `env.ts` 中声明变量，用 `import { env } from "void/env"` 读取。本地取值、生产密钥以及公开的 `VITE_*` 值参见[环境变量](/docs/env-vars)。
+
+## 直接访问绑定
+
+在 SvelteKit 3 中，服务端代码使用 `cloudflare:workers` 模块：
+
+```ts
+import { env } from 'cloudflare:workers';
+
+const { results } = await env.DB.prepare('SELECT * FROM users').all();
+```
+
+## 已有的 SvelteKit 2 应用
+
+请使用 SvelteKit 2.62 及以后版本与 `@sveltejs/adapter-cloudflare` 7。上面的 Vite 配置对 Kit 2 同样适用，只需在 `sveltekit()` 选项里加上 Void 的 tsconfig 钩子：
+
+```ts
+import { withVoidTSConfig } from 'void/sveltekit';
+
+sveltekit({
+  adapter: adapter({
+    config: './.void-wrangler.jsonc',
+    platformProxy: { configPath: './.void-wrangler.jsonc' },
+  }),
+  typescript: {
+    config: withVoidTSConfig(),
+  },
+});
+```
+
+tsconfig 沿用 Kit 2 的写法：
+
+```json
+{
+  "extends": "./.svelte-kit/tsconfig.json",
+  "compilerOptions": {
+    "types": ["void/env"]
+  }
+}
+```
+
+如果你的应用使用 `svelte.config.js` 或 `svelte.config.ts`，保留它原有配置，并在 `kit` 下加上 `typescript.config: withVoidTSConfig()`。Kit 2 的 `platform.env` 在 hooks 与 load 函数中依然可用。

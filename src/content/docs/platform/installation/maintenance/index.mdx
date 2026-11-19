@@ -1,0 +1,202 @@
+---
+title: 维护与恢复
+description: 恢复、修复、升级或找回一次安装，包括 keychain 或 API 不可用时的处理。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 恢复、修复与升级
+
+运行 `void platform list`，在名字旁边找到安装的 slug。生命周期命令接受这个 slug、一个安装 ID，或一个已保存的连接 ID。只配置了一个安装时可以省略选择器。有多个安装时，交互式选一个，或在 CI 中传入它的 slug 或 ID。
+
+### 恢复一次安装
+
+如果 setup 停止或失败，从已保存的进度继续：
+
+```sh
+void platform install --resume --name <id>
+```
+
+数据库 URL 若初次连接失败，此时可以改正。一旦 Void 占用了数据库或开通了 Hyperdrive，这次安装就固定使用那个数据库。后续命令换一个 URL 会在做任何改动之前停止。
+
+### Cloudflare Access 挡住了健康检查
+
+如果安装报出 **Default-Deny (error 1050)**，说明 Cloudflare 在 HTTP 健康检查到达 Void 之前就拦截了它。这与部署 Worker 所用的 API 令牌是两回事。
+
+请保留企业保护，不要关掉它。自动的 Access setup 会把它那份受限范围的凭据，连同安装的加密恢复材料一起保存。对于一道已有的准入门，请确认它的服务策略允许安装令牌通过，并且该应用覆盖了打印出的 API 与 proxy origin。Cloudflare 管理 API 令牌无法为一个受 Access 保护的 HTTP 请求做认证。
+
+在自动 setup 的情况下，resume 还会在保留的 dispatch 健康主机名上创建或校验一条仅限 `/health` 的 Access 例外。Void 在该端点上仍然要求它私有的探测令牌；不带该令牌的请求无法到达任何应用。这样安装既能检查路由，又让员工保护与账户级 Default-Deny 保持启用。它不会为某个 Worker 整体或为已部署的应用绕过 Access。
+
+对于外部提供的凭据，请把 `VOID_ACCESS_CREDENTIALS` 从密钥管理器设为一个对象，以每个确切的 API/proxy origin 为键，每条中包含 `CF_ACCESS_CLIENT_ID` 与 `CF_ACCESS_CLIENT_SECRET`。然后重跑 `void platform install --resume --name <id>`。Void 会保留已保存的资源，若这道门仍然拒绝它的检查就停止。账户级 Default-Deny 与已部署应用的策略仍然由你负责。
+
+### 管理员 setup 码过期
+
+用 `void platform install --resume --name <id>` 恢复一次未完成的安装。对于资源已开通完毕、但管理员 setup 仍未完成的安装，运行 `void platform repair <id>`。若早先的 setup 码已过期，Void 会打印一个新的。在 `/setup` 输入它、登录，并确认页面上展示的身份。已经设有管理员的安装不会重新打开 setup。
+
+### 首位管理员登录失败
+
+如果输入 setup 码之后登录仍然失败，页面会显示原因与一个错误码。当原因可能出在某个提供方设置上时，页面还会显示该提供方必须登记的回调 URL。
+
+| 错误码                                                                      | 要检查的内容                                                      |
+| --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `github_incorrect_client_credentials`、`github_failed`、`oidc_token_failed` | client ID 与 client secret，以及提供方是否登记了回调 URL          |
+| `github_redirect_uri_mismatch`                                              | GitHub OAuth App 里登记的回调 URL                                 |
+| `oidc_discovery_failed`                                                     | issuer URL 是否一字不差，包括末尾的斜杠                           |
+| `github_unverified_user_email`                                              | 去确认该 GitHub 账户的主邮箱                                      |
+| `google_domain_not_allowed`、`oidc_group_not_allowed`                       | 改用一个被允许的账户登录，或调整允许的域名/组                     |
+| `login_denied`、`github_bad_verification_code`                              | 重新发起一次登录                                                  |
+
+如果提供方改为显示它自己的错误页，请精确登记与你的 setup 码一起打印出来的那个回调 URL。
+
+要修改登录设置，请在当初安装平台的那台电脑上运行 repair：
+
+```sh
+void platform repair <id>
+void platform repair <id> --auth-config <path>
+```
+
+交互式 repair 会询问是否修改登录设置，并把已保存的值填好备用；client secret 留空即保持不变。`--auth-config` 接受一个符合[安装格式](/docs/platform/installation/setup)的文件，也是修改 OIDC 允许组的唯一途径。登录方式与 Access 保护都保持安装时的状态。Repair 会打印新的 setup 码与回调 URL。
+
+仅用 GitHub 的安装会用它安装设置里的那个 GitHub OAuth App 登录。要替换它的 client ID 与 secret，请在运行 `void platform repair <id>` 时设置 `VOID_PLATFORM_GITHUB_CLIENT_ID` 与 `VOID_PLATFORM_GITHUB_CLIENT_SECRET`。
+
+### 修复缺失的资源
+
+先预览哪些东西需要修复，再应用：
+
+```sh
+void platform repair [id] --plan
+void platform repair [id]
+```
+
+Repair 会重建安装器名下缺失的基础设施。它不会还原 PostgreSQL 里的行，也不会还原存放在提供方资源中的数据。如果被接管或外部的资源缺失，请先自行恢复它再继续。被禁用的平台在 repair 与 upgrade 之后仍保持禁用。
+
+### 升级平台
+
+在你所在团队更新 CLI 之前，先升级平台。在管理员的机器上安装新版 CLI，运行下面的升级，然后再让团队更新。
+
+对于使用 `void/sandbox` 的应用，请给运行时令牌加上 **Account → Containers → Edit** 与 **Account → Cloudchamber → Edit**。可以在 Cloudflare 里编辑它的权限，或用 `VOID_PLATFORM_RUNTIME_CLOUDFLARE_API_TOKEN` 提供一个替代令牌。参见 [Cloudflare API 令牌](/docs/platform/installation/credentials)。
+
+用已安装 CLI 自带的运行时来升级：
+
+```sh
+void platform upgrade [id] --plan
+void platform upgrade [id]
+```
+
+升级会校验运行时、应用支持的待处理迁移、部署 Worker 并检查它们的健康状况。已有的 Worker secret 会被保留。
+
+install、upgrade 与 repair 还会发布已保存的 [AI Gateway 日志](/docs/reference/cli/platform-users)设置。受影响的项目随后大约 2 分钟内可能显示 `pending`，包括那些回到 `inherit` 的项目。用 `void platform project show <project-id>` 查看进度。
+
+开始前，Void 会检查对安装的 Cloudflare 账户、Worker 与既有 R2 bucket 的访问权限。如果凭据被拒绝，请把 `CLOUDFLARE_API_TOKEN` 设为限定到该账户的管理令牌后重试。这会覆盖安装中保存的管理令牌。
+
+某些升级会暂停应用流量，直到新版本通过健康检查。如果命令在流量暂停期间失败：
+
+1. 运行 `void platform status <id>` 查看已保存的进度。
+2. 修复报出的问题。
+3. 用同一个运行时运行打印出的 resume 命令。它成功后流量就会恢复。
+
+<Callout type="info" title="迁移安全性、凭据轮换与回滚">
+
+要更新运行时 Cloudflare 令牌、已启用 GitHub 登录时的 GitHub OAuth 凭据，或 R2 凭据，请在运行升级时提供它们的 `VOID_PLATFORM_*` 环境变量。只有你实际提供的值会替换线上凭据。来自旧工作站的恢复数据不会覆盖它们，升级也会保留线上的签名密钥与完整的项目加密密钥环。请把当前凭据保存在密钥管理器里，这样它们在 repair 重建某个缺失的 Worker 时同样能用来恢复。
+
+数据库迁移只向前。Void 会在升级前检查兼容性，并在需要中间版本时告诉你。如果部署失败，它会在兼容的数据库 schema 上尝试恢复上一个 Worker 版本。重试不会重复已完成的迁移。
+
+升级成功后，你可以在不回退迁移的情况下还原到一个声明兼容的较早运行时：
+
+```sh
+void platform rollback [id] --runtime /path/to/earlier/runtime --plan
+void platform rollback [id] --runtime /path/to/earlier/runtime
+```
+
+请保留较早的运行时文件以备回滚。如果当前安装的版本是自定义构建，还要用 `--from-runtime /path/to/current/runtime` 一并传入它的文件。Void 会检查较早的版本能否在你的当前数据库上运行，并拒绝不兼容的回滚。之后的 `upgrade` 可以再次向前。自定义构建的相关做法见[平台开发](/docs/platform/development/runtime)。
+
+升级到更高版本后，不要回退到 0.26.0 或更早版本。Void 不会拒绝这种回滚，但那些版本会拒绝后续版本发放给你应用的凭据。自升级以来被部署或轮换过的每个项目，都会失去 AI、邮件、ISR 重新校验、远程 D1、KV、R2 与预渲染，直到你再次升级。如果你已经回退到那么早，请再次升级，然后运行 `void platform system rotate-proxy-tokens --all --yes`，并用 `--plan` 检查，直到没有 pending 也没有 failed。
+
+回滚有可能恢复提示词与响应日志：
+
+- **1.8.0** 会应用项目的 AI 日志设置，但忽略[方案默认值](/docs/platform/administration/plans)。没有覆盖设置的项目使用 gateway 自身的设置，而新安装上该设置是启用日志的。方案默认值仍被保存，并在升级时重新发布。
+- **1.8.0 之前**，任何项目或方案的 AI 日志设置都不生效。
+
+请先让正在进行的轮换结束，再回滚。如果旧版 proxy 与新版 API 并行运行，预渲染以及远程 D1、KV、R2 会失败，直到两者回到同一个版本。在回滚到凭据轮换前的那个版本之后，自升级以来部署的项目会失去预渲染与远程 D1、KV、R2，直到它们重新部署或你再次升级。在任何回滚期间部署过的、已轮换的项目，即使你再次升级也仍是坏的；0.26.0 及更早版本还会丢弃尚未完成的轮换。从任何回滚状态再次升级之后，请运行同一组 `rotate-proxy-tokens` 命令。
+
+</Callout>
+
+### 变更运行时日志
+
+用一次升级在[完整与最小化运行时日志](/docs/platform/installation/setup)之间切换已安装的平台：
+
+```sh
+void platform upgrade [id] --runtime-logs minimal
+void platform upgrade [id] --runtime-logs full
+```
+
+该设置同样作用于已有的项目部署，后续升级会保持它。此前存储的日志会保留到 Cloudflare 的保留期结束。
+
+如果更新项目日志失败，平台升级仍会完成并打印一条恢复命令。切到 minimal 之后请运行 `void platform repair [id]`；切到 full 之后请重跑那次升级。
+
+在运行时日志为 minimal 期间，`void platform rollback` 会拒绝一个不支持该设置的运行时。请先运行 `void platform upgrade [id] --runtime-logs full`。
+
+### 平台 Worker 在 Void 之外被改动
+
+请用 Void 的命令管理平台的 Worker。如果它们的配置在 Cloudflare 侧被改动过，或者 Void 无法识别当前生效的版本，维护会请你批准用 Void 的配置替换它。用 `--plan` 预览受影响的 Worker。
+
+在终端里运行打印出的命令，并核对 **Replace the configuration of these Workers?** 这一问，默认为 No。接受会恢复 Void 的配置，包括移除手工添加的变量。在部署前你可能还会看到一次确认，其中列出配置差异。拒绝后面那次确认不会撤掉已经完成的资源与数据库准备。
+
+需要这项批准时，CI 与 `--yes` 运行会直接停止。先完成一次交互式命令，然后再回到自动化。如果某个 Worker 使用了渐进式部署，请先在 Cloudflare 里把某一个版本设为承接 100% 流量。
+
+如果流量已经被此前失败的运行暂停，请按[升级平台](#升级平台)恢复它。
+
+### 跟踪升级与回滚进度
+
+关注进度是可选的：正在进行的升级或回滚会在 CLI 中一路走完，不需要你在状态页上做任何操作。维护期间，在 admin UI 中导航会自动跳转到 `/admin/status`。你也可以直接在平台 API origin 上打开它，并以管理员身份登录。
+
+这个只读页面会显示保存下来的操作、源版本与目标版本，以及 API 报告的流量状态。页面可见时每五秒自动刷新一次。如果刷新失败，它会保留最后一次确认的快照并标记为已过期。普通的管理员改动会保持暂停。
+
+只要 API 与认证数据库可达，登录与状态页就仍然可用。某次操作完成并不代表每个项目都健康。被禁用的安装在升级或回滚之后仍保持流量暂停。
+
+如果某次操作失败，或在等待 DNS、等待 Sandbox 排空，CLI 会打印恢复说明与继续所需的命令。请先解决报出的问题，再用同样的运行时文件恢复。对于自定义回滚，源运行时文件也要一并保留。`void platform status <id>` 在检查线上 API 之前，还会打印本地保存的进度；如果另一位管理员改动过这次安装，这个本地 checkpoint 可能是过期的。
+
+在应用流量暂停期间，访客会看到一个临时不可用页面，其中带有 **Try again** 链接。API 请求与表单提交仍会收到 HTTP 503 响应。Void 不会自动重放请求；提交过表单的访客在再次提交前应先确认上一次的结果。
+
+### 在另一台机器上管理安装
+
+用 `discover` 恢复管理员本机的安装记录：
+
+```sh
+void platform discover --account <account-id> --installation <id-or-name>
+```
+
+Discovery 在校验这些资源确实属于你的平台之后，重建本地的安装记录。它对被中断或被禁用的安装同样有效。如果基础设施缺失，请在 discovery 之后运行 `void platform repair [id]`。如果无法验证归属，该命令会在不改动任何资源的情况下停止。
+
+Discovery 之后，请提供 `VOID_PLATFORM_DATABASE_URL`，用于迁移以及协调管理员命令。对于会保留每个已部署 Worker 的升级，你不需要重新输入其他密钥。对于一个启用了邮件、但加密恢复文件已丢失的安装，请恢复 `VOID_PLATFORM_EMAIL_SIGNING_SECRET`；只重建 email gateway 只需要这把密钥，不需要 Cloudflare 运行时令牌或 JWT 签名密钥。重建 API 或 proxy 时，若启用了邮件，除常规密钥外同样需要这把邮件密钥。重建 API 需要通过 `VOID_PLATFORM_*` 变量提供它原始的运行时令牌（`VOID_PLATFORM_RUNTIME_CLOUDFLARE_API_TOKEN`）、R2、JWT 与项目加密值；仅用 GitHub 的安装还需要它原始的 GitHub OAuth 值。重建 proxy 需要运行时令牌与 JWT 签名密钥。Cloudflare 无法返回这些值，所以请把它们保存在组织的密钥管理器里。
+
+如果你没有轮换过项目加密密钥，用 `VOID_PLATFORM_PROJECT_SECRET_KEY` 还原它。轮换过之后，请用 `VOID_PLATFORM_PROJECT_SECRET_KEYS_JSON` 提供全部保留的密钥，并用 `VOID_PLATFORM_PROJECT_SECRET_ACTIVE_KEY_VERSION` 提供生效密钥的名字。解密既有项目 secret 所需的旧密钥要保留下来。这些值用于重建一个缺失的 API Worker；在一次普通升级中它们不会替换线上密钥。请从密钥管理器提供它们。
+
+### 为灾难恢复做准备
+
+`discover` 能在另一台机器上重建已校验的安装元数据。它不会下载凭据、密钥材料或备份数据。`repair` 随后可以重建安装器名下缺失的基础设施，但恢复不了这些基础设施原先承载的数据。
+
+请为每次安装保留一套相互配套的恢复集合：
+
+- 一份 PostgreSQL 备份；
+- 安装的身份——JWT 签名密钥、启用邮件时的邮件签名密钥，以及完整的项目加密密钥环——保存在密钥管理器里；
+- 每个承载数据的提供方资源，都有提供方支持的备份或导出；
+- 已安装版本（或自定义源码 revision）不可变的运行时产物与清单。
+
+请把这些内容作为同一个恢复点一起采集并标注，好让 PostgreSQL、提供方数据、身份与加密密钥彼此匹配。备份与保留能力因提供方和资源而异；请为你使用的每种资源选定并演练其受支持的恢复流程。
+
+在恢复期间，改动资源之前请保持平台与应用流量处于禁用状态。用各方支持的恢复工具还原匹配的 PostgreSQL 与提供方数据，提供原始的身份与密钥环，并使用保留下来的运行时产物。然后运行 `discover`，用 `--plan` 预览 `repair`，在应用之前逐条复核归属判定与拟做的资源变更。只有在还原后的数据与平台健康都校验通过之后，才开放流量。Discovery 与 repair 不能替代那些备份，在所需的密钥或数据不可用时也不会提供恢复捷径。
+
+### 本地状态存放在哪里
+
+安装记录位于 `~/.void/platforms/`。凭据另外存放在加密的恢复文件中，而加密密钥保存在操作系统的 keychain 里。请在你自己的密码管理器中保留原始密钥，以便在另一台机器上恢复。Void 生成的签名与加密密钥只存在于这些文件中；要自己留一份，请在[安装时提供它们](/docs/platform/installation/credentials)。
+
+如果 keychain 不可用，Void 会在写入任何 secret 之前停止。无人值守环境可以提供 `VOID_PLATFORM_RECOVERY_KEY`：一个来自密钥管理器的、规范的 base64 编码 32 字节密钥。只有在每个原始凭据都仍可从受保护的 CI secret 中取得时——包括 `VOID_PLATFORM_JWT_SECRET`、启用邮件时的 `VOID_PLATFORM_EMAIL_SIGNING_SECRET`，以及原始的 `VOID_PLATFORM_PROJECT_SECRET_KEY` 或完整的轮换后密钥环加生效版本名——临时 CI runner 才可以每次运行都用一把新的恢复加密密钥。
+
+<Callout type="info" title="归属校验与被中断的维护">
+
+Void 会在做任何改动之前检查资源归属与所配置的数据库。并发的维护命令之间会相互协调，因此一位管理员不会覆盖另一位管理员的工作。
+
+如果维护被中断，请重跑同一条命令。在校验成功之前流量可能保持暂停。既有的路由、域名与数据都会被保留。
+
+</Callout>

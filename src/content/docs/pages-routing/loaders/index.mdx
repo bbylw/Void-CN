@@ -1,0 +1,264 @@
+---
+title: Loader 与 Props
+description: 在配套的 .server.ts 文件中加载页面数据，组件把它作为带类型的 props 接收。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+Loader 负责获取页面需要的数据。在配套的 `.server.ts` 文件里定义它，使用的 `defineHandler` API 与[服务端路由](/docs/server-routing)相同。
+
+## 定义 Loader
+
+`loader` 在 GET 请求上运行，返回的对象会成为页面的 props：
+
+```ts title="pages/users/index.server.ts"
+import { users } from '@schema';
+import { defineHandler } from 'void';
+import type { InferProps } from 'void';
+import { db } from 'void/db';
+
+export type Props = InferProps<typeof loader>;
+
+export const loader = defineHandler(async (c) => {
+  return { users: await db.select().from(users) };
+});
+```
+
+`InferProps` 推断 loader 的返回类型，因此页面 props 始终与它返回的数据保持同步。
+
+直接返回数据可以保留 `Date`、`Map`、`Set`、`bigint`、`RegExp`、`URL` 与 `undefined` 这类更丰富的值。页面 props 与共享数据在渲染、hydration、导航与 deferred 加载过程中都能保持这些类型，重复引用与循环引用也是如此。
+
+返回 `Response.json()` 则改用 JSON 转换。函数与自定义类实例不能作为页面数据发送。
+
+## 响应状态
+
+用 `c.status()` 让当前页面带上 `403`、`503` 这类 HTTP 错误状态，props 照常返回：
+
+```ts title="pages/maintenance.server.ts"
+import { defineHandler } from 'void/handler';
+
+export const loader = defineHandler((c) => {
+  c.status(503);
+  c.header('Retry-After', '120');
+  return { message: 'Down for maintenance' };
+});
+```
+
+浏览器收到 HTTP `503` 与 `Retry-After` 头，页面则用 `{ message: 'Down for maintenance' }` 渲染。客户端导航使用相同的状态、props 与布局。
+
+也可以在中间件里 `await next()` 之前设置状态，但必须在 deferred 流式渲染开始之前完成。想改为显示错误组件而不是所请求的页面，请[抛出 `HTTPException`](/docs/pages-routing/errors)。
+
+## 在页面组件中使用数据
+
+页面组件把 loader 的结果作为 props 接收。把推断出的类型从服务端文件导出，组件就能与之保持同步：
+
+```tsx title="React"
+// pages/users/index.tsx
+import type { Props } from './index.server';
+
+export default function UsersPage({ users }: Props) {
+  return (
+    <ul>
+      {users.map((u) => (
+        <li key={u.id}>{u.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+```vue title="Vue"
+<!-- pages/users/index.vue -->
+<script setup lang="ts">
+import type { Props } from './index.server';
+
+const { users } = defineProps<Props>();
+</script>
+
+<template>
+  <h1>Users</h1>
+  <ul>
+    <li v-for="u in users" :key="u.id">{{ u.name }}</li>
+  </ul>
+</template>
+```
+
+```svelte title="Svelte"
+<!-- pages/users/index.svelte -->
+<script lang="ts">
+  import type { Props } from "./index.server";
+
+  let { users }: Props = $props();
+</script>
+
+<h1>Users</h1>
+<ul>
+  {#each users as u (u.id)}
+    <li>{u.name}</li>
+  {/each}
+</ul>
+```
+
+```tsx title="Solid"
+// pages/users/index.tsx
+import { For } from 'solid-js';
+import type { Props } from './index.server';
+
+export default function UsersPage(props: Props) {
+  return (
+    <>
+      <h1>Users</h1>
+      <ul>
+        <For each={props.users}>{(u) => <li>{u.name}</li>}</For>
+      </ul>
+    </>
+  );
+}
+```
+
+## Deferred Props
+
+慢数据用 `defer()`。页面立即渲染，数据就绪后再收到结果：
+
+```ts title="pages/dashboard.server.ts"
+import { projects } from '@schema';
+import { defineHandler, defer } from 'void';
+import type { InferProps } from 'void';
+import { db } from 'void/db';
+
+export type Props = InferProps<typeof loader>;
+
+export const loader = defineHandler(async (c) => {
+  const allProjects = await db.select().from(projects); // 快，立即返回
+  return {
+    projects: allProjects,
+    usage: defer(async () => {
+      return await fetchUsageMetrics(); // 慢，就绪后流式返回
+    }),
+  };
+});
+```
+
+`usage` 还在加载时，页面就可以先渲染 `projects`。在 React 中，用 `Suspense` 内的 `use()` 读取 `usage`；其他适配器把它暴露为 `{ loading, value, error }`。
+
+### 处理 deferred 状态
+
+在 React 里，`Deferred<T>` 以 Promise 的形式消费。把 deferred 的读取放在 `<Suspense>` 边界之下，并在需要取值的地方调用 `use()`：
+
+```tsx title="React"
+import { Suspense, use } from 'react';
+import type { Props } from './dashboard.server';
+
+function Usage({ usage }: Pick<Props, 'usage'>) {
+  const resolved = use(usage);
+  return <p>{resolved.requests} requests</p>;
+}
+
+export default function Dashboard({ projects, usage }: Props) {
+  return (
+    <div>
+      <h1>Projects ({projects.length})</h1>
+      <Suspense fallback={<p>Loading usage...</p>}>
+        <Usage usage={usage} />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+被拒绝的 deferred prop 会从 `use()` 中抛出。如果页面需要展示自定义的失败状态，请在 `Suspense` 边界之外再包一层普通的 React 错误边界。若要在 React 的 props 类型标注里显式写出 deferred 类型，请从 `@void/react` 导入 `Deferred`；适配器导出的类型是 `Promise<T>`。
+
+生产环境中，deferred prop 里的意外错误会以 `Internal Server Error` 到达页面；想显示自己的消息，请抛出 [`HTTPException`](/docs/integrations/hono)。
+
+在 Vue、Svelte 与 Solid 中，`Deferred<T>` 表现为一个三态的[可辨识联合](https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions)：
+
+```ts
+type Deferred<T> =
+  | { loading: true; value: null; error: null } // pending
+  | { loading: false; value: T; error: null } // resolved
+  | { loading: false; value: null; error: Error }; // rejected
+```
+
+先检查 `loading`，再检查 `error`。在 resolved 分支里，TypeScript 会把 `value` 收窄为 `T`：
+
+```vue title="Vue"
+<script setup lang="ts">
+import type { Props } from './dashboard.server';
+
+const { projects, usage } = defineProps<Props>();
+</script>
+
+<template>
+  <div>
+    <h1>Projects ({{ projects.length }})</h1>
+    <p v-if="usage.loading">Loading usage...</p>
+    <p v-else-if="usage.error">Failed: {{ usage.error.message }}</p>
+    <p v-else>{{ usage.value.requests }} requests</p>
+  </div>
+</template>
+```
+
+```svelte title="Svelte"
+<script lang="ts">
+  import type { Props } from "./dashboard.server";
+
+  let { projects, usage }: Props = $props();
+</script>
+
+<div>
+  <h1>Projects ({projects.length})</h1>
+  {#if usage.loading}
+    <p>Loading usage...</p>
+  {:else if usage.error}
+    <p>Failed: {usage.error.message}</p>
+  {:else}
+    <p>{usage.value.requests} requests</p>
+  {/if}
+</div>
+```
+
+```tsx title="Solid"
+import type { Props } from './dashboard.server';
+
+export default function Dashboard(props: Props) {
+  return (
+    <div>
+      <h1>Projects ({props.projects.length})</h1>
+      {props.usage.loading ? (
+        <p>Loading usage...</p>
+      ) : props.usage.error ? (
+        <p>Failed: {props.usage.error.message}</p>
+      ) : (
+        <p>{props.usage.value.requests} requests</p>
+      )}
+    </div>
+  );
+}
+```
+
+### action 之后的 Deferred Props
+
+<Callout type="info">
+action 之后，deferred props 会保留它们最后一次解析出的值，直到下一次页面加载或客户端导航。loader 返回的其他 props 会立即刷新。
+</Callout>
+
+### 分组的 Deferred Props
+
+当多个 props 依赖同一个慢操作时，用一个具名分组让它们在一次调用中一起解析：
+
+```ts
+export const loader = defineHandler<Props>(async (c) => {
+  const analyticsResolver = async () => {
+    const data = await fetchAnalytics(); // 只有一次慢调用
+    return { metrics: data.metrics, chart: data.chart };
+  };
+
+  return {
+    projects: await db.select().from(projects),
+    metrics: defer('analytics', analyticsResolver),
+    chart: defer('analytics', analyticsResolver),
+  };
+});
+```
+
+`metrics` 与 `chart` 都由 analytics resolver 的单次调用解析得到，而组件收到的是两个独立的 `Deferred<T>` prop。

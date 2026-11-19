@@ -1,0 +1,132 @@
+---
+title: 沙箱
+description: 在隔离的 Cloudflare Sandbox 中运行命令、处理文件、连接服务。
+---
+
+用 Cloudflare Sandbox 在服务端代码里运行命令、处理文件、连接服务。每个 Sandbox ID 对应一个隔离的容器。
+
+## 前置要求
+
+部署到 Cloudflare 需要 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans) 以及 Containers 访问权限。本地开发以及需要构建镜像的直接部署，需要本机运行 Docker。团队平台的 runtime token 需要 Account / Containers: Edit 和 Account / Cloudchamber: Edit 权限。
+
+## 运行一条命令
+
+```ts
+import { defineHandler } from 'void';
+import { getSandbox } from 'void/sandbox';
+
+export const POST = defineHandler(async (c) => {
+  const sandbox = await getSandbox('default');
+  const result = await sandbox.run(['node', '--version']);
+  return c.json({
+    exitCode: result.exitCode,
+    stdout: new TextDecoder().decode(result.stdout),
+  });
+});
+```
+
+只要从 `void/sandbox` 导入，Void 就会启用所需的资源。本地开发、直接部署到 Cloudflare 以及团队平台共用同一套运行时 API。
+
+## 运行时 API
+
+`getSandbox(id, options)` 解析出一个 Sandbox 但不会启动它。第一条命令、第一次文件操作或第一次端口请求才会真正启动容器。ID 长度为 1–63 个字符，默认会转成小写；传入 `normalizeId: false` 可保留大小写。
+
+```ts
+import { getSandbox } from 'void/sandbox';
+
+const sandbox = await getSandbox(`user-${user.id}`, {
+  inactivityTimeoutMs: 10 * 60 * 1000,
+  enableInternet: false,
+});
+const result = await sandbox.run(['node', '--version'], {
+  signal: AbortSignal.timeout(5_000),
+});
+```
+
+命令以数组形式传入可执行文件与参数。要用 shell 语法，请显式执行 `['sh', '-c', command]`。执行选项包括 `cwd`（默认 `/workspace`）、`env`、`user`、`signal`、`pty`、`stdin`、`stdout` 与 `stderr`。
+
+Sandbox 操作返回 Promise。`run()` 解析出的结果里 `stdout` 与 `stderr` 是 `ArrayBuffer`，并带上命令的退出码。触达用量限制时会用 [`UsageLimit`](#用量限制) reject；其他失败按常规方式 reject。
+
+`exec()` 解析出一个进程。等待 `process.output()` 可以收集它的输出与退出码，或者读取各个流并等待 `process.exitCode`。等待完成会让一条长命令在其输出停顿期间继续保持活跃；无人看管的后台命令可能在 Sandbox 进入空闲时被中止。运行时限制可能直到命令成功启动之后才在完成阶段 reject。
+
+用 `stdin: 'pipe'` 获得一个可写入的输入流。`kill(signal?)` 停止一个进程，`resize(cols, rows)` 调整它的终端尺寸。
+
+文件操作都在 `sandbox.files` 下：`readFile`、`writeFile`、`stat`、`lstat`、`readDirectory`、`mkdir`、`rename` 与 `remove`。等待 `readFile()` 会收到一个流式的 `Response`，随后可以用 `.text()`、`.arrayBuffer()` 或 `.body`。`writeFile()` 接受文本、二进制数据或字节流。相对文件路径要求显式给出 `cwd` 选项。
+
+要访问容器内的服务，请等待 `sandbox.fetch(port, new Request(url))`。`sandbox.running()` 检查容器是否在运行；`sandbox.destroy()` 停止它。
+
+在原生 Cloudflare 部署上，`sandbox.fetch()` 还支持 WebSocket 升级请求。把它的响应从你的 Worker 处理器返回，即可把客户端连到容器。托管的 Void 部署暂不支持 WebSocket 升级。
+
+`getSandbox()` 的选项包括 `inactivityTimeoutMs`（默认十分钟，最长六小时）、`enableInternet`（默认 `false`）以及字符串 `labels`。联网与 labels 在下次容器启动时生效。`binding` 用于选择一个自定义的原生绑定；托管平台使用配置好的绑定。
+
+要让同一份代码在两种部署目标上都能运行，请使用 `getSandbox()`。直接通过 `c.env.SANDBOX` 访问只在本地和原生 Cloudflare 部署上可用。
+
+## 用量限制
+
+Sandbox 的限制会用 `SandboxLimitError` reject，它继承自 `void/limits` 的 `UsageLimit`。该错误带有 `resource: 'sandbox'`，`reason` 为 `concurrency` 或 `runtime_budget`。当错误未被捕获时，Void 的路由处理器与 Pages action 会自动发出结构化的 HTTP 429。
+
+用 `instanceof UsageLimit` 可以选择性地同时处理 AI 与 Sandbox 的限制，或者用 `instanceof SandboxLimitError` 只做 Sandbox 相关的处理：
+
+```ts
+import { defineHandler } from 'void';
+import { UsageLimit } from 'void/limits';
+import { getSandbox } from 'void/sandbox';
+
+export const POST = defineHandler(async (c) => {
+  const sandbox = await getSandbox('default');
+  try {
+    const result = await sandbox.run(['node', 'task.mjs']);
+    return c.json({ exitCode: result.exitCode });
+  } catch (error) {
+    if (error instanceof UsageLimit) {
+      return error.response({
+        message: 'Execution is temporarily unavailable. Try again shortly.',
+      });
+    }
+    throw error;
+  }
+});
+```
+
+请保留好用户输入，以便重试。触达用量限制之后，`running()` 检查、停止进程与 `destroy()` 仍然可用。
+
+## 状态持久化
+
+在同一份部署内，`getSandbox(id)` 为该 ID 选中同一个 Durable Object。原生 Cloudflare 部署会跨 Worker 版本保留这个命名空间。托管平台的每次部署各有自己的命名空间；回滚到一份被保留的部署，会重新连上那份部署的命名空间。
+
+文件、运行中的进程与监听中的服务只在容器存活期间存在。容器可能因空闲、崩溃或重启而停止。需要长期保留的东西，请存进你的数据库、KV 或 R2。在 Void 平台上删除项目会同时删除它的 Durable Object 与容器。
+
+## 配置
+
+默认环境提供 Debian Trixie 上的 Node.js 26。托管平台部署使用 Cloudflare 的托管 Node.js 镜像。
+
+需要自定义镜像或容器规格时，请在 `void.config.ts` 中配置：
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  sandbox: {
+    image: './Dockerfile.sandbox',
+    platformImage: 'registry.cloudflare.com/<account-id>/sandbox@sha256:<digest>',
+    instanceType: 'standard-1',
+  },
+});
+```
+
+绑定名、镜像设置与容器规格见[配置参考](/docs/config)。
+
+自定义镜像必须包含与 Void 已安装的 Sandbox SDK 版本匹配的 helper。SDK 镜像提供了这个二进制文件，但它本身并不是一个可运行的环境：
+
+```dockerfile
+FROM node:26.12.1-trixie-slim
+COPY --from=docker.io/cloudflare/sandbox:1.0.2 /usr/local/bin/sandbox-shim /usr/local/bin/sandbox-shim
+WORKDIR /workspace
+CMD ["sleep", "infinity"]
+```
+
+对于托管平台，请把你的自定义镜像推到该平台账户的 Cloudflare registry，并把 `platformImage` 设为按 digest 固定的引用。如果 `image` 本身已经是 Cloudflare registry 引用，它同时会成为默认的 `platformImage`。不支持外部 registry 和可变的 tag。参见 [Cloudflare 的镜像管理指南](https://developers.cloudflare.com/containers/guides/image-management/#push-images-to-the-cloudflare-registry)。
+
+## 部署
+
+`void deploy --platform cloudflare` 会构建原生镜像，并把 Sandbox 与应用一起部署。在已连接的 Void Platform 上执行 `void deploy`，会套用平台的 Sandbox 并发与运行时限制。

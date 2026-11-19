@@ -1,0 +1,219 @@
+---
+title: 布局与共享数据
+description: 用布局在多个页面之间共享导航等 UI。布局随目录嵌套，并在导航过程中保留自身状态。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+导航、页眉以及其他被多个页面共享的 UI 都交给布局。布局随你的目录结构嵌套，并在导航过程中保留组件状态。
+
+## 布局
+
+在某个 `pages/` 目录中放入布局文件，它就会包裹该目录下的页面（下面的示例以 React 的 `.tsx` 为例，其他适配器换成对应扩展名即可）：
+
+```text title="pages/"
+├── layout.tsx        根布局（导航、页脚）
+├── index.tsx
+└── users/
+    ├── layout.tsx    /users/* 的嵌套布局
+    ├── index.tsx
+    └── [id].tsx
+```
+
+```tsx title="React"
+// pages/layout.tsx
+import { useShared, Link } from '@void/react';
+
+export default function Layout({ children }: { children: React.ReactNode }) {
+  const { auth } = useShared();
+  return (
+    <>
+      <nav>
+        <Link href="/">Home</Link>
+        <Link href="/users">Users</Link>
+        {auth?.user && <span>{auth.user.name}</span>}
+      </nav>
+      <main>{children}</main>
+    </>
+  );
+}
+```
+
+```vue title="Vue"
+<!-- pages/layout.vue -->
+<script setup lang="ts">
+import { useShared, Link } from '@void/vue';
+
+const { auth } = useShared();
+</script>
+
+<template>
+  <nav>
+    <Link href="/">Home</Link>
+    <Link href="/users">Users</Link>
+    <span v-if="auth?.user">{{ auth.user.name }}</span>
+  </nav>
+  <main>
+    <slot />
+  </main>
+</template>
+```
+
+```svelte title="Svelte"
+<!-- pages/layout.svelte -->
+<script>
+  import { useShared, Link } from "@void/svelte";
+
+  let { children } = $props();
+  const { auth } = useShared();
+</script>
+
+<nav>
+  <Link href="/">Home</Link>
+  <Link href="/users">Users</Link>
+  {#if auth?.user}<span>{auth.user.name}</span>{/if}
+</nav>
+<main>
+  {@render children()}
+</main>
+```
+
+```tsx title="Solid"
+// pages/layout.tsx
+import { useShared, Link } from '@void/solid';
+import type { JSX } from 'solid-js';
+
+export default function Layout(props: { children: JSX.Element }) {
+  const shared = useShared();
+  return (
+    <>
+      <nav>
+        <Link href="/">Home</Link>
+        <Link href="/users">Users</Link>
+        {shared.auth?.user && <span>{shared.auth.user.name}</span>}
+      </nav>
+      <main>{props.children}</main>
+    </>
+  );
+}
+```
+
+页面渲染时由布局把它包裹起来：在 React、Solid 与 Svelte 中页面组件作为布局的 children 注入，在 Vue 中则作为 slot。嵌套关系是自外向内的——`pages/layout` 包裹 `pages/users/layout`，后者再包裹 `pages/users/[id]` 页面组件。
+
+## 具名布局
+
+具名布局让单个页面可以选用另一条布局，而不必改变 URL 结构。在 `pages/` 下的 `_layouts/` 目录中定义它们：
+
+```text title="pages/"
+├── _layouts/
+│   ├── landing.tsx      名为 "landing"
+│   └── post.tsx         名为 "post"
+├── layout.tsx           默认根布局
+├── index.tsx
+├── blog/
+│   ├── hello.md         layout: post
+│   └── archive.md       layout: landing
+└── pricing.tsx          layout: !landing（独占）
+```
+
+### 选择具名布局
+
+从任意页面导出一个 `layout` 常量：
+
+```tsx title="React"
+export const layout = 'landing';
+
+export default function Page() {
+  return <div>This page uses the landing layout</div>;
+}
+```
+
+```vue title="Vue"
+<script lang="ts">
+export const layout = 'landing';
+</script>
+
+<template>
+  <div>This page uses the landing layout</div>
+</template>
+```
+
+```svelte title="Svelte"
+<script context="module">
+export const layout = "landing";
+</script>
+
+<div>This page uses the landing layout</div>
+```
+
+```tsx title="Solid"
+export const layout = 'landing';
+
+export default function Page() {
+  return <div>This page uses the landing layout</div>;
+}
+```
+
+Markdown 页面则使用 frontmatter：
+
+```md
+---
+layout: post
+---
+
+# My Blog Post
+```
+
+### 布局模式
+
+| 取值         | 行为                                                                     |
+| ------------ | ------------------------------------------------------------------------ |
+| `"landing"`  | 替换布局链中最内层的那一条。外层祖先布局依然生效。                       |
+| `"!landing"` | 替换**整条**链。只有这条具名布局包裹页面。                               |
+| `false`      | 完全不使用布局，页面独立渲染。                                           |
+
+具名布局替换的是最深的默认布局：在 `[root, docs/layout]` 中它替换 `docs/layout`；在 `[root]` 中它替换根布局。
+
+Void 会在页面所在目录或其祖先目录中寻找最近的同名 `_layouts/` 文件。缺失的具名布局会让构建失败。
+
+`layout` 必须直接从页面导出，取值为字符串字面量或 `false`；计算得到的值与再导出会被忽略并给出警告。
+
+## 共享数据
+
+中间件可以通过 `c.set("shared", {...})` 注入在每个页面上都可用的数据。给 `CloudContextVariables` 做类型扩展之后，`useShared()` 会自动推断出类型：
+
+```ts title="middleware/01.auth.ts"
+import { defineMiddleware } from 'void';
+import { getUser, type AuthUser } from 'void/auth';
+
+declare module 'void' {
+  interface CloudContextVariables {
+    shared: { auth: { user: AuthUser | null } };
+  }
+}
+
+export default defineMiddleware(async (c, next) => {
+  const user = getUser();
+  c.set('shared', { auth: { user } });
+  await next();
+});
+```
+
+在你的框架适配器中调用 `useShared()`，就像上面布局示例里那样。它的返回类型由 `CloudContextVariables` 推断而来，见[上下文变量](/docs/type-safety#上下文变量)。
+
+中间件设定起始值。loader 或 action 可以在页面发送之前更新它：
+
+```ts title="pages/profile.server.ts"
+import { defineHandler } from 'void';
+
+export const action = defineHandler(async (c) => {
+  const user = await updateProfile(c);
+  c.set('shared', { ...c.get('shared'), auth: { user } });
+});
+```
+
+如果 action 修改了用户资料，就照上面的做法在那里一并更新共享数据。在下一次页面请求之前，中间件不会再次运行。你也可以用 `c.redirect()` 重定向，从而重新加载页面与共享数据。
+
+<Callout type="tip">
+布局在导航过程中保留组件状态，因此放在布局里的滚动容器、展开状态等不会因为切换页面而被重置。
+</Callout>

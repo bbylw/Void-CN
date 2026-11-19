@@ -1,0 +1,94 @@
+---
+title: Fetch 客户端 API
+description: 在客户端代码中用类型化 fetch 调用你的路由。路径与响应类型都来自生成的路由映射表。
+---
+
+import ApiTable from '@/components/docs/ApiTable.astro';
+
+从 `"void/client"` 导入。
+
+## `fetch(path, options?)`
+
+用于在客户端代码中调用 API 路由的类型安全 fetch 客户端，构建在 [ofetch](https://github.com/unjs/ofetch) 之上。路由路径与返回类型由生成的 `RouteMap` 推断。
+
+```ts
+import { fetch } from 'void/client';
+
+// 类型完全由你的路由处理器推断
+const users = await fetch('/api/users');
+const user = await fetch('/api/users/[id]', {
+  params: { id: '1' },
+});
+```
+
+**签名：**
+
+```ts
+function fetch<P extends keyof RouteMap, M extends MethodsOf<P>>(
+  path: P,
+  options?: FetchOptions<P, M>,
+): Promise<OutputOf<P, M>>;
+```
+
+**选项：**
+
+<ApiTable
+  rows={[
+    { name: 'method', type: 'string', description: 'HTTP 方法', default: '"GET"' },
+    { name: 'body', type: 'unknown', description: '请求体（自动序列化为 JSON）。' },
+    { name: 'query', type: 'Record<string, string>', description: '查询字符串参数。' },
+    { name: 'params', type: 'Record<string, string>', description: 'URL 路径参数（[id] 片段）。' },
+    { name: 'headers', type: 'HeadersInit', description: '额外的请求头。' },
+    { name: 'signal', type: 'AbortSignal', description: '中止信号。' },
+    { name: 'baseURL', type: 'string', description: '拼在路径前的 base URL，调用外部服务时很有用。' },
+    { name: 'retry', type: 'number', description: '重试次数（ofetch 默认对 GET 重试 1 次）。' },
+    { name: 'timeout', type: 'number', description: '请求超时时间（毫秒）。' },
+  ]}
+/>
+
+省略 `method` 时发送 GET。非 GET 调用必须显式给出 `method`，包括把方法写成泛型类型参数的调用。
+
+返回解析后的 JSON 响应体；对 `204` 响应返回 `undefined`。响应状态码非 2xx 时抛出 `FetchError`。
+
+## `FetchError`
+
+`fetch` 在响应状态码非 2xx 时抛出的错误类。
+
+```ts
+import { fetch, FetchError } from 'void/client';
+
+try {
+  await fetch('/api/users/[id]', { params: { id: '999' } });
+} catch (e) {
+  if (e instanceof FetchError) {
+    console.log(e.status); // 404
+    console.log(e.response); // 原始 Response
+  }
+}
+```
+
+**属性：**
+
+<ApiTable
+  rows={[
+    { name: 'status', type: 'number', description: 'HTTP 状态码。' },
+    { name: 'response', type: 'Response', description: '原始的 Response 对象。' },
+    { name: 'data', type: 'unknown', description: '解析后的响应体（如果可用）。' },
+  ]}
+/>
+
+## 与原生 `fetch` 的差异
+
+类型化客户端构建在 [ofetch](https://github.com/unjs/ofetch) 之上，并在此之上加了一层类型化路由。与原生 `fetch` 的主要差异：
+
+| 行为                   | 原生 `fetch`                                              | `void/client` 的 `fetch`                                                                                     |
+| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| **返回类型**     | `Promise<Response>`，需要自己调用 `.json()`               | `Promise<T>`，自动解析 JSON 并直接返回带类型的结果（`204` 返回 `undefined`）                                  |
+| **错误处理**     | 任何 HTTP 状态都会 resolve；需要检查 `response.ok`        | 非 2xx 响应抛出 `FetchError`                                                                                  |
+| **URL 构造**     | 原始 URL 字符串                                           | 路由路径 + 由 `options.params` 填入的 `[param]` 插值 + 由 `options.query` 生成的查询字符串                   |
+| **请求体序列化** | 手动 `JSON.stringify()` 并设置 `Content-Type` 头          | 自动把 `options.body` 序列化为 JSON，并设置 `Content-Type: application/json`                                 |
+| **类型安全**     | 接受任意 URL 与方法                                       | 路径被限制在 `RouteMap` 的键上，方法被限制在该路由实际定义的方法上。非法组合在编译期报错。                   |
+| **重试**         | 无                                                        | 对 408、429 与 5xx 自动重试（可通过 `retry` 选项配置）                                                        |
+| **超时**         | 无                                                        | 可通过 `timeout` 选项配置                                                                                     |
+
+`headers` 与 `signal` 会原样透传给底层的 fetch。

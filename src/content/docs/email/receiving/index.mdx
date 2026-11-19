@@ -1,0 +1,136 @@
+---
+title: 接收邮件
+description: 用 email/ 中的处理器接收邮件。入站邮件仅在原生 Void 应用中可用。
+---
+
+用顶层 `email/` 目录中的处理器接收邮件。入站处理器要求原生 Void 应用；框架以及 Node.js、Bun、Deno 构建不支持它。
+
+```ts
+// email/_default.ts —— 任何未匹配收件人的兜底
+import { defineEmail, parseEmail } from 'void/email';
+
+export default defineEmail(async (message, env, ctx) => {
+  const parsed = await parseEmail(message);
+
+  if (parsed.subject?.startsWith('STOP')) {
+    message.setReject('Use the unsubscribe link.');
+    return;
+  }
+
+  await message.forward('archive@example.com');
+});
+```
+
+处理器收到的是 Cloudflare 原生的 `ForwardableEmailMessage`，此外还有可选的第四个参数 `info`，其中的 `params` 会为动态 / 带标签的路由片段填充内容：
+
+| 方法                               | 用途                                       |
+| ---------------------------------- | ------------------------------------------ |
+| `message.setReject(reason)`        | 用 SMTP 错误拒收这封邮件。                 |
+| `message.forward(to, headers?)`    | 转发到一个已验证的目的地。                 |
+| `replyEmail(message, options)`     | 发送一封带会话主题的回信。                 |
+| `message.reply({ from, to, raw })` | 用你自己构造的 MIME 字节或流来回复。       |
+
+没有执行任何动作就直接返回，等于接受这封邮件。`forward` 与 `message.reply` 要使用纯邮箱地址。
+
+`parseEmail(message)` 返回 `from`、`to`、`subject`、`text`、`html`、`attachments` 与 `headers`。每封邮件最多调用一次——底层数据流只能被读取一次。
+
+## 按收件人路由
+
+```text
+email/
+  support.ts                — 处理 support@<your-domain>
+  billing.ts                — 处理 billing@<your-domain>
+  support+[ticket].ts       — 处理 support+ticket-123@... → info.params.ticket = "ticket-123"
+  support+vip.ts            — 精确处理 support+vip@...，优先于 support+[ticket].ts
+  [user].ts                 — 动态 local-part   → info.params.user
+  [user]+[tag].ts           — 动态 + 子地址 → info.params.user, info.params.tag
+  _default.ts               — 没有任何按地址匹配的模式命中时的兜底
+```
+
+文件按 `To` 地址的 local-part（`@` 之前的部分）匹配，不区分大小写。**匹配优先级（越具体越优先）：**
+
+1. `support+vip.ts`（静态 + 字面标签）
+2. `support+[ticket].ts`（静态 + 捕获标签）
+3. `support.ts`（静态）
+4. `[user]+vip.ts`（动态 + 字面标签）
+5. `[user]+[tag].ts`（动态 + 捕获标签）
+6. `[user].ts`（动态）
+7. `_default.ts`（兜底）
+
+第一个匹配上的模式胜出。在同一种形态内，字面标签优先于捕获标签——`support+vip@` 命中 `support+vip.ts`，其余任何 `support+…@` 命中 `support+[ticket].ts`。同一形态的处理器按字母顺序依次尝试。
+
+如果什么都没匹配上、也没有 `_default.ts`，控制权交还给 Cloudflare，发件人收到一封投递失败通知。`email/` 下的嵌套目录会被忽略——收件人是一个扁平字符串，不是路径。
+
+## 带会话的回信
+
+```ts
+// email/support+[ticket].ts
+import { defineEmail, parseEmail, replyEmail } from 'void/email';
+
+export default defineEmail(async (message, env, ctx, info) => {
+  const parsed = await parseEmail(message);
+  await ticketStore.append(info!.params.ticket, parsed.text ?? '');
+
+  await replyEmail(message, {
+    text: `Got your message on ticket ${info!.params.ticket}.`,
+  });
+});
+```
+
+`replyEmail()` 会回复原发件人，并带上会话化的主题。你可以覆盖 `subject`。要在处理器返回之后再回复，请使用[`sendEmail` 的 `threading`](/docs/email/sending)。
+
+在 Void 平台上，默认发件人是你项目的共享地址，或者在你注册域名上收到这封邮件的地址。共享邮件就用这个默认值；`message.to` 中的项目前缀已被去掉。覆盖发件人时，该地址必须属于你的项目。
+
+回信遵循你项目的收件人策略。用 `void email allow <address>` 验证共享发件人的收件人。处理器执行完后，可以在 `void email logs` 中查看服务商的处理结果。
+
+转发要求原生的 Cloudflare 邮件事件。对于经由平台中转的自定义域名，请改用回复。
+
+## 配置入站投递
+
+在启用了邮件能力的平台上，一旦平台验证了你的收件规则并开启 plus addressing，`<slug>+anything@<mail domain>` 就会送达你已部署的 `email/` 处理器，无需逐个项目配置 DNS。部署带处理器的代码时 Void 会创建这条规则；只创建项目或只发邮件都不需要入站规则。若配置无法完成，部署会报告路由冲突或容量上限。一个[已注册的自定义域名](/docs/email/domains)在其入站就绪状态变为 `ready` 后，邮件同样会到达这些处理器。用 `void email domain status` 查看当前的服务商路由状态和剩余的配置步骤。
+
+配置了[邮件别名](/docs/reference/cli/email)的项目还能在 `<alias>+anything@<mail domain>` 上收信。例如 `acme-store+support@…` 和它的别名 `acme+support@…` 都会命中 `email/support.ts`。
+
+直接部署的场景，请按[你自己的 Cloudflare 账户](/docs/email/domains)配置入站地址。
+
+在本地用下一节的 `createInboundTestHarness` 测试入站处理器。
+
+## 测试入站处理器
+
+用 `createInboundTestHarness` 捕获回信、转发与拒收。平台共享邮件要传入含项目前缀的完整地址，例如 `acme+support+abc-123@acme.dev`。直接对接 Cloudflare 的邮件则设 `slug: null`，并使用 `support+abc-123@mail.acme.com`。
+
+```ts
+import { describe, it, expect } from 'vite-plus/test';
+import { createInboundTestHarness } from 'void/email/testing';
+import defaultHandler from './email/_default';
+import support from './email/support+[ticket]';
+
+describe('email handlers', () => {
+  it('routes to support+[ticket] and extracts the tag', async () => {
+    const harness = createInboundTestHarness({
+      routes: { 'support+[ticket]': support, _default: defaultHandler },
+    });
+    const result = await harness.deliver({
+      from: 'user@example.com',
+      to: 'acme+support+abc-123@acme.dev',
+      subject: 'Help',
+      text: 'I have a problem',
+    });
+    expect(result.handler).toBe('support+[ticket]');
+    expect(result.params).toEqual({ ticket: 'abc-123' });
+  });
+
+  it('rejects STOP messages via _default', async () => {
+    const harness = createInboundTestHarness({ routes: { _default: defaultHandler } });
+    await harness.deliver({
+      from: 'user@example.com',
+      to: 'acme+unknown@acme.dev',
+      subject: 'STOP',
+      text: 'bye',
+    });
+    expect(harness.rejects).toEqual(['Use the unsubscribe link.']);
+  });
+});
+```
+
+该测试装置按与已部署邮件路由相同的顺序匹配处理器。[测试](/docs/testing) 说明了如何运行测试，以及如何测试使用了其他绑定的代码。

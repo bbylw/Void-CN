@@ -1,0 +1,119 @@
+---
+title: Analog
+description: 在 Analog 应用里接入 Void，获得资源探测、带类型的数据库查询、迁移与部署能力。
+---
+
+把 Void 用在 [Analog](https://analogjs.org/) 应用里，可以获得资源探测、带类型的数据库查询以及迁移能力。Analog 保留自己的构建流程和 Cloudflare 集成，Void 则接入它的 Vite 配置。
+
+## 接入步骤
+
+### 1. 创建新项目
+
+```bash
+npx create-analog@latest my-app
+cd my-app
+```
+
+### 2. 安装依赖
+
+```bash
+npm install -D void nitro-cloudflare-dev
+```
+
+Void 提供本地 Cloudflare 绑定运行时。`nitro-cloudflare-dev` 在开发期间创建 platform 代理，让 `void/db`、`void/kv` 等运行时辅助函数能访问绑定。
+
+### 3. 配置 `vite.config.ts`
+
+```ts
+import analog from '@analogjs/platform';
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  resolve: {
+    mainFields: ['module'],
+  },
+  plugins: [
+    analog({
+      ssr: true,
+      nitro: {
+        preset: 'cloudflare-module',
+        cloudflareDev: { configPath: './.void-wrangler.jsonc' },
+        modules: ['nitro-cloudflare-dev', 'void/nitro'],
+      },
+    }),
+    voidPlugin(),
+  ],
+});
+```
+
+`void/nitro` 模块让 Analog 的 API 路由和页面 server load 能够使用你应用里的 `void/db` 与 `@schema`。
+
+### 4. 创建 `void.config.ts`
+
+Void 会生成 Analog 开发运行时所使用的 Cloudflare 配置：
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  cloudflare: {
+    name: 'my-app',
+    compatibility_date: '2026-02-24',
+    compatibility_flags: ['nodejs_compat', 'nodejs_als'],
+  },
+});
+```
+
+Nitro 的 Cloudflare 运行时必须有 `nodejs_compat`；`void/*` 运行时辅助函数（例如 `void/db`、`void/kv`）必须有 `nodejs_als`。
+
+### 5. 部署
+
+```bash
+void auth login
+void deploy
+```
+
+## 使用 Void 能力
+
+多数 [Void 平台能力](/docs/app-types)都可以在 Analog 中使用。把它们用在页面的 server loader、action 与 API 路由里。
+
+Void 托管的认证暂不支持框架模式，目前请直接使用 Better Auth 的官方集成。
+
+### 数据库
+
+```ts
+// src/app/pages/users.server.ts
+import type { PageServerLoad } from '@analogjs/router';
+import { users } from '@schema';
+import { db } from 'void/db';
+
+export const load = async ({ event }: PageServerLoad) => {
+  return { users: await db.select().from(users) };
+};
+```
+
+### 其他资源
+
+在服务端代码中使用 [KV](/docs/kv)、[对象存储](/docs/storage) 与 [AI](/docs/ai)，导入方式和 Void 应用完全相同。在 `crons/` 中添加 [cron 任务](/docs/jobs)，在 `queues/` 中添加[队列消费者](/docs/queues)。
+
+### 环境变量
+
+在 `env.ts` 中声明变量，用 `import { env } from "void/env"` 读取。本地取值、生产密钥以及公开的 `VITE_*` 值参见[环境变量](/docs/env-vars)。
+
+访问环境变量时，`void/env` 取代 H3 的 event context 和 `import { env } from "cloudflare:workers"`。需要直接访问原始绑定（D1、KV、R2 等）时，仍保留那些写法。
+
+## 直接访问绑定
+
+你也可以通过 H3 的 event context 或 `cloudflare:workers` 模块访问原始的 Cloudflare 绑定：
+
+```ts
+// src/server/routes/api/users.ts
+import { env } from 'cloudflare:workers';
+import { eventHandler } from 'h3';
+
+export default eventHandler(async () => {
+  const { results } = await env.DB.prepare('SELECT * FROM users').all();
+  return results;
+});
+```

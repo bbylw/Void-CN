@@ -1,0 +1,79 @@
+---
+title: 首次部署
+description: 打开平台 URL、连接 CLI，并把第一个应用部署到共享的 Cloudflare 账户中。
+---
+
+在浏览器里打开你平台的 API URL，可以看到它的欢迎页、CLI 连接说明，以及指向管理员 dashboard 的链接。把这个 URL 分享给同事，他们就能连上你的平台。
+
+先校验这个新平台，并用 setup 期间选定的管理员登录方式登录：
+
+```sh
+void platform status
+void platform auth login
+void platform system health
+```
+
+管理员登录与部署应用所用的凭据是两回事。在一个全新的、或尚未关联的 Void 应用目录里，用已安装的 API URL 连接并部署你的第一个项目：
+
+```sh
+void connect void-company-api.example.workers.dev
+void deploy --platform void --project my-first-app
+```
+
+`void connect` 会校验平台，并在需要时让你登录。当 deploy 询问时，确认创建该项目。要使用一个已存在的项目，请改跑 `void project link`。已经关联到别的平台的应用会保留它原有的目标；首次测试请用一个新的应用目录。
+
+部署一旦被平台受理，它就不再依赖 CLI 的连接继续独立进行。连接失败后 CLI 会自动重连。关掉 CLI 之后想用 `void project status` 查看某次部署，或用 `void project cancel` 请求取消它。
+
+CLI 把登录凭据存放在系统 keychain 中，并按每个平台 URL 分开保存。不带 URL 时，`void connect` 会提供 Cloudflare 或某个 Void 平台；`void connect --platform void` 会列出已保存的平台，并提供一个手动输入其他 URL 的选项。
+
+在 CI 中，以项目所有者身份登录后创建一个受限范围、绑定到项目的部署凭据：
+
+```sh
+void project token create --name ci --expires-in 30
+```
+
+把打印出的 `VOID_TOKEN` 与 `VOID_API_URL` 存进 CI 的密钥管理器，然后在每个全新的 CI 环境里、部署之前先运行 `void connect "$VOID_API_URL" --no-login`。项目文件不能替代这一步连接。CI 无法回答关于项目的提问，所以要在 `void deploy` 之前定好项目：设置 `VOID_PROJECT`、传入 `--project <slug>`，或把 `void project link` 生成的 `.void/project.json` 提交进仓库。新建应用会忽略 `.gitignore` 里的 `.void`；要提交这个关联文件，请把那一行改成 `.void/*` 加 `!.void/project.json`。轮换用 `void project token renew <id>`，吊销用 `void project token revoke <id>`。人的登录令牌不是 CI 凭据。
+
+如果平台受 Cloudflare Access 保护，那么 Access 证明与项目凭据两者都必需；服务令牌并不授予 Void 用户或 operator 权限。使用预渲染或远程绑定的部署会同时调用 API 与 proxy，因此请在 CI 密钥管理器里保存 `VOID_ACCESS_CREDENTIALS`，为这两个确切的 HTTPS origin 各写一条。即便两个 origin 用的是同一对被准入的服务令牌，也要把两条都写上：
+
+```json
+{
+  "https://void-company-api.example.workers.dev": {
+    "CF_ACCESS_CLIENT_ID": "<service-token client ID>",
+    "CF_ACCESS_CLIENT_SECRET": "<service-token client secret>"
+  },
+  "https://void-company-proxy.example.workers.dev": {
+    "CF_ACCESS_CLIENT_ID": "<service-token client ID>",
+    "CF_ACCESS_CLIENT_SECRET": "<service-token client secret>"
+  }
+}
+```
+
+`VOID_ACCESS_ORIGIN` 只能把凭据限定到某一个 origin；把它设为 API origin 并不能授权 proxy 请求。
+
+用这些命令检查连接与安装：
+
+```sh
+void platform list
+void platform use [id]
+void platform status [id]
+```
+
+## 管理访问权限
+
+安装完成后，以第一位管理员身份登录。对于使用 GitHub 的同事，把他们的登录加入注册允许名单：
+
+```sh
+void platform auth login
+void platform signup allow github teammate
+```
+
+Void 会展示提议的访问变更并请你在生效前确认。批准之后，`teammate` 就能连接平台的 API URL 并用 GitHub 登录。
+
+要放行邮箱地址、域名或 OIDC 身份，或开放注册，参见[授予成员访问权限](/docs/platform/administration/access)。
+
+你的管理员会话有效期为一小时。用它来查看用户、项目、日志与平台健康状况。[平台管理指南](/docs/platform/administration)讲述了这些工作流、预览与自动化。你也可以打开 `<API origin>/admin/login` 使用浏览器里的管理界面。
+
+### 用 Zero Trust 保护项目主机名
+
+安装之后，管理员可以要求新的项目主机名必须走 Cloudflare Access，同时允许每个项目所有者或项目管理员自行退出。这与 Access 登录、以及平台 API 自身的保护都是独立的，并且需要它自己的 Cloudflare API 令牌。相关要求、设置命令与恢复方式见[项目 Zero Trust](/docs/platform/administration/zero-trust)。

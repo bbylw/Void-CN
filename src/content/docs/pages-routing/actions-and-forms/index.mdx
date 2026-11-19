@@ -1,0 +1,482 @@
+---
+title: Action 与表单
+description: 用页面 action 从表单或按钮修改服务端数据。Action 支持 POST、PUT、PATCH 与 DELETE 请求。
+---
+
+用 action 从表单或按钮修改服务端数据。在页面的 `.server.ts` 文件里用 `defineHandler` 定义它，与 [loader](/docs/pages-routing/loaders) 或[服务端路由](/docs/server-routing)一样。Action 处理 `POST`、`PUT`、`PATCH` 与 `DELETE` 请求。
+
+## 定义 Action
+
+从 `.server.ts` 文件导出 `action`。用 `withValidator()` 搭配 [schema 派生校验器](/docs/database)校验请求体：
+
+```ts title="pages/users/index.server.ts"
+// pages/users/index.server.ts
+import { users, insertUserSchema } from '@schema';
+import { defineHandler } from 'void';
+import { db } from 'void/db';
+
+export const action = defineHandler.withValidator({
+  body: insertUserSchema,
+})(async (c, { body }) => {
+  await db.insert(users).values(body);
+  // 不返回 → 重新运行 loader，页面用新鲜数据重新渲染
+});
+```
+
+| action 的返回        | 行为                                                                                                                             |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 不返回（void）       | 重新运行 loader，页面用新的 props 重新渲染。                                                                                       |
+| `c.redirect(url)`    | 导航到其他页面。启用 [`routing.typedRoutes`](/docs/type-safety) 后，该地址与链接一样被检查。TypeScript 无法检查的字符串用 `as Href` 断言。 |
+
+action 之后中间件不会再次运行。要更新[共享数据](/docs/pages-routing/layouts)，就在 action 里更新它，或者改为重定向。
+
+## Form
+
+把 `Form` 与 `useForm` 搭配使用，提交取值并展示校验与 action 错误。提交失败时，输入框保持可编辑。
+
+`Form` 从你的适配器导入。传入 `form`，可选传 `method="put"`、`"patch"` 或 `"delete"`；默认为 `"post"`。需要自定义 action 错误渲染器时使用 `renderError`（在 Svelte 中是一段代码片段）。
+
+## `useForm`
+
+`useForm` 负责提交、加载状态与校验错误。URL、表单取值与错误字段都由你的 action 推导出类型。
+
+提交到上面定义的 `/users` action：
+
+```tsx title="React"
+// pages/users/index.tsx
+import { Form, useForm } from '@void/react';
+import { useFormStatus } from 'react-dom';
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return <button disabled={pending}>Create</button>;
+}
+
+export default function CreateUser() {
+  const form = useForm('/users', { name: '', email: '' });
+
+  return (
+    <Form form={form}>
+      <input
+        name="name"
+        value={form.data.name}
+        onChange={(e) => form.setData('name', e.target.value)}
+      />
+      {form.errors.name && <span>{form.errors.name}</span>}
+
+      <input
+        name="email"
+        value={form.data.email}
+        onChange={(e) => form.setData('email', e.target.value)}
+      />
+      {form.errors.email && <span>{form.errors.email}</span>}
+
+      <SubmitButton />
+    </Form>
+  );
+}
+```
+
+```vue title="Vue"
+<!-- pages/users/index.vue -->
+<script setup lang="ts">
+import { Form, useForm } from '@void/vue';
+
+const form = useForm('/users', { name: '', email: '' });
+</script>
+
+<template>
+  <Form :form="form">
+    <input v-model="form.data.name" />
+    <span v-if="form.errors.name">{{ form.errors.name }}</span>
+
+    <input v-model="form.data.email" />
+    <span v-if="form.errors.email">{{ form.errors.email }}</span>
+
+    <button :disabled="form.pending">Create</button>
+  </Form>
+</template>
+```
+
+```svelte title="Svelte"
+<!-- pages/users/index.svelte -->
+<script>
+  import { Form, useForm } from "@void/svelte";
+
+  const form = useForm("/users", { name: "", email: "" });
+</script>
+
+<Form {form}>
+  <input bind:value={form.data.name} />
+  {#if form.errors.name}<span>{form.errors.name}</span>{/if}
+
+  <input bind:value={form.data.email} />
+  {#if form.errors.email}<span>{form.errors.email}</span>{/if}
+
+  <button disabled={form.pending}>Create</button>
+</Form>
+```
+
+```tsx title="Solid"
+// pages/users/index.tsx
+import { Form, useForm } from '@void/solid';
+
+export default function CreateUser() {
+  const form = useForm('/users', { name: '', email: '' });
+
+  return (
+    <Form form={form}>
+      <input value={form.data.name} onInput={(e) => form.setData('name', e.target.value)} />
+      {form.errors.name && <span>{form.errors.name}</span>}
+
+      <input value={form.data.email} onInput={(e) => form.setData('email', e.target.value)} />
+      {form.errors.email && <span>{form.errors.email}</span>}
+
+      <button disabled={form.pending}>Create</button>
+    </Form>
+  );
+}
+```
+
+类型来自配套 `.server.ts` 文件中 action 的 `withValidator()` schema。如果没有定义校验器，body 类型回退为 `Record<string, unknown>`，但你仍然拥有 URL 自动补全。
+
+### `useForm` API
+
+`useForm` 返回一个响应式对象，包含：
+
+| 属性 / 方法                      | 用途                                                                                                                               |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `data` / `setData`               | 当前表单取值，类型与 action 的 body schema 一致。                                                                                    |
+| `errors`                         | 字段级校验错误，键的类型就是 body 字段名。                                                                                             |
+| `error`                          | action 错误，或 `null`。                                                                                                             |
+| `throwOnError`（选项）           | 设为 `false` 时，认证与服务器失败留在 `form.error` 里而不是抛出。                                                                     |
+| `post`, `put`, `patch`, `delete` | 用对应方法提交表单。在 React 中它们是原生 form action 回调。                                                                          |
+| `pending`                        | 提交进行期间为 `true`。                                                                                                              |
+| `hasChanges`                     | 表单数据与当前默认值不同则为 `true`。提交成功后，默认值更新为提交的取值，因此除非在提交期间编辑过表单，`hasChanges` 会变成 `false`。  |
+| `wasSuccessful`                  | 提交成功后为 `true`，并保持到下一次提交。                                                                                              |
+| `recentlySuccessful`             | 提交成功后的 2 秒内为 `true`，适合做闪现提示。                                                                                          |
+| `reset(...fields)`               | 把表单数据重置到当前默认值（提交成功后的默认值是最后提交的取值）。字段名可自动补全。把 `{ initial: true }` 放在第一位可重置到传给 `useForm` 的初始值。 |
+| `resetOnSuccess`（选项）         | 为 `true` 时，提交成功后默认值重置为挂载时的取值，表单数据也一并重置（除非在提交期间被编辑过）。适合保存后清空的创建表单。             |
+| `setError(field, message)`       | 给某个字段设置客户端校验错误。                                                                                                        |
+| `clearErrors(...fields)`         | 清除校验错误。字段名可自动补全。                                                                                                      |
+| `clearError()`                   | 清除 `error`。                                                                                                                       |
+
+客户端校验用 `setError()`。编辑某个字段会自动清除它的错误。
+
+在 React 中原生表单提交用 `form.post`、`form.put`、`form.patch` 或 `form.delete` 作为原生 form action。需要可 await 的变更时，用 `action()`。在 Vue、Svelte 与 Solid 中，表单提交返回 `Promise<void>`；请捕获抛出的错误或使用框架的错误处理。
+
+动态路由请把 `params` 放在选项里传入：
+
+```ts
+// pages/users/[id].server.ts 中有一个 action
+const form = useForm('/users/[id]', { name: '' }, { params: { id: '42' } });
+<Form form={form} method="put">{/* 提交到 /users/42 */}</Form>
+```
+
+想在保存后清空创建表单，在第三个参数里传入 `resetOnSuccess: true`。想手动恢复最初的取值，用 `form.reset({ initial: true })`。
+
+### React 提交回调
+
+在 React 中，给 `useForm()` 传入 `onSuccess` 与 `onError` 来响应提交结果：
+
+```tsx
+const form = useForm(
+  '/users',
+  { name: '', email: '' },
+  {
+    onSuccess: () => setDialogOpen(false),
+    onError: (error) => {
+      console.error(error);
+    },
+  },
+);
+```
+
+`onError` 收到字段错误映射或 `VoidActionError`。回调可以是 async：`form.pending` 会保持 `true` 直到回调结束，抛出的错误交给最近的 React 错误边界。回调在 React 提交更新后的 UI 之前运行，因此若某个元素要等提交后才出现，请改用 effect 或 ref 回调来聚焦它。
+
+在回调里 await `router.visit()` 或 `router.refresh()` 时，请传 `{ resolveOn: 'data' }`。这样回调可以在 React 提交导航之前结束。参见 [React 导航完成](/docs/reference/api/pages)。
+
+Vue、Svelte 与 Solid 的提交返回 Promise；用 `await form.post()` 在提交后执行工作。
+
+### 提交后的查询参数
+
+action 与表单提交到当前页面时会保留当前的查询参数。例如从 `/items?page=2&search=foo` 出发：
+
+```ts
+import { action } from '@void/react'; // 或 "@void/vue"、"@void/svelte"、"@void/solid"
+
+// action 与 loader 都会收到 page=2 与 search=foo。
+await action('/items?vote');
+
+// 显式参数覆盖当前页面上的取值。
+await action('/items?vote&page=1');
+```
+
+页面 URL、滚动位置与历史记录条目都保持不变。
+
+action 里的重定向不会带上页面的查询参数。想在 action 之后清除它们，返回 `c.redirect('/items')`。
+
+### 提交后的滚动
+
+action 与表单在当前页面就地更新时会保持当前滚动位置。重定向以及打开其他页面的提交会滚动到顶部，或滚动到目标的 hash 位置。
+
+传入 `preserveScroll: false` 可在就地更新后重置滚动，传 `true` 则连重定向后也保持：
+
+```ts
+await action('/users/[id]?update', {
+  params: { id: '42' },
+  data: { name: 'Alice' },
+  preserveScroll: false,
+});
+```
+
+在 React 中，把 `preserveScroll` 放在 `useForm()` 的第三个参数里。在 Vue、Svelte 与 Solid 中，把它传给提交方法，例如 `form.post({ preserveScroll: false })`。
+
+## 具名 Action
+
+当一个页面需要多个变更操作时——例如在同一页面上更新与删除用户——导出 `actions`（复数）而不是 `action`：
+
+```ts title="pages/users/[id].server.ts"
+// pages/users/[id].server.ts
+import { users, updateUserSchema } from '@schema';
+import { defineHandler } from 'void';
+import { db, eq } from 'void/db';
+import type { PageParams } from 'void/routes';
+
+export const actions = {
+  update: defineHandler.withValidator({
+    body: updateUserSchema,
+  })(async (c, { body }) => {
+    const { id } = c.req.param() as PageParams<'/users/[id]'>;
+    await db
+      .update(users)
+      .set(body)
+      .where(eq(users.id, Number(id)));
+  }),
+
+  delete: defineHandler(async (c) => {
+    const { id } = c.req.param() as PageParams<'/users/[id]'>;
+    await db.delete(users).where(eq(users.id, Number(id)));
+  }),
+};
+```
+
+具名 action 使用 `?actionName` 后缀，例如 `/users/42?update`。`useForm` 与 `action()` 会自动处理。POST action 渲染页面或使用默认的 `c.redirect()` 之后，页面 URL 会保留 action URL 上的普通查询参数：`/users/42?update&tab=profile` 变成 `/users/42?tab=profile`。想保留请求方法的重定向，参见[重定向查询参数](/docs/reference/api/rewrites)。
+
+同一文件里 `action` 与 `actions` 只能二选一。
+
+你也可以在 `actions` 中定义 `default` 键，对应未指定名字时（即对页面 URL 的裸 POST）运行的 action：
+
+```ts
+export const actions = {
+  default: defineHandler(async (c) => {
+    // POST /users/edit（无 ?后缀）时运行
+  }),
+  delete: defineHandler(async (c) => {
+    // POST /users/edit?delete 时运行
+  }),
+};
+```
+
+### 在 `useForm` 中使用具名 Action
+
+页面导出了具名 action 时，在 URL 后追加 `?actionName`：
+
+```ts
+const form = useForm('/users/[id]?update', { name: '' }, { params: { id } });
+<Form form={form} method="put">{/* 提交到 /users/42?update */}</Form>
+```
+
+每个具名 action 都有自己的校验 schema，为它的 URL、body 与错误键提供类型。参见[类型安全](/docs/type-safety)中的示例。
+
+## `action()` 辅助函数
+
+按钮等不需要表单状态的操作用 `action()`。请求成功后它会更新页面：
+
+```ts
+import { action } from '@void/react'; // 或 "@void/vue"、"@void/svelte"、"@void/solid"
+
+const result = await action('/users/[id]?delete', {
+  params: { id: '42' },
+  method: 'DELETE',
+});
+if (!result.ok) {
+  showToast(result.error.message);
+}
+```
+
+`action()` 默认为 `POST`。传入 `data`、`params` 与 `method` 可设置请求体、路由参数或 HTTP 方法。
+
+调用成功返回 `{ ok: true, pageData }`。预期错误（如校验失败或冲突）返回 `{ ok: false, error }`。
+
+对于 `4xx` 错误，`error.message` 取自 [`HTTPException`](/docs/integrations/hono) 的消息或纯文本响应的正文。其他响应格式则使用状态摘要，例如 `Action failed with 404 Not Found`。
+
+## 校验错误
+
+`withValidator()` 与 `ValidationError` 会自动填充 `form.errors`。
+
+`400`、`404`、`409`、`422`、`429` 这类预期错误留在表单或 `action()` 调用处。`useForm` 把它们存进 `form.errors` 或 `form.error`；`action()` 返回 `{ ok: false, error }`。
+
+默认情况下，认证错误（`401`、`403`）与服务器错误（`500`、`502`）会被抛出，请用框架的错误边界或错误处理来接管。
+
+想让表单在请求失败后依然可见，传入 `throwOnError: false`：
+
+```ts
+import { useForm } from '@void/react'; // 或 "@void/vue"、"@void/svelte"、"@void/solid"
+
+const form = useForm('/users', { name: '', email: '' }, { throwOnError: false });
+```
+
+校验错误出现在 `form.errors`；其他 HTTP 失败出现在 `form.error`。`Form` 会替你展示错误。在 React 中，`onError` 也会收到它。
+
+网络错误与其他意外失败仍会抛出。被取消的提交不会设置表单错误。
+
+用 `isVoidActionError()` 读取 action 错误的 `status` 与 `message`，包括被抛出的那些：
+
+```ts
+import { isVoidActionError } from '@void/react'; // 或 "@void/vue"、"@void/svelte"、"@void/solid"
+
+function describeError(error: unknown) {
+  if (isVoidActionError(error)) {
+    if (error.status === 401) return 'Please sign in again.';
+    if (error.status === 403) return error.message;
+  }
+  return 'Something went wrong.';
+}
+```
+
+用 `isCallSiteActionError()` 只识别 `action()` 返回的预期错误。
+
+Action 可以为了自定义校验逻辑抛出 `ValidationError`：
+
+```ts
+import { defineHandler, ValidationError } from 'void/handler';
+
+export const action = defineHandler(async (c) => {
+  const body = await c.req.json();
+  if (await emailExists(body.email)) {
+    throw new ValidationError({ email: 'Email already taken' });
+  }
+  // ...
+});
+```
+
+### 用量限制
+
+[AI](/docs/ai)与 [Sandbox](/docs/sandboxes)的 action 中，未被捕获的 `UsageLimit` 会自动产生结构化的 HTTP 429。想自定义消息，用 `instanceof UsageLimit` 捕获错误并返回 `error.response({ message: 'Try again shortly. Your draft is still editable.' })`。`Form` 会展示该消息，并在已知重试期限到达前不允许再次提交。字段保持可编辑，且永远不会自动重试。
+
+## 认证与来源检查
+
+来自浏览器的提交必须与页面同源，包括协议、主机名与端口。Void 会以 `403 Forbidden` 拒绝跨源的页面 action。服务端客户端调用 action 时不带浏览器来源头；访问受保护数据的 action 仍需要认证与授权。
+
+## 文件上传
+
+在表单数据里设置 `File`、`Blob` 或 `FileList` 然后提交，`useForm` 会以 `multipart/form-data` 发送：
+
+```tsx title="React"
+import { Form, useForm } from '@void/react';
+
+export default function Upload() {
+  const form = useForm('/photos', { title: '', photo: null as File | null });
+
+  return (
+    <Form form={form}>
+      <input value={form.data.title} onChange={(e) => form.setData('title', e.target.value)} />
+      <input type="file" onChange={(e) => form.setData('photo', e.target.files?.[0] ?? null)} />
+      <button disabled={form.pending}>Upload</button>
+    </Form>
+  );
+}
+```
+
+```vue title="Vue"
+<script setup lang="ts">
+import { Form, useForm } from '@void/vue';
+import { ref } from 'vue';
+
+const form = useForm('/photos', { title: '', photo: null as File | null });
+const fileInput = ref<HTMLInputElement>();
+
+function onFileChange() {
+  form.data.photo = fileInput.value?.files?.[0] ?? null;
+}
+</script>
+
+<template>
+  <Form :form="form">
+    <input v-model="form.data.title" />
+    <input type="file" ref="fileInput" @change="onFileChange" />
+    <button :disabled="form.pending">Upload</button>
+  </Form>
+</template>
+```
+
+```svelte title="Svelte"
+<script>
+  import { Form, useForm } from "@void/svelte";
+
+  const form = useForm("/photos", { title: "", photo: null });
+</script>
+
+<Form {form}>
+  <input bind:value={form.data.title} />
+  <input type="file" onchange={(e) => { form.data.photo = e.target.files?.[0] ?? null; }} />
+  <button disabled={form.pending}>Upload</button>
+</Form>
+```
+
+```tsx title="Solid"
+import { Form, useForm } from '@void/solid';
+
+export default function Upload() {
+  const form = useForm('/photos', { title: '', photo: null as File | null });
+
+  return (
+    <Form form={form}>
+      <input value={form.data.title} onInput={(e) => form.setData('title', e.target.value)} />
+      <input type="file" onChange={(e) => form.setData('photo', e.target.files?.[0] ?? null)} />
+      <button disabled={form.pending}>Upload</button>
+    </Form>
+  );
+}
+```
+
+服务端用 `c.req.parseBody()` 读取上传的文件：
+
+```ts title="pages/photos.server.ts"
+// pages/photos.server.ts
+import { defineHandler, ValidationError } from 'void/handler';
+import { storage } from 'void/storage';
+
+// file.name 与 file.type 来自浏览器。不要拿它们当键，也不要相信类型。
+const imageTypes = new Map([
+  ['image/jpeg', 'jpg'],
+  ['image/png', 'png'],
+  ['image/webp', 'webp'],
+]);
+
+export const action = defineHandler(async (c) => {
+  const body = await c.req.parseBody();
+  const file = body['photo'];
+  if (!(file instanceof File) || file.size === 0) return;
+  const ext = imageTypes.get(file.type);
+  if (!ext) {
+    throw new ValidationError({ photo: 'Upload a JPEG, PNG, or WebP image.' });
+  }
+  await storage.put(`uploads/${crypto.randomUUID()}.${ext}`, file.stream(), {
+    httpMetadata: { contentType: file.type },
+  });
+});
+```
+
+`withValidator({ body })` 同样接受上传。`profile[name]`、`tags[0]`、`tags[]` 这样的嵌套字段名会变成对象与数组，其余取值需要在 schema 里自行转换：布尔到达时是 `'1'` 或 `'0'`，数字与日期是字符串，`null` 是 `''`。
+
+存储键要在服务端选取，并只允许你预期的文件类型。想安全地把文件发回浏览器，参见[提供文件](/docs/storage)。
+
+## 如何选用原语
+
+| 原语             | 更新页面 | 表单状态                        | 依赖框架 |
+| ---------------- | -------- | ------------------------------- | -------- |
+| `useForm`        | 是       | 是（错误、dirty、reset）        | 是       |
+| `action()`       | 是       | 否                              | 是       |
+| 原生 `fetch()`   | 否       | 否                              | 否       |

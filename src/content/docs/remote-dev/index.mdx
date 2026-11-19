@@ -1,0 +1,65 @@
+---
+title: 远程开发
+description: 让本地代码连到已部署在你 Void 平台上的项目，包括它的数据库与存储。
+---
+
+Void 默认通过 [Miniflare](https://miniflare.dev/) 使用本地的 D1、KV 与 R2。远程模式让你用本地代码连接一个已部署到 Void 平台的项目，比如用真实数据做测试，或排查一个问题。
+
+`db.select()`、`env.KV.get()` 这类调用会直接使用已部署的资源，应用代码无需改动。写入会影响真实数据，因此尽可能使用 staging 项目。
+
+## 前置条件
+
+启用远程模式之前你需要：
+
+1. 用 `void connect <url>` 连上团队的平台，需要时会引导你登录。
+2. 用 `void project link` 关联一个项目，并至少部署一次，让它的资源存在。
+
+## 启用远程模式
+
+### 在 `void.config.ts` 中（持久生效）
+
+```json
+{
+  "remote": true
+}
+```
+
+### 通过环境变量（单次生效）
+
+```bash
+VOID_REMOTE=1 vite dev
+```
+
+即使 `void.config.ts` 里写了 `"remote": true`，`VOID_REMOTE=0` 也会关闭远程模式。
+
+## 支持的绑定
+
+| 绑定  | 本地（默认）              | 远程                |
+| ----- | ------------------------- | ------------------- |
+| D1    | 通过 Miniflare 使用本地 SQLite | 远程 D1 数据库      |
+| KV    | 本地文件后端的 KV         | 远程 KV namespace   |
+| R2    | 本地文件后端的 R2         | 远程 R2 bucket      |
+| AI    | 始终代理                  | 始终代理            |
+
+无论本地还是远程模式，AI 请求都使用你平台账户与额度。没有本地的 AI 模拟器。
+
+## 确认远程模式
+
+开发服务器启动时如果远程模式已生效，会打印：
+
+```text
+[void] Remote bindings active
+         DB      → remote D1
+         KV      → remote KV
+         STORAGE → remote R2
+```
+
+## 限制
+
+- **网络延迟：** 每次绑定调用都会发起网络请求，响应可能比本地开发慢。
+- **R2 分段上传：** 远程模式不支持 `createMultipartUpload()` 与 `resumeMultipartUpload()`。
+- **R2 范围读与条件读：** 远程模式下 `get()` 会忽略以 `range` 或 `onlyIf` 传入的请求头部，直接返回整个对象。例如请求带有 `Range` 或 `If-None-Match` 头部时，`get(key, { range: request.headers, onlyIf: request.headers })` 仍然返回整个对象。当 `range` 或 `onlyIf` 是明确表示字节范围或条件的对象，例如 `{ offset: 0, length: 100 }` 或 `{ etagMatches: etag }` 时，`get()` 会抛错。
+- **R2 条件写：** `put(..., { onlyIf })` 需要更新后的平台与项目部署。前置条件不满足时返回 `null`。
+- **R2 元数据与列举选项：** 自定义元数据、HTTP 元数据，以及带 `delimiter`、`startAfter`、`include` 的 `list()`，都要求更新后的项目部署。没有的话，带这些选项的 `list()` 以及带 `contentType` 之外元数据的 `put()` 会抛错。
+- **D1 导出：** 远程模式不支持 `db.dump()`。
+- **D1 批量：** `db.batch()` 需要更新后的平台与项目部署。

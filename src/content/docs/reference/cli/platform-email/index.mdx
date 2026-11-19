@@ -1,0 +1,53 @@
+---
+title: 平台邮件管理
+description: 管理平台邮件，包括共享发件地址与项目的收件人规则。
+---
+
+这些命令使用你的 administrator 会话。平台选择、预览与确认规则见[平台管理](/docs/reference/cli/platform)。
+
+决定共享发件地址的邮件可以发给谁、谁可以注册邮件域名，以及项目的发信上限：
+
+```sh
+void platform email policy
+void platform email policy-set <verified|domains|any> [--domains <domain[,domain...]>]
+void platform email settings
+void platform email settings-set --domains <self-serve|admin>
+void platform email limit <project-id|slug> [--monthly <n>] [--burst <n>]
+void platform email logs <project-id|slug> [--page <n>] [--limit <n>] [--json]
+void platform email attempts [--project <id|slug>] [--page <n>] [--limit <n>]
+void platform email attempt-resolve <attempt-id> --ended --reason <text>
+void platform email operation-resolve <operation-id> --ended --outcome <applied|not-applied> --reason <text>
+void platform email shared-recipients [--project <id|slug>] [--page <n>] [--limit <n>]
+void platform email shared-recipient-resolve <recipient-id> --ended --outcome <applied|not-applied> --reason <text>
+```
+
+`policy` 决定项目的 `<slug>+tag@<mail domain>` 发件地址可以触达哪些收件人：`verified`（默认）只允许该项目已验证的目的地；`domains` 额外允许所列域名下的全部地址；`any` 取消这项检查。两者都不会放宽发往平台自己邮件域名的地址：那些仍然只允许已验证目的地，因此任何项目都无法在未经同意的情况下投递到另一个项目的收件箱。在平台邮件域名完成 Email Sending 开通之前，Cloudflare 仍会拒绝它尚未验证的目的地，因此在 `domains` 或 `any` 下这类拒绝会以逐个收件人的 `UNVERIFIED_DESTINATION` 结果返回。自定义域名的发信不受影响。
+
+`settings-set --domains admin` 会让 `void email domain add` 打印需要 administrator 执行的命令，而不是自行开始 token 配置。`limit` 覆盖项目的月度上限与滚动 60 秒上限（默认 200 与 10）；管理界面中的项目页面会显示并允许清除它们。
+
+`logs` 查看保留的回执与收件人结果，包括 operation ID、提供方引用、错误码与策略版本。每页最多 100 条记录，最新的在前；需要全部字段时用 `--json`。项目删除之后，可用它的项目 ID 继续查看元数据，直到 30 天保留期结束。邮件内容与凭据永远不会出现在其中。
+
+`attempts` 列出被中断的提供方调用及其最早可处理时间。当原始 Worker 执行已经结束、且该尝试至少已存在 24 小时后，`attempt-resolve` 会记录 `outcome_unknown`、保留其配额计费，并解除项目/域名的清理栅栏。`--ended` 表示你确认该调用已不在运行；`--reason` 会存入 operator 审计日志。请勿在原因里写收件人地址或邮件内容。这次发送绝不会被重试。用 `--plan` 预览，用 `--yes` 免确认应用。
+
+`operation-resolve` 用于恢复一次结果仍未知的 Cloudflare routing、Worker、secret、catch-all 或 Sending 变更。在原始执行已经结束、且该操作至少已存在 24 小时后，请检查预览所指明的确切资源，并确认它的写入是 `applied` 还是 `not-applied`。已应用的写入从下一步继续；未应用的写入会重试同一份已持久化的意图。运行中的平台版本必须与该意图一致，因此恢复旧代码创建的操作之前，请先恢复到匹配的版本。仅靠时间推移永远不会重试一次写入。
+
+`shared-recipients` 用于发现共享的收件地址、提供方规则名与 ID，以及被中断的创建意图，包括正在等待删除的项目。如果创建结果未知，请在原始执行结束、且其创建意图至少存在 24 小时后使用 `shared-recipient-resolve`。请检查 `--plan` 指明的确切账户、zone、收件人与规则，并用 Cloudflare 的提供方审计确认创建是 `applied` 还是 `not-applied`。仅「规则不存在」不足以证明 `not-applied`。请把这个结论写进 `--reason`，它会记录在平台事件中。
+
+`applied` 的恢复要求那个确切的、归属于你的规则确实存在，并记录它的 ID。`not-applied` 的恢复只有在反复探测提供方并由你确认之后才会释放创建意图。两种结果在常规对齐校验通过之前，投递都仍不可用。恢复本身不会创建或删除任何提供方规则，也绝不会重新打开一个正在删除的项目；如果是为了清理而恢复，请在之后重试删除。用 `--yes` 免确认应用预览。如果意图或提供方归属发生了变化，请重新检查一份新的预览。
+
+为那些所有者没有 Cloudflare 凭据的项目注册并维护邮件域名：
+
+```sh
+void platform email domains [--project <id|slug>]
+void platform email domain-add <domain> --project <id|slug> [--token-stdin] [--outbound-only]
+void platform email domain-status <domain>
+void platform email domain-sync <domain>
+void platform email domain-rotate-secret <domain>
+void platform email domain-remove <domain> [--token-stdin]
+```
+
+`domain-add` 对属于平台自己账户的 zone 使用平台持有的 Cloudflare 凭据。对于其他账户，请用 `--token-stdin --yes`，把一个范围受限的 Cloudflare API token 通过标准输入传入。托管的自定义收件邮件要求使用 Cloudflare zone apex（`example.com`）。如果它的 MX 记录已经属于另一个邮件提供方，例如 Microsoft 365 或 Google Workspace，请加上 `--outbound-only`，这样可以在该提供方继续收信的同时从这个 apex 发信；见[从已在收信的域名发信](/docs/platform/administration/email)。否则请改用项目的共享邮件地址，或另选一个未被使用的 zone。原生 Cloudflare 部署也支持在子域名上使用字面量收件地址；见[你自己的 Cloudflare 账户](/docs/email/domains)。
+
+`domain-status` 显示收件、发信与凭据管理的就绪状态，以及最近一次操作。被阻塞的操作通过 `domain-sync` 恢复；被阻塞的轮换通过 `domain-rotate-secret` 恢复，并保留已确认的步骤与其暂存的凭据。结果不确定的操作会保持停止，直到回读证明结果，或由 administrator 使用 `operation-resolve`。由 administrator 添加的域名会显示 `managed_by: admin`；它们的项目所有者可以列出与查看，但需要用这些命令来执行 `sync`、`domain-rotate-secret` 与 `remove`。
+
+如果项目删除留下的清理工作被一个已过期或被吊销的 Cloudflare token 阻塞，请用 `domain-remove <domain> --token-stdin --yes` 传入一个范围限定到同一账户与同一 zone 的替代 token。仅当没有其他项目使用该连接时，这才会继续执行保留下来的清理。对于仍在运行的项目，请改用 `domain-add` 续期它的 token。

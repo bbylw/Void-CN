@@ -1,0 +1,107 @@
+---
+title: 禁用与卸载
+description: 暂停一个平台而不删除它的数据，或者卸载它并移除它的 Cloudflare 资源。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+要在不删除数据的情况下暂停平台：
+
+```sh
+void platform disable [id] --plan
+void platform disable [id]
+```
+
+被禁用的平台会拒绝应用流量，但保留域名与路由。平台 API 同样拒绝请求，因此使用它的 CLI 命令（包括登录与部署）都会失败，直到你重新启用平台。只有管理员状态页 `<api-url>/admin/status` 与管理员登录仍然可用。Repair 与 upgrade 会保持这个状态。
+
+启用会用所选运行时重新部署平台 Worker、校验它们，然后恢复流量。传入 `--runtime <path>` 可以用自定义的平台构建启用：
+
+```sh
+void platform enable [id] --plan
+void platform enable [id]
+```
+
+在非交互式 shell 中，对会做出改动的命令加上 `--yes`。
+
+在禁用期间，平台会在五分钟之后重试队列批次，而不是把它们投递给应用。队列的保留时长与重试上限仍然生效。如果要长时间暂停，请提前规划好死信队列或其他找回消息的办法。
+
+## 卸载
+
+先预览要移除的内容，再应用：
+
+```sh
+void platform uninstall [id] --plan
+void platform uninstall [id]
+```
+
+卸载会阻断平台流量，移除那些不再被任何平台 Worker 使用的队列，并列出留给你复核的资源。用 `--plan` 在做改动之前复核删除项与保留项。默认情况下，Worker、它们使用的队列、KV、R2、Hyperdrive、dispatch namespace 与 AI Gateway 都会留在你的账户里。被接管的资源、外部 PostgreSQL 与 zone 一律保留。要再次安装一个平台，请使用一个全新的空 PostgreSQL 数据库。Email Routing 设置会被保留；`--purge-resources` 也只移除那些把邮件发往平台的路由规则。除非使用 `--purge-resources`，DNS 记录、路由、自定义域名与 Cloudflare Access 资源都会被保留。
+
+卸载完成后，关于保留了什么的记录仍留在 `~/.void/platforms/<account-id>/<installation-id>.json`。不加 `--purge-data` 时，它旁边加密的凭据文件 `<installation-id>.recovery.enc` 也会保留。等你完成下面的手动清理之后，再把这两个文件删掉。
+
+要顺带移除安装器名下符合条件的数据资源：
+
+```sh
+void platform uninstall [id] --purge-data
+```
+
+即使加了 `--purge-data`，Void 仍会保留 Worker、它们使用的队列、R2、AI Gateway、DNS 记录、路由、自定义域名、Access 资源、被接管的资源、外部 PostgreSQL 与 zone。若你打算移除这些，请在 Cloudflare 控制台里逐项复核，或者使用 `--purge-resources`。
+
+### 移除 Void 创建的一切
+
+要删除这次安装创建的所有 Cloudflare 资源：
+
+```sh
+void platform uninstall [id] --purge-resources --plan
+void platform uninstall [id] --purge-resources
+```
+
+`--purge-resources` 包含 `--purge-data` 的效果。它还会删除平台 Worker、队列、留在 dispatch namespace 中的应用 Worker、R2 bucket 及其对象、AI Gateway、平台 DNS 记录、Worker 路由与自定义域名，以及安装器创建的 Access 应用与服务令牌。计划会按删除顺序列出每一项资源，也会列出所有保留项。如果 Cloudflare 显示 AI Gateway 是在安装之后创建的（例如它被删除后又以同名重建），它会被保留并列出。
+
+如果平台会发邮件，它先删除发信域名所在 zone 中那些把邮件送往平台 email gateway Worker 的 Email Routing 规则，并把此类 catch-all 规则重置为丢弃邮件。它会让 Email Routing 保持启用，并保留发信域名的 MX、SPF 与 DKIM 记录。
+
+它绝不会移除 zone、被接管的资源、外部 PostgreSQL、其他 Email Routing 设置、Analytics Engine dataset、你所选择的 Access 策略或身份提供方，也不会移除 API 令牌。之后请自行吊销你为平台创建的那些 API 令牌。
+
+在做任何改动之前，`--purge-resources` 会检查是否还有项目残留，以及它能否读取计划删除的资源。请先用 `void project delete <name>` 删除所有项目。
+
+把 `CLOUDFLARE_API_TOKEN` 设为具备 `--plan` 所列 Edit 权限的令牌。浏览器登录无法删除 DNS 记录或 Access 资源。位于独立身份账户中的 Access 资源需要那个账户里的权限；启用了邮件的平台还需要发信域名所在 zone 上的 **Zone → Email Routing Rules → Edit**。
+
+读取类检查无法验证 Edit 权限。如果某次删除被拒绝，卸载可能已经禁用了流量或移除了部分资源。请更新令牌权限后重跑该命令以继续。
+
+如果某条路由、自定义域名、DNS 记录或 Access 资源与安装记录的内容已不再一致（例如某条路由现在把流量送往另一个 Worker），它会被保留并连同原因一起列出，卸载继续。请不要在其他人正在改动平台的 Worker、路由或自定义域名时运行 `--purge-resources`：在 Void 检查某个资源之后、删除它之前发生的改动不会被发现。
+
+如果 Cloudflare 拒绝某次删除（例如因为某个你自己创建的 Worker 仍在把日志发送到平台 tail Worker），卸载会停止并指名那个资源。修好它，然后重跑同一条命令继续。
+
+如果一次普通卸载或 `--purge-data` 卸载在结束前停止了，请加 `--purge-resources` 重跑，把它保留下来的内容也一并删除。一旦某次卸载已经完成，请改走下面的手动步骤。
+
+### 移除被保留的资源
+
+在不含 `--purge-resources` 的卸载之后，只要某个平台 Worker仍在使用某个资源，Cloudflare 就会拒绝删除它。请在 Cloudflare 控制台里按以下顺序移除剩余内容，已经不存在的直接跳过：
+
+1. 删除平台 DNS 记录、Worker 路由与自定义域名。
+2. 如果平台会发邮件，打开发信域名所在 zone 的 **Email Routing**。删除那些把邮件送往平台 email gateway Worker 的路由规则与 catch-all 规则。然后把发信子域名从 Email Routing 中移除；如果你只是为了平台才启用 Email Routing，就把它关闭。
+3. 依次打开每个平台队列，把平台 API Worker 从它的消费者中移除。
+4. 删除平台 Worker，除 tail Worker 之外（它的名字以 `-tail` 结尾）。
+5. 删除平台队列。
+6. 删除 dispatch namespace 中的应用 Worker，然后删除该 namespace。
+7. 删除 tail Worker。只要还有 Worker 在向它发送日志，Cloudflare 就会拒绝。
+8. 删除平台的 KV namespace 与 Hyperdrive 配置。
+9. 清空 R2 bucket，然后删除它。
+10. 删除 AI Gateway。
+
+如果安装时配置过 Cloudflare Access，卸载计划会列出它记录在案的 Access 应用与服务令牌及其归属与 ID。卸载后请在 Zero Trust 中复核它们。只有在没有其他东西使用时，才移除安装器创建的资源；从既有企业配置接入的资源仍由其所有方掌控。
+
+卸载不会移除为[项目 Zero Trust](/docs/platform/administration/zero-trust) 创建的应用。只要 Zero Trust 处于启用状态、或仍留有 Access 应用，卸载与 `--plan` 都会在任何改动之前停止并列出那些应用。请先运行 `void platform zero-trust disable`。卸载是从安装数据库中读取这一状态的，因此数据库不可达时它同样会停止。
+
+如果安装数据库已永久丢失，请[手动移除它的 Cloudflare 资源](#移除被保留的资源)。清理完成后，删除 `~/.void/platforms/<account-id>/<installation-id>.json` 这条本地记录，以及同级的 `<installation-id>.recovery.enc` 与 `<installation-id>.secrets.enc` 文件。这些文件包含安装元数据与加密凭据；删除它们不会动 Cloudflare 上留下的资源。
+
+如果此时还没有任何平台用户（例如首位管理员的 setup 没走完），就没有人能运行 `zero-trust disable`。这时卸载会自行关闭项目 Zero Trust 并删除它的应用。请在当初安装平台的那台电脑上运行它。如果卸载要求你更新，请先更新一个较旧的平台运行时。
+
+<Callout type="info" title="为什么有些资源需要手动清理">
+
+那些可能被共享或被改作他用的资源，在删除前需要人工复核。Void 会校验归属、把这些资源原地保留，并阻断平台流量。
+
+如果移除过程被打断，请重跑该命令继续。如果某个资源的归属发生了变化，请先解决报出的冲突再重试。
+
+外部 PostgreSQL 及其数据始终由你掌控。
+
+</Callout>

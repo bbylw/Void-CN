@@ -4,7 +4,8 @@ description: 用 TypeScript 定义表，然后用 void/db 的 db 查询它们。
 ---
 
 import Callout from '@/components/docs/Callout.astro';
-import ApiTable from '@/components/docs/ApiTable.astro';
+
+用 TypeScript 定义表，再用 `void/db` 导出的 `db` 查询它们。Void 内置了 [Drizzle ORM](https://orm.drizzle.team)，并为你配置好连接，因此同一份 schema 与查询流程可以直接用在 D1、PostgreSQL 或 MySQL 上。
 
 ```text title="db/"
 ├── schema.ts            表定义（唯一真相来源）
@@ -22,11 +23,11 @@ import ApiTable from '@/components/docs/ApiTable.astro';
 
 在 `void init` 期间选择数据库，或在 `void.config.ts` 中设置 `database`：
 
-| 方言         | 配置                  | 托管方     | 连接方式       |
-| ------------ | --------------------- | ---------- | -------------- |
-| D1（SQLite） | 默认                  | Void 托管  | 自动的 D1 绑定 |
-| PostgreSQL   | `"database": "pg"`    | 自带数据库 | Hyperdrive     |
-| MySQL        | `"database": "mysql"` | 自带数据库 | Hyperdrive     |
+|              | [D1（SQLite）](/docs/database/d1) | [PostgreSQL](/docs/database/postgresql) | [MySQL](/docs/database/mysql) |
+| ------------ | --------------------------------- | --------------------------------------- | ----------------------------- |
+| 配置         | 默认                              | `"database": "pg"`                      | `"database": "mysql"`         |
+| 托管方       | Void                              | 自带数据库                              | 自带数据库                    |
+| 连接方式     | 自动的 D1 绑定                    | Hyperdrive                              | Hyperdrive                    |
 
 <Callout type="tip" title="Void 平台会关闭 Hyperdrive 查询缓存">
   这样读取能反映已完成的写入。已有连接会在项目下一次部署时更新。
@@ -113,7 +114,7 @@ D1 项目省略 `dialect` 即可。数据库里已经有表时，改完 `casing`
 
 ## 查询
 
-Void 会从 `void/db` 重新导出所有常用的 Drizzle 查询运算符，因此你不需要单独安装 `drizzle-orm`。从 `void/db` 导入 `db`，从 `@schema` 导入你的表。
+Void 会从 `void/db` 重新导出所有常用的 [Drizzle 查询运算符](https://orm.drizzle.team/docs/select)，因此你不需要单独安装 `drizzle-orm`。从 `void/db` 导入 `db`，从 `@schema` 导入你的表。
 
 <Callout type="info" title="@schema 是什么">
   `@schema` 是 Void 插件自动配置的 Vite 路径别名，指向你的 `db/schema.ts`（或拆分后的
@@ -228,7 +229,7 @@ const results = await db
   .innerJoin(users, eq(posts.userId, users.id));
 ```
 
-如果 schema 中定义了 `relations`，还可以使用 Drizzle 的关系查询 API：
+如果 schema 中定义了 [relations](https://orm.drizzle.team/docs/relations)，还可以使用 Drizzle 的关系查询 API：
 
 ```ts
 const usersWithPosts = await db.query.users.findMany({
@@ -241,6 +242,10 @@ const usersWithPosts = await db.query.users.findMany({
 用 `void db seed` 重置本地数据库、重新应用迁移，然后运行一个种子文件。
 
 用 `db/seed.ts` 做程序化种子，用 `db/seed.sql` 写 SQL。JavaScript 以及 `.mts` / `.mjs` 文件同样可用。如果存在多个种子文件，用 `--file <path>` 选择其中一个。
+
+### 程序化种子
+
+当你想在代码里生成种子数据时，使用 `db/seed.ts`。导出一个默认函数或名为 `seed` 的函数。
 
 ```ts title="db/seed.ts"
 import { defineSeed } from 'void/seed';
@@ -259,6 +264,10 @@ export default defineSeed<typeof import('./schema')>(async ({ db, schema }) => {
 - `dialect`：`"sqlite"`、`"postgresql"` 或 `"mysql"`
 - `db`：指向本地数据库的 Drizzle 实例
 - `schema`：来自 `db/schema.ts` 或 `db/schema/` 的导出
+
+### SQL 种子
+
+如果你更喜欢原始 SQL，可以继续用 `db/seed.sql`：
 
 ```sql title="db/seed.sql"
 INSERT INTO messages (text) VALUES ('Hello from SQL');
@@ -299,7 +308,22 @@ export const insertUserSchema = createInsertSchema(users, {
 
 `createInsertSchema` 会生成与 `$inferInsert` 匹配的校验器：有默认值或自增的列变为可选，`NOT NULL` 列保持必填。可选的第二个参数让你逐列细化，既可以传入一个接收生成 schema 的回调，也可以直接传入一个类型来覆盖某个字段。
 
-在[路由处理器](/docs/server-routing#校验)中用 `withValidator()` 使用派生的 schema。三个可用函数：
+在[路由处理器](/docs/server-routing)中用 `withValidator()` 使用派生的 schema：
+
+```ts title="routes/api/users/index.ts"
+import { users, insertUserSchema } from '@schema';
+import { defineHandler } from 'void';
+import { db } from 'void/db';
+
+export const POST = defineHandler.withValidator({
+  body: insertUserSchema,
+})(async (c, { body }) => {
+  const [created] = await db.insert(users).values(body).returning();
+  return created;
+});
+```
+
+三个可用函数：
 
 | 函数                 | 用途                                             |
 | -------------------- | ------------------------------------------------ |
@@ -307,10 +331,15 @@ export const insertUserSchema = createInsertSchema(users, {
 | `createSelectSchema` | 匹配查询结果行的结构                             |
 | `createUpdateSchema` | 与 insert 类似，但所有字段都是可选的（部分更新） |
 
-<Callout type="tip">
-  Void 已经打包了 Drizzle 适配器。如果你在 schema 文件中直接使用校验库自身的 API，请自行安装它：`npm
-  install zod` / `valibot` / `arktype`。
-</Callout>
+Void 已经打包了 Drizzle 适配器。如果你在 schema 文件中直接使用校验库自身的 API，请自行安装它：
+
+```bash
+npm install zod
+# or
+npm install valibot
+# or
+npm install arktype
+```
 
 ## CLI 命令
 
@@ -326,36 +355,7 @@ export const insertUserSchema = createInsertSchema(users, {
 
 `void db execute` 会为每条有返回行的语句打印结果表格，纯改动数据的语句不打印内容；包含多条语句的 SQL 作为脚本执行，不打印结果行。直连 Cloudflare 的 D1 部署上，超过 100 KB 的 `--file` 会走 D1 import：等待期间数据库不服务查询，也不打印结果行。`DELETE`、`UPDATE`、`DROP` 这类破坏性语句在 TTY 下会先要求确认，`--yes` 可跳过，非 TTY（CI）不会询问。
 
-## 脚手架
-
-`void gen model` 会生成适配当前方言的 `sqliteTable`、`pgTable` 或 `mysqlTable` 定义：
-
-```bash
-void gen model posts title:string body:text published:boolean
-```
-
-它会创建：
-
-- `db/schema/posts.ts`：包含 `id`、`createdAt`、`updatedAt` 与你指定列的 Drizzle 表定义
-- 更新 `db/schema.ts`，加入 `export * from "./schema/posts"`
-- `routes/api/posts/index.ts`：列表 GET 与带校验的插入 POST
-- `routes/api/posts/[id].ts`：按 id 查询的 GET，带 404 处理
-
-## 迁移出问题时回档
-
-在自有 Cloudflare 账户上部署 D1 时，`void deploy` 会在应用迁移之前保存一个恢复点，并打印出对应的 `void db restore` 命令。遇到坏迁移时：
-
-1. 如果线上版本依赖新的 schema，先用 `void project rollback` 回退代码。
-2. 用打印出的 bookmark 执行 `void db restore`；也可以传 `--timestamp`，值必须是带时区的 ISO 8601 时间，例如 `2026-10-16T09:30:00Z`。
-3. 修正或删掉失败的迁移之后再部署。恢复点同时会回退迁移历史，所以下一次部署会重新应用待处理的迁移文件。
-
-`void db restore` 只作用于直连 Cloudflare 部署的 D1（基于 Time Travel），需要单次指定目标时给它加 `--platform cloudflare`。
-
-<Callout type="warn" title="恢复会丢弃之后的写入">
-  回档会丢弃所选时间点之后的所有写入，Time Travel 的历史也有限：Workers Free 保留 7 天，Workers Paid 保留 30
-  天；更早的迁移只能用一个新的迁移反向修正。Void 执行前会要求确认，并打印一条可撤销本次恢复的命令；脚本与 CI 用
-  `--yes`。恢复之后请确认已部署的代码能与恢复到的 schema 配合。
-</Callout>
+连接配置、SQL 执行、Studio、导出等更多命令见 [CLI 参考](/docs/reference/cli/database)。
 
 ## 接管已有的 Drizzle PostgreSQL 数据库
 
@@ -394,14 +394,56 @@ void gen model posts title:string body:text published:boolean
 
 部署时，Void 会把 Drizzle schema 与 `db/migrations/meta/` 中的快照做比较。如果你有 SQL 迁移却没有这份元数据，运行 `void db generate` 会为同样的表再创建一个迁移。
 
-要保留已有的迁移历史：让 Drizzle schema 与你的 SQL 迁移所创建的表保持一致，在项目的一份临时副本中删除 `db/migrations/` 后运行 `void db generate`，再把生成的 `meta/` 目录复制回你的迁移目录。在 `_journal.json` 中，为每个已有的 SQL 文件按顺序替换条目，`idx` 从 0 连续递增，`tag` 为去掉 `.sql` 的文件名，`when` 使用递增的时间戳，`version` 使用生成条目的版本。快照文件重命名为 `<prefix>_snapshot.json`，其中 `<prefix>` 是最后一个迁移 tag 在第一个 `_` 之前的部分。例如 `001_create_users.sql` 对应 `001_snapshot.json`。
+要保留已有的迁移历史：
+
+1. 让你的 Drizzle schema 与 SQL 迁移所创建的表保持一致。
+2. 在项目的一份临时副本中删除 `db/migrations/`，然后运行 `void db generate`。
+3. 把生成的 `meta/` 目录复制回你原来的迁移目录。在 `_journal.json` 中，按顺序为每个已有的 SQL 文件替换 `entries` 条目：`idx` 从 `0` 开始连续递增，`tag` 为去掉 `.sql` 的文件名，`when` 使用递增的时间戳，`version` 沿用生成条目的值。`breakpoints` 设为该文件是否使用了 `--> statement-breakpoint` 行。
+4. 把生成的快照重命名为 `<prefix>_snapshot.json`，其中 `<prefix>` 是最后一个迁移 tag 在第一个 `_` 之前的部分。例如 `001_create_users.sql` 对应 `001_snapshot.json`。
+
+检查并提交这份元数据，然后再次运行 `void deploy`。如果还没有任何数据库应用过这些 SQL，你也可以直接用 `void db generate` 生成的迁移替换它们。
 
 <Callout type="warn" title="statement-breakpoint">
   对于包含触发器的 D1 迁移，以及包含触发器、存储过程、函数或事件的 MySQL 迁移，请在每个完整 SQL
-  语句之后添加一行 `--&gt; statement-breakpoint`，包括触发器结尾的 `END;`。保持触发器主体完整。
+  语句之后添加一行 `--> statement-breakpoint`，包括触发器结尾的 `END;`。保持触发器主体完整。
+</Callout>
+
+## 脚手架
+
+`void gen model` 会生成适配当前方言的 `sqliteTable`、`pgTable` 或 `mysqlTable` 定义：
+
+```bash
+void gen model posts title:string body:text published:boolean
+```
+
+它会创建：
+
+1. `db/schema/posts.ts`：包含 `id`、`createdAt`、`updatedAt` 与你指定列的 Drizzle 表定义
+2. 更新 `db/schema.ts`，加入 `export * from "./schema/posts"`
+3. `routes/api/posts/index.ts`：列表 GET 与带校验的插入 POST
+4. `routes/api/posts/[id].ts`：按 id 查询的 GET，带 404 处理
+
+完整生成器列表见 [CLI 参考](/docs/reference/cli/generate)。
+
+## 迁移出问题时回档
+
+在自有 Cloudflare 账户上部署 D1 时，`void deploy` 会在应用迁移之前保存一个恢复点，并打印出对应的 `void db restore` 命令。遇到坏迁移时：
+
+1. 如果线上版本依赖新的 schema，先用 `void project rollback` 回退代码。
+2. 用打印出的 bookmark 执行 `void db restore`；也可以传 `--timestamp`，值必须是带时区的 ISO 8601 时间，例如 `2026-10-16T09:30:00Z`。
+3. 修正或删掉失败的迁移之后再部署。恢复点同时会回退迁移历史，所以下一次部署会重新应用待处理的迁移文件。
+
+`void db restore` 只作用于直连 Cloudflare 部署的 D1（基于 Time Travel），需要单次指定目标时给它加 `--platform cloudflare`。
+
+<Callout type="warn" title="恢复会丢弃之后的写入">
+  回档会丢弃所选时间点之后的所有写入，Time Travel 的历史也有限：Workers Free 保留 7 天，Workers Paid 保留 30
+  天；更早的迁移只能用一个新的迁移反向修正。Void 执行前会要求确认，并打印一条可撤销本次恢复的命令；脚本与 CI 用
+  `--yes`。恢复之后请确认已部署的代码能与恢复到的 schema 配合。
 </Callout>
 
 ## D1 的特别说明
+
+本页保留 D1 最常踩坑的部分；本地数据库、批量操作与完整的副本一致性配方见 [D1（SQLite）](/docs/database/d1)。
 
 ### 读副本需要显式开启
 

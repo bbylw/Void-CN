@@ -1,0 +1,160 @@
+---
+title: 数据库命令
+description: 从 Drizzle schema 生成迁移、应用迁移，并更新本地数据库。
+---
+
+## `void db push`
+
+把 Drizzle schema 直接应用到开发数据库，不生成迁移文件。D1 更新的是本地数据库；PostgreSQL 与 MySQL 使用 `.env` 里的 `DATABASE_URL`。
+
+原型阶段快速迭代 schema 时用它。部署之前，请用 `void db generate` 生成迁移文件并逐一检查。
+
+## `void db generate`
+
+从 schema 变更生成 SQL 迁移文件。
+
+它把你的 schema 与最后一次 Drizzle 快照做对比，把迁移写入 `db/migrations/`。即使没有应用 schema，也会包含 Void 托管的认证表与已配置的认证插件。部署前请检查并提交生成的文件。
+
+对 SQLite，Void 会检查迁移历史能否应用到一个全新数据库。如果生成没通过这个检查，之前的 SQL、快照与 journal 会被还原。如果某个已有迁移失败了，请先修复这份尚未应用的迁移：重新运行生成只会对比快照，不会修复已有 SQL。这个检查不验证迁移是否保留已有数据，请仔细检查表重建与外键行为。
+
+## `void db status`
+
+在本地与已保存的部署目标上分别显示已应用和待应用的迁移。直连 Cloudflare 的 PostgreSQL 与 MySQL 项目，其远端状态使用当前 shell 里的 `DATABASE_URL`。
+
+## `void db reset`
+
+```sh
+void db reset [--yes]
+```
+
+重置开发数据库并重新应用全部迁移。D1 会重置本地数据。PostgreSQL 清空 `public` schema 中的表、视图、序列与自定义类型，但保留扩展；来自其他 schema 的依赖需要先处理。MySQL 会删除所有表与视图。PostgreSQL 与 MySQL 使用 `.env` 里的 `DATABASE_URL`。
+
+当这个 `DATABASE_URL` 指向 `localhost` 以外的主机时，Void 会报出数据库名，并在删除其中的表之前先征求确认。在脚本和 CI 中可用 `--yes` 跳过确认；没有终端时，除非设置 `--yes`，否则命令会直接停止。如果 `.env` 用的是与部署相同的 URL（例如执行过 `void db connect` 之后），reset 会删除已部署的表。
+
+## `void db seed`
+
+```sh
+void db seed [--file <path>] [--yes]
+```
+
+重置本地数据库、重新应用全部迁移，然后执行 seed 文件。重置行为与 `void db reset` 一致，包括确认提示与 `--yes`。
+
+省略 `--file` 时，Void 按以下顺序查找默认 seed 文件：`db/seed.ts`、`db/seed.mts`、`db/seed.js`、`db/seed.mjs`、`db/seed.sql`。
+
+如果存在多个默认 seed 文件，CLI 会停止并要求你传入 `--file <path>`。
+
+以编程方式编写的 seed 模块必须导出默认函数或名为 `seed` 的具名函数。
+
+## `void db execute`
+
+```sh
+void db execute <sql>
+void db execute --file <path>
+void db execute --remote <sql> [--yes]
+void db execute --remote --file <path> [--yes]
+```
+
+对数据库执行临时 SQL。可以内联提供 SQL，也可以来自文件。会返回结果的语句以格式化表格打印，改动数据的语句不打印任何内容。包含多条语句的 SQL 按脚本执行，不打印结果。
+
+默认作用于本地数据库。传 `--remote` 则对 `.void/project.json` 中选定的已部署数据库执行：
+
+- **Void 平台的 D1 项目**：用你的 auth token，把查询经所选平台登记的代理转发出去。
+- **直连 Cloudflare 的 D1 项目**：针对 `void.config.ts` 或 `void.lock.json` 中固定的 D1 绑定调用 Cloudflare。
+- **托管的 PostgreSQL 与 MySQL 项目**：从平台取回保存的连接串并直连。
+- **直连 Cloudflare 的 PostgreSQL 与 MySQL 项目**：使用当前 shell 的 `DATABASE_URL`；Cloudflare 无法从 Hyperdrive 返回密码。
+
+在直连 Cloudflare D1 的部署上，超过 100 KB 的 `--file` 会走 D1 import：Void 会等待它执行完，这期间数据库无法响应查询，也不会打印结果行。更小的文件与内联 SQL 一样会打印结果行。
+
+在 TTY 中执行破坏性语句（`DELETE`、`UPDATE`、`DROP` 等）时，查询发往已部署数据库之前会先让你确认。TTY 下的 D1 import 无论文件内容是什么也都会先询问。用 `--yes` 跳过确认。非 TTY 环境（CI）从不询问，因此那里的 `--yes` 是可选的。
+
+## `void db migrate`
+
+```sh
+void db migrate [--remote]
+```
+
+把待应用的迁移应用到本地数据库，不做重置。与 `void db reset` 不同，它保留已有数据，只运行尚未应用的迁移。
+
+传 `--remote` 可以把待应用迁移应用到已保存的目标。托管项目需要先有 Void 登录与关联。直连 Cloudflare 的 D1 项目使用绑定的配置项 migration directory、table 与 pattern，且 D1 绑定必须设置 `migrations_dir`。直连的 PostgreSQL 与 MySQL 项目使用 shell 里的 `DATABASE_URL`。
+
+## `void db studio`
+
+```sh
+void db studio [--remote]
+```
+
+为数据库打开 [Drizzle Studio](https://orm.drizzle.team/docs/drizzle-kit-studio)，即启动一个基于网页的图形界面来浏览和编辑数据。
+
+默认作用于本地数据库。传 `--remote` 则针对已部署数据库打开 Studio：
+
+- **托管的 PostgreSQL 与 MySQL 项目**：从平台取回保存的连接串并针对它打开 Studio。如果还没有存过 URL，请先运行 `void db set-url`。
+- **直连 Cloudflare 的 PostgreSQL 与 MySQL 项目**：使用当前 shell 的 `DATABASE_URL`。
+- **D1 项目**：用 `void db execute --remote` 查询已部署的数据库。
+
+## `void db restore`
+
+```sh
+void db restore --bookmark <bookmark> [--platform cloudflare] [--yes]
+void db restore --timestamp <iso-time> [--platform cloudflare] [--yes]
+```
+
+借助 [Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/) 恢复直连部署到 Cloudflare 的 D1 数据库。可以使用部署迁移前打印的 bookmark，也可以是带时区的 ISO 8601 时间戳，例如 `2026-10-16T09:30:00Z`。
+
+Time Travel 在 Workers Free 上保留 7 天历史，在 Workers Paid 上保留 30 天。更早的迁移请用新写的迁移做反向操作。
+
+恢复会丢弃所选时间点之后的全部写入。Void 会请求确认，并打印一条事后可以撤销该恢复的命令。脚本与 CI 请用 `--yes`。
+
+从一次失败的迁移中恢复的步骤：
+
+1. 如果线上版本需要更新的 schema，先用 [`void project rollback`](/docs/reference/cli/project) 回滚代码。
+2. 用打印出的 bookmark 恢复数据库。
+3. 在重新部署前修复或删除失败的迁移。恢复同时会倒回迁移历史，因此下一次部署会重新应用待处理的文件。
+
+对一次性的 Cloudflare 部署，可以在 restore、rollback 与 deploy 命令上加 `--platform cloudflare`。
+
+## `void db rename-migrations`
+
+对于已关联的 Void 平台项目，它把迁移从数字前缀（`0001_name.sql`）重命名为时间戳（`20260410161500_name.sql`），并更新本地与远端的迁移记录。请先登录并运行 `void project link`。
+
+对直连 Cloudflare 的部署，保留现有文件名。新迁移使用时间戳，并排在它们之后执行。
+
+## `void db connect`
+
+连接一个已有的 PostgreSQL/MySQL 数据库，或通过适配器开通一个：
+
+```sh
+void db connect 'postgresql://user:password@host/database'
+NEON_API_KEY=... void db connect --provider neon --name my-app
+void db connect --provider @acme/void-db-provider --region region-id
+```
+
+该命令把 `DATABASE_URL` 保存到 `.env`。当以已关联的 Void 项目身份认证时，它还会更新加密后的部署用 URL；传 `--local-only` 可跳过这次同步。`neon` 是内置的。其他适配器是项目依赖或本地模块，需从 `void/database-provider` 导出一个 `DatabaseProviderAdapter`。
+
+由提供方创建的凭据永不打印。对直连 Cloudflare 的部署，请在执行 deploy 的 shell 或 CI 环境里把同一个 URL 配置成受保护的 `DATABASE_URL`。
+
+对于已有 Drizzle 迁移历史的 PostgreSQL 数据库，在第一次 Void 部署之前先[接管它已应用的迁移历史](/docs/database)。
+
+## `void db set-url`
+
+更新部署用的 PostgreSQL 或 MySQL 连接串。仅对 `"database": "pg"` 或 `"database": "mysql"` 的项目可用。
+
+提示输入连接串，并把它发给平台 API 以创建或更新 Hyperdrive 配置。
+
+## `void db export`
+
+```sh
+void db export [--output <path>] [--no-data] [--no-schema] [--table <name>]
+```
+
+把本地数据库导出为 SQL。默认输出到 stdout（可管道），用 `--output` 可写入文件。
+
+导出数据会保留 SQLite 的 AUTOINCREMENT 以及 PostgreSQL 的 SERIAL 与 identity 计数器，包括被删除行占用过的 ID。SQLite 的 schema 导出包含索引、视图与触发器。PostgreSQL 的 schema 导出保留列类型、生成列、identity 定义、serial 序列、约束与索引。`--no-schema` 会把计数器值恢复到已有 schema 上；`--no-data` 则让计数器从 schema 定义的起始值开始。
+
+对于包含视图、触发器、自定义类型、函数或独立序列的 PostgreSQL schema，请用 `pg_dump` 做完整备份。`void db export` 会在写出 schema 导出之前报告这些对象。
+
+| Flag              | 用途                             |
+| ----------------- | -------------------------------- |
+| `--output <path>` | 写入文件而不是 stdout            |
+| `--no-data`       | 只要 schema（不含 INSERT 语句）  |
+| `--no-schema`     | 只要数据（不含 CREATE TABLE）    |
+| `--table <name>`  | 只导出单张表                     |

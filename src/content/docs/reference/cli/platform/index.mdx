@@ -1,0 +1,73 @@
+---
+title: 平台管理
+description: 选择平台、确认变更，并针对该安装执行 operator 命令。
+---
+
+Void 托管的项目会部署到一个显式选定的平台。用 [`void connect`](/docs/reference/cli/auth) 加入一个。连接按 API origin 分别保存，凭据也被限定在该 origin 上。
+
+## 连接命令
+
+```sh
+void platform list
+void platform use [id]
+void platform status [id]
+```
+
+`list` 先显示当前选中的平台，随后是其他已保存的平台。有本地安装记录的平台，其安装 slug 会显示在名字旁边，例如 `Cloudflare Void (cloudflare)`。用 `void platform use cloudflare` 选中它。对于没有本地安装 slug 的已连接平台，请使用它打印出的 API URL。
+
+`use` 与 `status` 接受安装 slug、显示名、保存的 ID 或 API URL。如果某个 slug 或名字匹配到多个平台，请用 API URL 来指定。当只配置了一个平台时它们会自动选中；配置了多个平台时，交互式使用会给出选择列表，非交互使用则必须显式给出选择器。已经记录了平台 URL 的项目，在全局默认值改变后仍继续使用那个平台。
+
+对自托管的安装，`status <installation-id>` 会先打印本地保存的 lifecycle 进度，再检查线上 API。保存的检查点可能已经过期。如果在维护期间线上探测失败，命令仍会显示那个检查点并以错误退出；它并不确认当前的可用性。
+
+## Operator 命令
+
+用 `void platform` 管理你所选平台上的用户与应用。请先阅读[平台管理指南](/docs/platform/administration)，了解如何登录、给别人开放权限，以及如何排查部署问题。
+
+下面每条命令都接受 `--connection <slug-or-url>` 来选择已登记的平台，并接受 `--json` 输出结构化结果。显示名与保存的 ID 同样可用。不带 `--connection` 时，Void 依次使用 `VOID_API_URL`（若已设置）与当前活动的平台连接。应用项目目录中的文件不会影响这个选择。
+
+### 执行变更
+
+会改动用户、项目、注册权限、邀请或 Worker 的命令，在请求确认之前先展示预览：
+
+```sh
+void platform user plan <user-id> pro --plan
+void platform user plan <user-id> pro --yes
+```
+
+`--plan` 校验变更并打印其影响，但不应用。`--yes` 不询问直接应用，脚本中必须这样用。两者只能选一个，不能组合。这些 flag 同样适用于取消部署与维护命令，但不适用于认证命令。
+
+每个预览与应用请求给五分钟时间。用 `--timeout <seconds>` 可把该限制改成 1 到 3600 之间的整数。读取请求与单次日志轮询给 30 秒。
+
+Void 不会自动重试变更。如果请求丢失连接或超时，请先检查受影响的对象与 `void platform system events`，再决定是否重做。部分完成的结果会描述已完成的工作，并以非零状态退出。
+
+### 认证
+
+登录、查看当前会话或登出：
+
+```sh
+void platform auth login [--provider <connection-id>] [--token-stdin]
+void platform auth status
+void platform auth logout
+void platform auth token [--token-stdin]
+```
+
+浏览器登录会提供该平台启用的登录方式；`--provider <connection-id>` 用于指定其一。登录会在系统钥匙串中保存一个一小时的 administrator 会话。登出会吊销该会话并删除本地凭据。
+
+`auth token` 打印当前的 operator token。带 `--token-stdin` 时，它用标准输入传入的完整 administrator API 登录会话换取一个新的 operator token。`auth login --token-stdin` 则把换来的 token 存入钥匙串而不打印。
+
+用于自动化时，请提供 `VOID_OPERATOR_TOKEN`，并显式给出 `VOID_API_URL` 或 `--connection`。operator token 与应用部署凭据分开存放。API 会在每次请求时校验你当前的 administrator 权限。示例见[脚本化操作](/docs/platform/administration/operations)。
+
+## 分页与 JSON
+
+用户、项目、部署、邀请与事件列表默认取第 `1` 页、每页 20 条。这些列表的 `--limit` 接受 1 到 100。它们的 JSON 响应包含页码、每页数量与总数。
+
+使用 `--json` 时，结果写到标准输出，命令错误以 JSON 写到标准错误。错误与部分失败都以非零状态退出。`system health` 结果不健康时仍然打印到标准输出，但同样以非零状态退出。跟踪日志时，每个响应写一个 JSON 对象，包括每一页和空响应。
+
+## 平台命令分组
+
+- [安装与维护](/docs/reference/cli/platform-installation)
+- [套餐与认证配置](/docs/reference/cli/platform-config)
+- [用户、项目与注册权限](/docs/reference/cli/platform-users)
+- [项目 Zero Trust](/docs/reference/cli/platform-zero-trust)
+- [部署、构建与系统操作](/docs/reference/cli/platform-operations)
+- [邮件管理](/docs/reference/cli/platform-email)

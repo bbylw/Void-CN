@@ -1,0 +1,322 @@
+---
+title: Pages 适配器
+description: React、Vue、Svelte 与 Solid 页面的 Vite 插件与客户端运行时。
+---
+
+各框架的[页面路由](/docs/pages-routing)适配器。每个适配器都提供一个 Vite 插件与一套客户端运行时。
+
+## 错误组件
+
+四个适配器都导出 `PageError` 与 `ErrorPageProps`，供 [`_not-found` 与 `_error` 组件](/docs/pages-routing/errors)使用：
+
+```ts
+// @void/react、@void/vue、@void/svelte 与 @void/solid 同样导出这两个类型。
+import type { ErrorPageProps, PageError } from 'void/pages';
+```
+
+`PageError` 有一个数字型的 `status` 和一个字符串型的 `message`。`ErrorPageProps` 的内容是 `{ error: PageError }`。
+
+## 导航目标
+用 [`routeUrl()`](/docs/reference/api/types) 构建 URL，并把它传给 `Link` 的 `href`。四个适配器都使用 [`Href`](/docs/reference/api/types) 类型描述链接。
+
+router 的 `visit(destination, options?)`、`prefetch(destination, options?)` 与 `flush(destination, method?)` 接收 [`RouteUrlInput`](/docs/reference/api/types)：字符串、`URL` 或带类型的目标对象。
+
+开启 [`routing.typedRoutes`](/docs/config) 后，`href` 与 router 传入的字符串必须匹配你的某条路由，或者是同页 URL、外部 URL。不开启时，两者接受任意字符串。
+
+框架示例见[带类型的导航](/docs/pages-routing)。
+
+## 预取
+`Link` 的 `prefetch` prop 接受 `true`、`false`、某个策略，或策略数组：
+
+```ts
+type LinkPrefetchStrategy = 'hover' | 'click' | 'mount' | 'visible';
+```
+
+| 取值                | 何时加载页面                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `'hover'` 或 `true` | 指针在链接上停留达到 `hoverDelay`、链接获得键盘焦点，或被触摸时                     |
+| `'click'`           | 鼠标按下或手指按下时，就在点击之前                                                  |
+| `'mount'`           | 链接一渲染出来                                                                      |
+| `'visible'`         | 链接进入视口并保持 300 ms 后。快速滚过的链接会被跳过                                |
+| `false`             | 从不                                                                                |
+
+用数组组合多个策略，例如 `['visible', 'hover']`。最先触发的那个会加载页面；后续触发会直接复用。
+
+只有同源的 GET 链接才会被预取。当 Chromium 上报 data saver 或 2G 网络时，`Link` 会跳过预取。显式调用 `router.prefetch()` 仍会加载页面。
+
+点击一个已预取的链接时，如果数据就绪就会复用。如果仍在加载，导航会另起一个请求，这样[延迟 props](/docs/pages-routing/loaders)可以流式返回而不拖慢页面。
+
+`cacheFor` 以毫秒设置，或用 `'5m'` 这样的时长字符串。想先展示缓存数据、同时在后台刷新，可以用 `['30s', '5m']` 这样的成对值：页面在 30 秒内保持新鲜，最多可复用 5 分钟。
+
+每个适配器插件的 `prefetch` 选项设置全局默认值：
+
+| 选项              | 默认值  | 说明                                                                                                                                     |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `defaultStrategy` | `false` | 所有未自行设置 `prefetch` 的 `Link` 的默认值。`Link` 自己的 `prefetch` 会覆盖它，`prefetch={false}` 则关闭它。`method` 非 GET 或带 `reloadDocument` 的链接不使用它。 |
+| `hoverDelay`      | `75`    | 触发 `'hover'` 预取前，指针需在链接上停留的毫秒数。                                                                                      |
+| `cacheFor`        | `'30s'` | 所有未自行设置 `cacheFor` 的 `Link` 的默认值。                                                                                           |
+
+## `@void/vue`
+### `voidVue(options?)`
+从 `"@void/vue/plugin"` 导入。返回一组 Vite 插件，负责 Vue SFC 编译以及 SSR 或水合入口的生成。它已包含 `@vitejs/plugin-vue`，因此你无需另外安装或配置。
+
+```ts
+import { voidVue } from '@void/vue/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidVue()],
+});
+```
+
+**签名：**
+
+```ts
+function voidVue(options?: VoidVueOptions): Plugin[];
+```
+
+**选项：**
+
+```ts
+interface VoidVueOptions {
+  vue?: VuePluginOptions; // 透传给 @vitejs/plugin-vue
+  viewTransitions?: boolean; // 为导航启用 View Transitions API
+  prefetch?: {
+    defaultStrategy?: boolean | LinkPrefetchStrategy | LinkPrefetchStrategy[]; // 默认 false
+    hoverDelay?: number; // 默认 75（毫秒）
+    cacheFor?: number | string | [string, string]; // 默认 '30s'
+  };
+}
+```
+
+### Vue 运行时
+从 `"@void/vue"` 导入。
+
+| 导出                               | 说明                                                                                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Link`                             | 用于 SPA 导航的 Vue 组件。GET 渲染 `<a>`，非 GET 方法渲染 `<button>`。props：`href`、`method`、`data`、`prefetch`、`cacheFor`、`preserveScroll`、`preserveState`、`replace`、`reloadDocument`、`viewTransition`、`activeMatch`、`onNavigate`。指向当前页面的链接会加上 `aria-current="page"` 与 `data-void-active`（[活动链接](/docs/pages-routing)），页面加载期间指向它的链接会加上 `data-void-pending`（[待处理链接](/docs/pages-routing)）。 |
+| `useRouter()`                      | 返回 Void Router，包含当前路由状态（`url`、`path`、`query`、`params`）与导航方法：`visit`、`refresh`、可等待的 `prefetch`、`flush`、`flushAll`。            |
+| `useParams()`                      | 返回当前正在渲染的页面的动态路由参数。把页面的模式作为类型参数传入，例如 `useParams<'/users/[id]'>()`，即可获得类型。                                      |
+| `useNavigation()`                  | 返回待处理导航状态：`{ state, location, method }`，其中 `state` 是 `"idle"`、`"loading"` 或 `"submitting"`，`location` 是待处理的目标。                    |
+| `useForm(url, defaults, options?)` | 绑定到页面 action URL 的带类型响应式表单助手。返回 `{ data, post, put, patch, delete, pending, errors, error, hasChanges, wasSuccessful, recentlySuccessful, reset, setError, clearErrors, clearError }`。 |
+| `useIslandForm(defaults)`          | 岛屿组件的表单助手。与 `useForm()` 表单状态相同，另有 `submit(url, method)`。`post(url)`、`put(url)`、`patch(url)` 与 `delete(url)` 接收 action URL 并用 `fetch()` 提交。开启 [`routing.typedRoutes`](/docs/config) 时，URL 类型是 [`RouteUrl`](/docs/reference/api/types)。 |
+| `action(url, options?)`            | 可等待的一次性页面 action 助手。默认使用 `POST`，接受 `{ data, method, params, preserveScroll }`，其中 `method` 可以是 `"PUT"`、`"PATCH"` 或 `"DELETE"`。返回 [`ActionResult`](/docs/pages-routing/actions-and-forms)。 |
+| `isVoidActionError(error)`         | 检查并把 `error` 收窄为 `VoidActionError`，包括抛出的 `401`、`403` 与 `500` 错误。见[处理 action 错误](/docs/pages-routing/actions-and-forms)。             |
+| `isCallSiteActionError(error)`     | 识别 `action()` 返回的预期错误，例如 `409` 或 `422`。                                                                                                      |
+| `getValidationErrors(body)`        | 从失败 action 的 `error.body` 中取回字段错误映射；body 中没有字段错误时返回 `null`。用于展示 `action()` 的校验错误。                                       |
+| `useShared()`                      | 返回共享数据。中间件用 `c.set("shared", {...})` 设置；loader 或 action 可以更新它。见[共享数据](/docs/pages-routing/layouts)。                            |
+
+Vue 的 `Link` 在 GET 时会把 `data` 合并进渲染出的 `href` 查询字符串。基础值用 `String(value)` 序列化，数组变成重复的键，`null` 与 `undefined` 会被省略，嵌套对象会抛错。`prefetch` 与 `reloadDocument` 仅适用于 GET，用于变更类链接会抛错。
+
+Vue 在 GET 导航时会重新挂载页面，让 `useForm()` 取到目标记录的 URL 与默认值；布局保持存活。变更请求与 `router.refresh()` 默认保留页面状态。在同一条记录内导航时，显式设置 `preserveState` 可以覆盖默认行为。
+
+## `@void/react`
+### `voidReact(options?)`
+从 `"@void/react/plugin"` 导入。返回一组 Vite 插件，负责 SSR 与水合入口的生成。它已包含 `@vitejs/plugin-react`，因此你无需另外安装或配置。
+
+```ts
+import { voidReact } from '@void/react/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidReact()],
+});
+```
+
+**签名：**
+
+```ts
+function voidReact(options?: VoidReactOptions): Plugin[];
+```
+
+**选项：**
+
+```ts
+interface VoidReactOptions {
+  react?: ReactPluginOptions; // 透传给 @vitejs/plugin-react
+  viewTransitions?: boolean; // 为导航启用 View Transitions API
+  prefetch?: {
+    defaultStrategy?: boolean | LinkPrefetchStrategy | LinkPrefetchStrategy[]; // 默认 false
+    hoverDelay?: number; // 默认 75（毫秒）
+    cacheFor?: number | string | [string, string]; // 默认 '30s'
+  };
+}
+```
+
+### React 运行时
+从 `"@void/react"` 导入。
+
+| 导出                               | 说明                                                                                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Link`                             | 用于 SPA 导航的 React 组件。GET 渲染 `<a>`，非 GET 方法渲染 `<button>`。props：`href`、`method`、`data`、`prefetch`、`cacheFor`、`preserveScroll`、`preserveState`、`replace`、`reloadDocument`、`viewTransition`、`activeMatch`、`onNavigate`。指向当前页面的链接会加上 `aria-current="page"` 与 `data-void-active`（[活动链接](/docs/pages-routing)），页面加载期间指向它的链接会加上 `data-void-pending`（[待处理链接](/docs/pages-routing)）。 |
+| `useRouter()`                      | 返回 Void Router，包含当前路由状态（`url`、`path`、`query`、`params`）与导航方法：`visit`、`refresh`、可等待的 `prefetch`、`flush`、`flushAll`。React 的导航会作为 transition 调度。 |
+| `useParams()`                      | 返回当前正在渲染的页面的动态路由参数。把页面的模式作为类型参数传入，例如 `useParams<'/users/[id]'>()`，即可获得类型。                                      |
+| `useNavigation()`                  | 返回待处理导航状态：`{ state, location, method }`，其中 `state` 是 `"idle"`、`"loading"` 或 `"submitting"`，`location` 是待处理的目标。                    |
+| `useForm(url, defaults, options?)` | 表单助手 hook。返回 `{ data, setData, post, put, patch, delete, pending, errors, error, hasChanges, wasSuccessful, recentlySuccessful, reset, setError, clearErrors, clearError }`。 |
+| `useIslandForm(defaults)`          | 岛屿组件的表单助手 hook。与 `useForm()` 表单状态相同。`post(url)`、`put(url)`、`patch(url)` 与 `delete(url)` 接收 action URL 并用 `fetch()` 提交。开启 [`routing.typedRoutes`](/docs/config) 时，URL 类型是 [`RouteUrl`](/docs/reference/api/types)。 |
+| `action(url, options?)`            | 可等待的一次性页面 action 助手。默认使用 `POST`，接受 `{ data, method, params, preserveScroll }`，其中 `method` 可以是 `"PUT"`、`"PATCH"` 或 `"DELETE"`。返回 [`ActionResult`](/docs/pages-routing/actions-and-forms)。 |
+| `isVoidActionError(error)`         | 检查并把 `error` 收窄为 `VoidActionError`，包括抛出的 `401`、`403` 与 `500` 错误。见[处理 action 错误](/docs/pages-routing/actions-and-forms)。             |
+| `isCallSiteActionError(error)`     | 识别 `action()` 返回的预期错误，例如 `409` 或 `422`。                                                                                                      |
+| `getValidationErrors(body)`        | 从失败 action 的 `error.body` 中取回字段错误映射；body 中没有字段错误时返回 `null`。用于展示 `action()` 的校验错误。                                       |
+| `useShared()`                      | 返回共享数据。中间件用 `c.set("shared", {...})` 设置；loader 或 action 可以更新它。见[共享数据](/docs/pages-routing/layouts)。                            |
+| `Deferred<T>`                      | 仅 React 有的 prop 类型，对应 `defer()` 的结果。它就是 `Promise<T>`，用 React 的 `use()` 消费。                                            |
+
+React 的 `Link` 在 GET 时会把 `data` 合并进渲染出的 `href` 查询字符串。基础值用 `String(value)` 序列化，数组变成重复的键，`null` 与 `undefined` 会被省略，嵌套对象会抛错。`prefetch` 与 `reloadDocument` 仅适用于 GET，用于变更类链接会抛错。
+
+React 的 `useForm()` 接受 `onSuccess?: () => void | Promise<void>` 与 `onError?: (error: Record<string, string> | VoidActionError) => void | Promise<void>`。在回调完成之前 `pending` 一直保持 true。见[提交回调](/docs/pages-routing/actions-and-forms)。
+
+`defer()` 返回的 React 延迟 props 是 Suspense 资源。在 `<Suspense>` 边界内用 React 的 `use()` 读取它们。
+React Pages 要求 React 19，并在首次延迟渲染的外壳上使用流式 SSR。
+被拒绝的 Promise 会从 `use()` 抛出，因此自定义的延迟错误 UI 请使用常规的 React 错误边界。Vue、
+Svelte 与 Solid 保留 `{ loading, value, error }` 这个延迟状态对象。
+当你显式标注 props 类型时，请从对应框架适配器包（`@void/react`、`@void/vue`、`@void/svelte` 或 `@void/solid`）导入
+`Deferred`，让类型与该适配器的客户端运行时形态一致。
+
+### React 导航完成时机
+默认情况下，`await router.visit()` 与 `await router.refresh()` 会等待 React 提交更新后的页面与 URL。你也可以用 `{ resolveOn: 'commit' }` 显式要求这一行为。
+
+当你在 `startTransition`、`<form action>`、`useActionState` 或异步的 `useForm()` 回调内部等待导航时，请传入 `{ resolveOn: 'data' }`：
+
+```tsx
+startTransition(async () => {
+  await saveUser();
+  await router.refresh({ resolveOn: 'data' });
+});
+
+await router.visit('/account', { resolveOn: 'data' });
+```
+
+使用 `'data'` 时，Promise 在页面数据就绪时 resolve，因此 Action 可以在 React 提交之前结束。transition 可以在整个 Suspense 期间保持 pending。
+
+`await` 之后 DOM 与 URL 可能仍显示上一个页面。需要更新后 DOM 的工作，请改用 effect 或 ref 回调。
+
+## `@void/svelte`
+### `voidSvelte(options?)`
+从 `"@void/svelte/plugin"` 导入。返回一组 Vite 插件，负责 Svelte 5 的 SSR 与水合入口生成。它已包含 `@sveltejs/vite-plugin-svelte`，因此你无需另外安装或配置。
+
+```ts
+import { voidSvelte } from '@void/svelte/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidSvelte()],
+});
+```
+
+**签名：**
+
+```ts
+function voidSvelte(options?: VoidSvelteOptions): Plugin[];
+```
+
+**选项：**
+
+```ts
+interface VoidSvelteOptions {
+  svelte?: SveltePluginOptions; // 透传给 @sveltejs/vite-plugin-svelte
+  viewTransitions?: boolean; // 启用 View Transitions API
+  prefetch?: {
+    defaultStrategy?: boolean | LinkPrefetchStrategy | LinkPrefetchStrategy[]; // 默认 false
+    hoverDelay?: number; // 默认 75（毫秒）
+    cacheFor?: number | string | [string, string]; // 默认 '30s'
+  };
+}
+```
+
+### Svelte 运行时
+从 `"@void/svelte"` 导入。
+
+| 导出                               | 说明                                                                                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Link`                             | 用于 SPA 导航的 Svelte 组件。GET 渲染 `<a>`，非 GET 方法渲染 `<button>`。props：`href`、`method`、`data`、`prefetch`、`cacheFor`、`preserveScroll`、`preserveState`、`replace`、`reloadDocument`、`viewTransition`、`activeMatch`、`onNavigate`。指向当前页面的链接会加上 `aria-current="page"` 与 `data-void-active`（[活动链接](/docs/pages-routing)），页面加载期间指向它的链接会加上 `data-void-pending`（[待处理链接](/docs/pages-routing)）。 |
+| `useForm(url, defaults, options?)` | 使用 Svelte 5 runes 的表单助手。返回 `{ data, post, put, patch, delete, pending, errors, error, hasChanges, wasSuccessful, recentlySuccessful, reset, setError, clearErrors, clearError }`。 |
+| `useIslandForm(defaults)`          | 岛屿组件的表单助手。与 `useForm()` 表单状态相同，另有 `submit(url, method)`。`post(url)`、`put(url)`、`patch(url)` 与 `delete(url)` 接收 action URL 并用 `fetch()` 提交。开启 [`routing.typedRoutes`](/docs/config) 时，URL 类型是 [`RouteUrl`](/docs/reference/api/types)。 |
+| `action(url, options?)`            | 可等待的一次性页面 action 助手。默认使用 `POST`，接受 `{ data, method, params, preserveScroll }`，其中 `method` 可以是 `"PUT"`、`"PATCH"` 或 `"DELETE"`。返回 [`ActionResult`](/docs/pages-routing/actions-and-forms)。 |
+| `isVoidActionError(error)`         | 检查并把 `error` 收窄为 `VoidActionError`，包括抛出的 `401`、`403` 与 `500` 错误。见[处理 action 错误](/docs/pages-routing/actions-and-forms)。             |
+| `isCallSiteActionError(error)`     | 识别 `action()` 返回的预期错误，例如 `409` 或 `422`。                                                                                                      |
+| `getValidationErrors(body)`        | 从失败 action 的 `error.body` 中取回字段错误映射；body 中没有字段错误时返回 `null`。用于展示 `action()` 的校验错误。                                       |
+| `useShared()`                      | 返回共享数据。中间件用 `c.set("shared", {...})` 设置；loader 或 action 可以更新它。见[共享数据](/docs/pages-routing/layouts)。                            |
+| `useRouter()`                      | 返回 Void Router，包含当前路由状态（`url`、`path`、`query`、`params`）与导航方法：`visit`、`refresh`、可等待的 `prefetch`、`flush`、`flushAll`。            |
+| `useParams()`                      | 返回当前正在渲染的页面的动态路由参数。把页面的模式作为类型参数传入，例如 `useParams<'/users/[id]'>()`，即可获得类型。                                      |
+| `useNavigation()`                  | 返回待处理导航状态：`{ state, location, method }`，其中 `state` 是 `"idle"`、`"loading"` 或 `"submitting"`，`location` 是待处理的目标。                    |
+
+Svelte 的 `Link` 在 GET 时会把 `data` 合并进渲染出的 `href` 查询字符串。基础值用 `String(value)` 序列化，数组变成重复的键，`null` 与 `undefined` 会被省略，嵌套对象会抛错。`prefetch` 与 `reloadDocument` 仅适用于 GET，用于变更类链接会抛错。
+
+## `@void/solid`
+### `voidSolid(options?)`
+从 `"@void/solid/plugin"` 导入。返回一组 Vite 插件，负责 Solid 的 SSR 与水合入口生成。它已包含 `vite-plugin-solid`，因此你无需另外安装或配置。
+
+```ts
+import { voidSolid } from '@void/solid/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidSolid()],
+});
+```
+
+**签名：**
+
+```ts
+function voidSolid(options?: VoidSolidOptions): Plugin[];
+```
+
+**选项：**
+
+```ts
+interface VoidSolidOptions {
+  solid?: SolidPluginOptions; // 透传给 vite-plugin-solid
+  viewTransitions?: boolean; // 启用 View Transitions API
+  prefetch?: {
+    defaultStrategy?: boolean | LinkPrefetchStrategy | LinkPrefetchStrategy[]; // 默认 false
+    hoverDelay?: number; // 默认 75（毫秒）
+    cacheFor?: number | string | [string, string]; // 默认 '30s'
+  };
+}
+```
+
+### Solid 运行时
+从 `"@void/solid"` 导入。
+
+| 导出                               | 说明                                                                                                                                                     |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Link`                             | 用于 SPA 导航的 Solid 组件。GET 渲染 `<a>`，非 GET 方法渲染 `<button>`。props：`href`、`method`、`data`、`prefetch`、`cacheFor`、`preserveScroll`、`preserveState`、`replace`、`reloadDocument`、`viewTransition`、`activeMatch`、`onNavigate`。指向当前页面的链接会加上 `aria-current="page"` 与 `data-void-active`（[活动链接](/docs/pages-routing)），页面加载期间指向它的链接会加上 `data-void-pending`（[待处理链接](/docs/pages-routing)）。 |
+| `useForm(url, defaults, options?)` | 使用 Solid store 的表单助手。返回 `{ data, setData, post, put, patch, delete, pending, errors, error, hasChanges, wasSuccessful, recentlySuccessful, reset, setError, clearErrors, clearError }`。 |
+| `useIslandForm(defaults)`          | 岛屿组件的表单助手。与 `useForm()` 表单状态相同。`post(url)`、`put(url)`、`patch(url)` 与 `delete(url)` 接收 action URL 并用 `fetch()` 提交。开启 [`routing.typedRoutes`](/docs/config) 时，URL 类型是 [`RouteUrl`](/docs/reference/api/types)。 |
+| `action(url, options?)`            | 可等待的一次性页面 action 助手。默认使用 `POST`，接受 `{ data, method, params, preserveScroll }`，其中 `method` 可以是 `"PUT"`、`"PATCH"` 或 `"DELETE"`。返回 [`ActionResult`](/docs/pages-routing/actions-and-forms)。 |
+| `isVoidActionError(error)`         | 检查并把 `error` 收窄为 `VoidActionError`，包括抛出的 `401`、`403` 与 `500` 错误。见[处理 action 错误](/docs/pages-routing/actions-and-forms)。             |
+| `isCallSiteActionError(error)`     | 识别 `action()` 返回的预期错误，例如 `409` 或 `422`。                                                                                                      |
+| `getValidationErrors(body)`        | 从失败 action 的 `error.body` 中取回字段错误映射；body 中没有字段错误时返回 `null`。用于展示 `action()` 的校验错误。                                       |
+| `useShared()`                      | 返回共享数据。中间件用 `c.set("shared", {...})` 设置；loader 或 action 可以更新它。见[共享数据](/docs/pages-routing/layouts)。                            |
+| `useRouter()`                      | 返回 Void Router，包含当前路由状态（`url`、`path`、`query`、`params`）与导航方法：`visit`、`refresh`、可等待的 `prefetch`、`flush`、`flushAll`。            |
+| `useParams()`                      | 返回当前正在渲染的页面的动态路由参数。把页面的模式作为类型参数传入，例如 `useParams<'/users/[id]'>()`，即可获得类型。                                      |
+| `useNavigation()`                  | 返回待处理导航状态：`{ state, location, method }`，其中 `state` 是 `"idle"`、`"loading"` 或 `"submitting"`，`location` 是待处理的目标。                    |
+
+Solid 的 `Link` 在 GET 时会把 `data` 合并进渲染出的 `href` 查询字符串。基础值用 `String(value)` 序列化，数组变成重复的键，`null` 与 `undefined` 会被省略，嵌套对象会抛错。`prefetch` 与 `reloadDocument` 仅适用于 GET，用于变更类链接会抛错。
+
+Solid 在 GET 导航时，以及路由或其参数发生变化时，都会重新创建页面，因此 `useForm()` 会取到目标记录的 URL 与默认值；布局保持存活。在同一条记录内部，前进/后退、变更请求与 `router.refresh()` 会保留页面并就地更新其 props，已 resolve 的延迟 props 也是如此，因此请在 JSX 或 memo 中读取 props，而不是在组件函数体里复制它们。在同一条记录内导航时，显式设置 `preserveState` 可以覆盖默认行为。
+
+## Markdown 包
+可选的 `@void/md` 包为页面路由增加 Markdown 页面。把它与某个 Pages 适配器一起安装，并在 Vite 插件中加入 `voidMarkdown()`。
+
+```ts
+import { voidMarkdown } from '@void/md/plugin';
+
+export default defineConfig({
+  plugins: [voidPlugin(), voidReact(), voidMarkdown()],
+});
+```
+
+| 导入路径                     | 内容                                                                                     |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `@void/md/plugin`            | `voidMarkdown(options?)`、`MarkdownOptions`、`MdPage`                                    |
+| `@void/md`                   | `useFrontmatter()`、`MdPage`                                                             |
+| `@void/md/pages`             | 为 Markdown 页面生成的元数据，用于导航、侧边栏与搜索索引                                  |
+| `@void/md/theme.css`         | 完整的 Markdown 主题样式                                                                  |
+| `@void/md/theme-content.css` | 仅包含内容的 Markdown 样式，供自行提供外壳/布局的应用使用                                 |
+
+`FrontmatterContext` 与 `setFrontmatter()` 已废弃，请改用 `useFrontmatter()`。
+
+安装步骤与各框架示例见 [Markdown 页面](/docs/pages-routing/markdown)。
+
+## Form
+
+每个 Pages 适配器都导出 `Form`。把 `useForm()` 返回的对象作为 `form` 传入；`method` 默认为 `post`。它会渲染校验错误与 action 错误、保留受控输入，并遵守可知的配额重试等待时间，且不会自动提交。`renderError` 用于自定义 action 错误的展示方式；Svelte 使用 snippet。见[Action 与表单](/docs/pages-routing/actions-and-forms)。
+
+把 `{ throwOnError: false }` 作为第三个参数传给 `useForm()`，可以让 HTTP 失败就地展示。校验错误写入 `form.errors`；其他 HTTP 失败写入 `form.error`。React 还会调用 `onError`。意外失败仍会抛出，被取消的提交不会设置表单错误。见[处理 action 错误](/docs/pages-routing/actions-and-forms)。

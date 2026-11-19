@@ -1,0 +1,49 @@
+---
+title: 环境变量 API
+description: 从 void/env 读取经过校验的环境变量值与绑定类型。
+---
+
+从 `"void/env"` 导入。
+
+## `defineEnv(schema)`
+
+注册一个 env schema 并返回带类型的 [`env`](#env) 代理。Void 会自动发现 `env.ts`，在 dev/build/deploy 期间导入它，生成 `.void/env.d.ts`，在部署前校验生产环境的密钥，并在 worker 启动时校验各项取值。
+
+```ts
+import { defineEnv, string, number, oneOf, url } from 'void/env';
+
+export default defineEnv({
+  STRIPE_KEY: string(),
+  PORT: number().default(3000),
+  NODE_ENV: oneOf(['development', 'production']),
+  VITE_PUBLIC_URL: url(),
+});
+```
+
+## `env`
+
+针对已声明 env 键的类型化运行时代理。未知的键与绑定会以 `unknown` 透传。
+
+```ts
+import { env } from 'void/env';
+
+const port = env.PORT;
+```
+
+## Schema 辅助方法
+
+`void/env` 内置与 Standard Schema 兼容的辅助方法：`string()`、`number()`、`boolean()`、`url()`、`email()`、`oneOf([...])` 与 `json<T>()`。每个辅助方法都支持 `.optional()` 与 `.default(value)`。
+
+非 client 键属于服务端取值，在生产环境使用远端密钥存储。`VITE_*` 键是公开的、构建期的客户端取值。非法输入会被统一脱敏；存储方式不由 schema 修饰方法决定。
+
+## 类型
+
+`void/env` 同时提供全局的 Cloudflare 环境类型：
+
+```ts
+/// <reference types="void/env" />
+```
+
+它会声明 `Cloudflare.Env` 命名空间，包含 `DB`、`KV`、`STORAGE`、`AI`、`SANDBOX` 与 `ASSETS` 的绑定类型。
+
+对于 `c.set()`、`c.get()` 这类处理器上下文变量，请扩展 [`CloudContextVariables`](/docs/reference/api/types)。这与 `Cloudflare.Env` 是相互独立的两套东西，后者描述的是 worker 绑定。`@void/vue`、`@void/react`、`@void/svelte` 这类框架适配器同样会扩展 `CloudContextVariables`，加入 `useShared()` 使用的 `shared` 键。

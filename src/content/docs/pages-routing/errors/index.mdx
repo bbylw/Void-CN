@@ -1,0 +1,129 @@
+---
+title: 未找到与错误
+description: 用 _not-found 与 _error 组件在应用的布局与导航内展示未找到与错误状态。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+页面缺失或加载失败时，应用的导航与布局依然可见。在 `pages/` 中添加 `_not-found` 与 `_error` 组件即可，两者都会收到带 `status` 与 `message` 的 `error` prop：
+
+```tsx title="React"
+// pages/_error.tsx（也可以是 pages/_not-found.tsx）
+import type { ErrorPageProps } from '@void/react';
+
+export default function ErrorPage({ error }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>{error.status}</h1>
+      <p>{error.message}</p>
+      <a href="/">回首页</a>
+    </main>
+  );
+}
+```
+
+```vue title="Vue"
+<!-- pages/_error.vue（也可以是 pages/_not-found.vue） -->
+<script setup lang="ts">
+import type { ErrorPageProps } from '@void/vue';
+
+defineProps<ErrorPageProps>();
+</script>
+
+<template>
+  <main>
+    <h1>{{ error.status }}</h1>
+    <p>{{ error.message }}</p>
+    <a href="/">回首页</a>
+  </main>
+</template>
+```
+
+```svelte title="Svelte"
+<!-- pages/_error.svelte（也可以是 pages/_not-found.svelte） -->
+<script lang="ts">
+  import type { ErrorPageProps } from '@void/svelte';
+
+  let { error }: ErrorPageProps = $props();
+</script>
+
+<main><h1>{error.status}</h1><p>{error.message}</p><a href="/">回首页</a></main>
+```
+
+```tsx title="Solid"
+// pages/_error.tsx（也可以是 pages/_not-found.tsx）
+import type { ErrorPageProps } from '@void/solid';
+
+export default function ErrorPage(props: ErrorPageProps) {
+  return (
+    <main>
+      <h1>{props.error.status}</h1>
+      <p>{props.error.message}</p>
+      <a href="/">回首页</a>
+    </main>
+  );
+}
+```
+
+## 缺失的页面
+
+商品不存在时，让它的 loader 返回 404，就能显示 `_not-found`。四种适配器写法相同：
+
+```ts title="pages/products/[id].server.ts"
+import { defineHandler } from 'void/handler';
+
+export const loader = defineHandler((c) => c.notFound());
+```
+
+抛出 `HTTPException(404)` 同样会显示 `_not-found`。根级的 `pages/_not-found` 负责所有不匹配任何页面或 API 路由的 URL。
+
+在中间件里，`c.notFound()` 会直接显示根 `_not-found`，并且不运行页面 loader。想改为发送自定义响应，就返回 `c.text('Not Found', 404)`。
+
+## 失败的页面
+
+`_error` 处理 loader 与渲染的意外失败。生产环境中，访客只会看到通用消息，错误细节留在你的服务端日志里；开发环境会显示错误消息。
+
+到达客户端边界的 action 错误会保留自己的 HTTP 状态与可对外的消息。要在表单内联处理失败，参见[Action 与表单](/docs/pages-routing/actions-and-forms)。
+
+## HTTP 异常
+
+抛出 `HTTPException` 可以在页面的布局里显示特定错误。例如账号被停用时返回 `403` 并附上说明：
+
+```ts title="pages/account.server.ts"
+import { HTTPException } from 'hono/http-exception';
+import { defineHandler } from 'void/handler';
+
+export const loader = defineHandler(() => {
+  throw new HTTPException(403, { message: 'Your account is suspended' });
+});
+```
+
+最近的 `_error` 会收到 `{ status: 403, message: 'Your account is suspended' }`，响应也使用 HTTP `403`。文档请求与客户端页面导航都是如此。请只使用适合展示给访客的消息。
+
+状态要用 4xx 或 5xx，`404` 会走 `_not-found`。如果中间件在 loader 之前抛出，Void 会显示根错误组件并跳过 loader；没有可用的错误组件时，Void 返回该异常自身的响应。
+
+错误组件只在页面的 GET 与 HEAD 请求上处理这些异常，API 路由与 action 保持各自的错误处理。想发送自定义响应，返回 `c.text()` 或 `c.json()`；想把访客送到别处，可以[抛出重定向](/docs/integrations/hono)。所有决定响应状态的检查必须在 deferred 流式渲染开始之前完成。
+
+如果你想在保留页面正常 props 的同时带上错误状态，改用 [`c.status()`](/docs/pages-routing/loaders)。
+
+## 嵌套错误
+
+把错误组件放进子目录，即可自定义那一段区域的展示。Void 使用最近的一个，并保留它周围的布局。如果某个布局本身失败，就由该布局之外的错误组件处理；如果错误组件自己也失败，Void 会尝试更外层的，最后使用内置的错误页。
+
+这些边界组件没有 `.server` 配套文件、没有 action，也没有自己的 `layout` 导出。它们不是路由：`/error` 与 `/not-found` 仍然可以作为普通页面使用。`.dev` 与 `.prod` 变体的行为与其他页面组件一致。
+
+## 恢复
+
+在可交互的错误组件里调用 `useRouter().refresh()` 可以重试页面的 loader，它只获取新数据，不会重复提交表单。普通链接或整页刷新同样有效。错误响应不会被客户端路由缓存。
+
+客户端渲染错误交由框架自己的错误边界处理。事件处理器、脱离页面的异步任务、独立岛屿都沿用框架惯用的错误处理方式。对于 deferred 数据，React 可能在渲染期间抛出被拒绝的 Promise；Vue、Svelte 与 Solid 则暴露组件可以读取的错误状态。
+
+## 渲染模式
+
+`ssr = false` 时，错误组件在浏览器里渲染。岛屿页面在服务端渲染错误，且没有客户端路由。错误组件会收到它所替换页面的共享上下文。
+
+`output: 'static'` 时，除非你自己提供，根 `_not-found` 会产出 `404.html`。它在构建期以空的共享数据与参数渲染，不运行请求中间件，也不做 hydration，因此要保证它及其布局在未登录时也可用。未知 URL 的响应状态由你的静态托管服务决定。
+
+<Callout type="tip">
+布局本身失败时由外层错误组件接管，因此错误页不需要重复实现导航与页脚——Void 会保留边界外的布局。
+</Callout>

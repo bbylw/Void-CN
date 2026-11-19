@@ -1,20 +1,42 @@
 ---
 title: 配置
-description: void.config.ts 控制应用类型推断、资源推断与部署行为。本页汇总最常用的配置项与 CLI 命令。
+description: void.config.ts 的完整配置参考——源码目录、推断、数据库、路由与边缘行为、部署、认证、存储、AI、沙箱与邮件，外加常用 CLI 命令。
 ---
 
 import Callout from '@/components/docs/Callout.astro';
-import ApiTable from '@/components/docs/ApiTable.astro';
+
+## 配置文件格式
+
+用 `void.config.ts` 配置你的应用。想先看引导式介绍，请从[什么是 Void](/docs)开始。
+
+把 `void.config.ts` 放在项目根目录，并从 `void/config` 导入 `defineConfig`。所有字段都是可选的。`void init`、`void deploy` 与 `void migrate` 可以转换较早的 Void 与 Cloudflare JSON 配置文件，并把备份保存在 `.void/config-migration/`。当 Void 创建 `void.lock.json` 时请把它与 `void.config.ts` 一起提交，锁文件记录了资源 ID 与迁移历史。
 
 ```ts title="void.config.ts"
 import { defineConfig } from 'void/config';
 
 export default defineConfig({
-  inference: {
-    appType: 'void',
-  },
+  sourceDir: 'src',
+  target: 'cloudflare',
+  auth: { providers: ['email', 'github', 'google'] },
   routing: {
-    notFound: '404-page',
+    revalidate: { '/': 60, '*': 30 },
+    headers: {
+      '/assets/*': ['Cache-Control: public, max-age=31536000, immutable'],
+      '/*': ['X-Frame-Options: DENY', 'X-Content-Type-Options: nosniff'],
+    },
+  },
+  inference: {
+    bindings: { db: true, kv: false },
+    appType: 'spa',
+    outputDir: 'dist',
+  },
+  worker: {
+    compatibility_date: '2025-12-01',
+    compatibility_flags: ['nodejs_compat'],
+  },
+  cloudflare: {
+    name: 'my-app',
+    account_id: 'your-account-id',
   },
 });
 ```
@@ -23,17 +45,98 @@ TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校�
 
 下面的 JSON 片段展示的是可以放进 `defineConfig({ ... })` 的单个字段。
 
-## inference
+## sourceDir
 
-| 选项                  | 类型                                         | 说明                                                |
-| --------------------- | -------------------------------------------- | --------------------------------------------------- |
-| `inference.appType`   | `"void" \| "framework" \| "spa" \| "static"` | 应用类型。省略时自动检测。                          |
-| `inference.outputDir` | `string`                                     | 静态应用类型的输出目录，相对项目根目录，默认 `dist` |
-| `inference.database`  | `"d1" \| "pg" \| "mysql"`                    | 数据库方言                                          |
+包含 Void 源码约定的目录，相对项目根目录。
 
-详见[支持的应用类型](/docs/app-types#显式配置)。
+省略时，Void 沿用原有的项目根目录约定：`pages/`、`routes/`、`middleware/`、`crons/`、`queues/`、`db/`、`auth.ts` 与 `env.ts`。
+
+设置之后，这些约定都会移到该目录下：
+
+```json title="void.config.json"
+{ "sourceDir": "src" }
+```
+
+有了这个配置，Void 会读取 `src/pages`、`src/routes`、`src/db/schema.ts`、`src/db/migrations`、`src/auth.ts` 与 `src/env.ts`。而 `void.config.ts`、`vite.config.ts`、`package.json`、`tsconfig.json`、`public/` 以及仅本地使用的 `.env` 等项目文件仍留在项目根目录。Void 不会同时扫描两处：如果 dev/build 期间两处都存在源码约定，请删除其中一份，让生效的源码树唯一。
+
+## ai
+
+把 `ai.gateway` 设为在你的 Cloudflare 账户上供 `ai.provider().fetch()` 使用的 Cloudflare AI Gateway。`ai.run()`、`ai.stream()` 与 `ai.image()` 使用的是 Workers AI 绑定。在 Void 平台上，网关由平台选择。
+
+```json title="void.config.json"
+{ "ai": { "gateway": "my-gateway" } }
+```
+
+见[在你自己的 Cloudflare 账户上使用 AI](/docs/integrations/cloudflare)。
+
+## auth
+
+较高级的 Better Auth 配置。
+
+用 `auth.providers` 选择 Void 默认应启用哪些内置认证提供方。需要邮箱/密码登录就包含 `"email"`。社交提供方从 `AUTH_<PROVIDER>_CLIENT_ID` 与 `AUTH_<PROVIDER>_CLIENT_SECRET` 读取凭据。`cognito` 还需要域名、区域与用户池 ID：设置 `AUTH_COGNITO_DOMAIN`、`AUTH_COGNITO_REGION` 与 `AUTH_COGNITO_USER_POOL_ID`，或者在 `auth.ts` 中设置。
+```json title="void.config.json"
+{
+  "auth": {
+    "providers": ["email", "github", "google", "discord"]
+  }
+}
+```
+
+如果省略 `auth`，但通过导入启用了认证，Void 只启用邮箱/密码。需要提供方专属选项、scopes、插件或自定义 OAuth 流程时，请在根目录用 `auth.ts` 配合 `defineAuth(...)`。
+
+`auth.providers` 支持的取值：
+
+- `email`
+- `apple`
+- `atlassian`
+- `cognito`
+- `discord`
+- `dropbox`
+- `facebook`
+- `figma`
+- `github`
+- `gitlab`
+- `google`
+- `huggingface`
+- `kakao`
+- `kick`
+- `line`
+- `linear`
+- `linkedin`
+- `microsoft`
+- `naver`
+- `notion`
+- `paybin`
+- `paypal`
+- `polar`
+- `railway`
+- `reddit`
+- `roblox`
+- `salesforce`
+- `slack`
+- `spotify`
+- `tiktok`
+- `twitch`
+- `twitter`
+- `vercel`
+- `vk`
+- `zoom`
 
 ## database
+
+数据库后端。省略时为 D1/SQLite（默认）。通过 Hyperdrive 使用外部数据库时设为 `"pg"` 或 `"mysql"`。
+
+```json title="void.config.json"
+{
+  "database": "pg"
+}
+```
+
+| 取值          | 说明                                                   |
+| ------------- | ------------------------------------------------------ |
+| _(省略)_      | D1（SQLite），由 Void 全托管，无需额外配置             |
+| `"pg"`        | 通过 Hyperdrive 使用 PostgreSQL；数据库自带            |
+| `"mysql"`     | 通过 Hyperdrive 使用 MySQL；数据库自带                 |
 
 `database` 也可以写成对象，用来指定方言，以及 `void/db` 查询与 `void db` 命令在未声明列名时采用的命名方式：
 
@@ -41,83 +144,152 @@ TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校�
 { "database": { "dialect": "pg", "casing": "snake_case" } }
 ```
 
-| 键                | 取值                                      | 说明                                                                     |
-| ----------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
-| `dialect`         | `"sqlite"`（默认，即 D1）、`"pg"`、`"mysql"` | 数据库后端                                                               |
-| `casing`          | `"snake_case"`、`"camelCase"`             | [Drizzle 命名风格](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing)。省略时以键名作为列名 |
-| `readReplication` | `boolean`（可选）                         | 仅 D1。部署时开启或关闭[读复制](/docs/database)。省略则保留现有设置，新数据库默认关闭 |
+| 键                | 取值                                          | 说明                                                                                       |
+| ----------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `dialect`         | `"sqlite"`（默认）、`"pg"`、`"mysql"`         | 数据库后端。`"sqlite"` 即 D1                                                               |
+| `casing`          | `"snake_case"`、`"camelCase"`                 | [Drizzle 命名风格](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing)，作用于 `void/db` 查询与 `void db` 命令。省略时以键名作为列名 |
+| `readReplication` | `boolean`（可选）                             | 仅 D1。部署时开启（`true`）或关闭（`false`）[读复制](/docs/database/d1)。省略则保留现有设置，新数据库默认关闭 |
 
-## routing
+使用外部数据库时：
 
-```json title="void.config.json"
-{ "routing": { "notFound": "404-page" } }
-```
+- 在 `.env` 中添加 `DATABASE_URL` 供本地开发使用
+- 从 `void/schema-pg` 或 `void/schema-mysql` 导入 schema 辅助函数
+- `void/db` 在生产环境通过 Hyperdrive 连接，本地直连
+- `void gen model` 会生成对应该方言的表与列构建器
 
-当 Worker 处理未匹配的请求时，用 `routing.notFound` 指定要提供的生成器 404 页面。
+## email
 
-### routing.typedRoutes
-
-```ts
-export default defineConfig({
-  routing: { typedRoutes: true },
-});
-```
-
-开启后，链接、router 方法、重定向、rewrite、缓存重验证、岛屿表单与流客户端中的 URL 字符串都会与你的路由做类型比对。默认 `false`；`void init` 创建的新应用已启用。这只改变 TypeScript 检查，运行时的导航行为不变。细节见[检查 URL 字符串](/docs/type-safety#检查-url-字符串)。
-
-### routing.trailingSlash
-
-```ts
-export default defineConfig({
-  routing: { trailingSlash: true },
-});
-```
-
-给页面 URL 加上结尾斜杠，并按目录索引预渲染：`/posts/` 产出 `posts/index.html`，`/posts` 重定向到 `/posts/`。默认 `false`，即产出 `posts.html`。API 路由保持原有 URL，第三方框架使用各自的路由设置。
-
-### routing.alwaysUseHttps
-
-```ts
-export default defineConfig({
-  routing: { alwaysUseHttps: true },
-});
-```
-
-用 `308` 永久重定向把 HTTP 请求跳转到 HTTPS。省略或 `false` 表示关闭；需要 Cloudflare target，`localhost` 仍保持 HTTP。
-
-### routing.prerender
-
-启用 `routing.typedRoutes` 后，可以给预渲染路径数组加上 `RouteUrl` 标注，让 TypeScript 检查每个路径：
-
-```ts
-import type { RouteUrl } from 'void/routes';
-
-export default defineConfig({
-  routing: { prerender: ['/', '/about', '/pricing'] satisfies RouteUrl[] },
-});
-```
-
-`output: 'static'` 时，动态页面需要 `getPrerenderPaths()` 才能被预渲染；给它的返回类型标注 [`PageParams`](/docs/type-safety#预渲染路径) 即可检查参数名。
-
-## deploy
-
-```ts
-export default defineConfig({
-  deploy: {
-    cloudflare: { mode: 'atomic' },
-  },
-});
-```
-
-对于使用了自定义 [Durable Objects](/docs/durable-state) 的 Worker，`deploy.cloudflare.mode: 'atomic'` 可以让每次部署都以原子方式进行。
-
-## auth
+[邮件集成](/docs/email)的配置。
 
 ```json title="void.config.json"
-{ "auth": { "providers": ["email", "google", "github"] } }
+{
+  "email": {
+    "from": "Acme <noreply@mail.acme.com>"
+  }
+}
 ```
 
-提供方凭据来自 `AUTH_<PROVIDER>_CLIENT_ID` 与 `AUTH_<PROVIDER>_CLIENT_SECRET`。更复杂的配置请使用根级的 `auth.ts` 文件。
+| 字段   | 类型     | 说明                                                                                             |
+| ------ | -------- | -------------------------------------------------------------------------------------------------- |
+| `from` | `string` | `sendEmail()` 的默认发件人：一个地址，可以带显示名（`Acme <noreply@mail.acme.com>`） |
+
+开发期间，`email.from` 是本地收件箱的默认发件人。在 Void 平台上，请使用项目的共享发件人或已注册的域名。
+
+直连 Cloudflare 部署时，这个地址决定所选的邮件域名与默认发件人。请使用你账户下的一个 zone 或子域名；已有邮件服务商的 MX 记录会被保留。没有 `email.from` 时，Void 会跳过自动配置，并保留你手写的 `cloudflare.send_email` 绑定与 `cloudflare.addresses`，此时请自行检查它们的就绪状态。`--require-email` 在无法确认自动配置成功时仍会拒绝部署。见[邮件配置](/docs/email/domains)。
+
+## head
+
+pages 模式下站点级的 HTML `<head>` 默认值。用于设置标题模板、默认 meta 标签、link、script 以及 html/body 属性。页面级的 `head()` 导出与中间件默认值会按明确的优先级叠加在其上：**页面 > 中间件 > 配置**。
+
+| 字段            | 类型                     | 说明                                                              |
+| --------------- | ------------------------ | ------------------------------------------------------------------- |
+| `title`         | `string`                 | 默认页面标题（被页面 `head()` 覆盖）                              |
+| `titleTemplate` | `string`                 | 包裹最终标题。`%s` 会被替换为页面标题。                           |
+| `meta`          | `Array<object>`          | 默认 `<meta>` 标签（按 `name`/`property` 去重，页面优先）         |
+| `link`          | `Array<object>`          | 默认 `<link>` 标签（顺序拼接：配置、中间件、页面）                |
+| `script`        | `Array<object>`          | 默认 `<script>` 标签（顺序拼接：配置、中间件、页面）              |
+| `htmlAttrs`     | `Record<string, string>` | `<html>` 上的属性（浅合并，页面优先）                             |
+| `bodyAttrs`     | `Record<string, string>` | `<body>` 上的属性（浅合并，页面优先）                             |
+
+```json title="void.config.json"
+{
+  "head": {
+    "titleTemplate": "%s | My Site",
+    "htmlAttrs": { "lang": "en" },
+    "meta": [
+      { "charset": "utf-8" },
+      { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    ],
+    "link": [{ "rel": "icon", "href": "/favicon.svg" }]
+  }
+}
+```
+
+完整的合并行为、`HeadDescriptor` 结构与逐页用法见 [Head 管理](/docs/pages-routing/head)。
+
+## output
+
+输出模式，控制页面的默认渲染策略。
+
+| 取值                 | 默认预渲染        | 单页覆盖                           | 预渲染时机               |
+| -------------------- | ----------------- | ---------------------------------- | ------------------------ |
+| `"server"`（默认）   | `false`           | `export const prerender = true`    | 部署时（平台 ISR）       |
+| `"static"`           | `true`            | `export const prerender = false`   | 构建时或部署的构建之后   |
+
+设为 `"static"` 时，页面会被预渲染成 `dist/client/` 下的 HTML。单个页面可以用 `export const prerender = false` 退出。动态页面需要 [`getPrerenderPaths()`](/docs/ssg) 才会被预渲染；给它的返回类型标注 [`PageParams`](/docs/reference/api/types)，TypeScript 就会检查参数名。
+
+省略或设为 `"server"` 时，页面在请求时服务端渲染。单个页面可以用 `export const prerender = true` 选择部署时预渲染，或用 `export const ssr = false` 退出服务端渲染的组件 HTML。
+
+```json title="void.config.json"
+{ "output": "static" }
+```
+
+## remote
+
+本地开发期间使用某个已部署 Void 项目的 D1、KV 与 R2 资源。写入会影响真实数据。见[远程开发](/docs/remote-dev)。
+
+```json title="void.config.json"
+{ "remote": true }
+```
+
+**前提条件：**
+
+- 必须已登录（`void account login`）
+- 必须已关联项目（`void project link`）
+- 只影响 D1（`DB`）、KV（`KV`）与 R2（`STORAGE`）绑定
+
+也可以通过环境变量 `VOID_REMOTE=1` 开启远程模式，而不修改 `void.config.ts`：
+
+```bash
+VOID_REMOTE=1 pnpm dev
+```
+
+## sandbox
+
+启用并配置 Cloudflare Sandboxes。只要从 `void/sandbox` 导入就会自动启用。
+
+```json title="void.config.json"
+{
+  "sandbox": {
+    "image": "./Dockerfile.sandbox",
+    "platformImage": "registry.cloudflare.com/<account-id>/sandbox@sha256:<digest>",
+    "instanceType": "standard-1"
+  }
+}
+```
+
+| 字段                | 类型     | 默认值                      |
+| ------------------- | -------- | --------------------------- |
+| `binding`           | `string` | `SANDBOX`                   |
+| `className`         | `string` | `SandboxV1`                 |
+| `containerName`     | `string` | `void-sandbox-v1`           |
+| `image`             | `string` | 随包提供的 Node.js Dockerfile |
+| `imageBuildContext` | `string` | `image` 所在目录            |
+| `platformImage`     | `string` | `cloudflare/debian-trixie`  |
+| `instanceType`      | `string` | `lite`                      |
+
+支持的规格是 `lite`、`basic` 以及 `standard-1` 到 `standard-4`。原生部署用 Docker 构建 Dockerfile；registry 镜像必须是 Cloudflare 托管 registry 中带 digest 的引用。自定义镜像必须包含配套的 Sandbox SDK helper。如果用的是本地 Dockerfile，在部署到托管平台时请提供 `platformImage`。镜像准备与运行时示例见 [Sandboxes](/docs/sandboxes)。
+
+Sandbox 需要 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans) 与 Containers 访问权限。托管运行时令牌需要 Account / Containers: Edit 与 Account / Cloudchamber: Edit。见 [Sandbox 部署](/docs/sandboxes)。
+
+## target
+
+部署目标的运行时，默认 `"cloudflare"`。
+
+| 取值           | 说明                                                   |
+| -------------- | -------------------------------------------------------- |
+| `"cloudflare"` | Cloudflare Workers（默认），具备完整平台特性             |
+| `"node"`       | Node.js，使用 `@hono/node-server`                      |
+| `"bun"`        | Bun，使用 `Bun.serve()`                                |
+| `"deno"`       | Deno，使用 `Deno.serve()`                              |
+
+非 Cloudflare 目标会禁用 CF 绑定导入（`void/db`、`void/kv`、`void/auth`、`void/storage`、`void/ai`、`void/sandbox`、`void/env`）。在非 CF 目标下导入其中任何一个都会产生编译期错误。基于文件的路由、中间件与 `void/client` 都照常工作。
+
+Void 托管的 WebSocket 路由文件（`*.ws.ts`）仅限 Cloudflare，因为它们会编译成 Durable Objects。`void/ws` 子路径本身在非 CF 目标上不封闭，这样客户端的 `connect()` 代码仍可以在具备类浏览器 `WebSocket` 的运行时中被打包。
+
+```json title="void.config.json"
+{ "target": "node" }
+```
 
 ## storage.locationHint
 
@@ -125,11 +297,63 @@ export default defineConfig({
 { "storage": { "locationHint": "apac" } }
 ```
 
-为 Void 创建的 R2 桶选择一个优先区域，可选 `apac`（亚太）、`eeur`（东欧）、`enam`（北美东部）、`weur`（西欧）、`wnam`（北美西部）、`oc`（大洋洲）。这些只是[尽力而为的位置提示](https://developers.cloudflare.com/r2/reference/data-location/)，不构成数据驻留保证。
+无论是在 Void 平台还是直连 Cloudflare 部署，都可以为 Void 创建的 R2 桶选择一个优先区域，可选 `apac`（亚太）、`eeur`（东欧）、`enam`（北美东部）、`weur`（西欧）、`wnam`（北美西部）、`oc`（大洋洲）。这些只是[尽力而为的位置提示](https://developers.cloudflare.com/r2/reference/data-location/)，不构成数据驻留保证。
 
 项目设置优先于平台默认值；两者都没有时由 Cloudflare 自动选择。只影响新建的桶：修改提示不会移动或替换已有的桶，不使用 R2 的应用也不会创建桶。
 
-## Cloudflare 绑定
+## worker
+
+Cloudflare Workers 的设置，包括 `void init` 固定的 `compatibility_date`。`d1_databases`、`kv_namespaces`、`r2_buckets` 这类绑定数组请写在 [`cloudflare`](#cloudflare) 里。
+
+| 字段                  | 类型       | 说明                                   |
+| --------------------- | ---------- | ---------------------------------------- |
+| `compatibility_date`  | `string`   | Cloudflare Workers 兼容日期            |
+| `compatibility_flags` | `string[]` | Cloudflare Workers 兼容标志            |
+| `vars`                | `object`   | 明文 worker 变量                       |
+| `limits`              | `object`   | Worker 资源限额覆盖                    |
+
+```json title="void.config.json"
+{
+  "worker": {
+    "compatibility_date": "2025-12-01",
+    "compatibility_flags": ["nodejs_compat"],
+    "vars": {
+      "PUBLIC_API_BASE": "https://api.example.com"
+    }
+  }
+}
+```
+
+`worker.vars` 的值必须是字符串。仅在本地开发期间，根目录 `.env` 中的值会覆盖它们。生产构建不加载 `.env`，并且会拒绝任何在 `env.ts` 中被声明为服务端密钥的 `worker.vars` 名称。生产环境的服务端值请用 `void secret put`。
+
+托管部署会把 `worker.vars` 作为明文绑定包含进去。同名的远端密钥优先级更高。想改用配置的变量，请删除那个远端密钥并重新部署。删除密钥会立即影响正在运行的 Worker，所以请把这次迁移安排在维护窗口内。
+
+`worker.limits.cpu_ms` 设置每个请求的 CPU 时间上限，范围 1 到 300000 毫秒。在 Void 平台上，如果该上限超出账户套餐，部署会失败；请先在 `void.config.ts` 中调低再重试。回滚则会把旧上限压到当前套餐的天花板以内。直连部署时由 [Cloudflare 强制执行该值](https://developers.cloudflare.com/workers/platform/limits/#cpu-time)：Workers Free 每请求最多 10 毫秒，Workers Paid 最多 300000 毫秒。
+
+```json title="void.config.json"
+{
+  "worker": {
+    "limits": {
+      "cpu_ms": 30000
+    }
+  }
+}
+```
+
+## cloudflare
+
+用于直连 Cloudflare 构建与部署的完整 Cloudflare Worker 配置。自定义绑定、`name`、`account_id`、routes、services、vars、迁移以及其他任何 Cloudflare 字段都写在这里。Void 会把这些字段透传给生成的 Cloudflare 构建配置。你在此处编辑的设置，优先级高于 Void 先前记录在 `void.lock.json` 中的值。
+
+```ts
+// 在 defineConfig({ ... }) 内
+cloudflare: {
+  name: 'my-app',
+  d1_databases: [{ binding: 'ANALYTICS', database_name: 'analytics', database_id: '...' }],
+  vars: { PUBLIC_API_BASE: 'https://api.example.com' },
+},
+```
+
+Void 会为它的工具链写出一份生成的 Cloudflare 配置，并把已开通的资源 ID 与只追加的迁移历史记录在 `void.lock.json`。锁文件变化时请提交它。根目录的 `wrangler.jsonc` 与 `wrangler.json` 会在 `void init` 或 `void deploy` 时被迁移；Void 会把备份副本保存在 `.void/config-migration/`。
 
 ```ts
 export default defineConfig({
@@ -141,7 +365,282 @@ export default defineConfig({
 
 声明绑定后，Void 会使用它所指定的数据库 ID；本地开发期间 `preview_database_id` 优先。
 
-运行 `void prepare`、dev server 或构建之后，这里声明的绑定会带上 `c.env` 类型；需要 RPC 方法等更专门的类型时，可以扩展 `CloudBindings`，见[自定义绑定类型](/docs/type-safety#自定义绑定类型)。
+运行 `void prepare`、dev server 或构建之后，这里声明的绑定会带上 `c.env` 类型；需要 RPC 方法等更专门的类型时，可以扩展 `CloudBindings`，见[自定义绑定类型](/docs/type-safety)。
+
+如果确实要移除 Void 之前生成的某个值，请从 `void.lock.json` 的 `resolved` 对象中删除它。Void 会在下一条命令刷新生成的 Cloudflare 文件。长期需要的自定义设置请放在 `void.config.ts` 的 `cloudflare` 里。
+
+## deploy
+
+```ts
+export default defineConfig({
+  deploy: {
+    cloudflare: { mode: 'atomic' },
+  },
+});
+```
+
+### deploy.cloudflare.mode
+
+直连 Cloudflare 部署默认使用 `staged`：Void 会先把新 Worker 检查一遍，再把它接入生产流量。如果 Cloudflare 无法为某个已存在的 Durable Object Worker 做 staged 部署，请在审阅待处理的 Worker 与数据库变更之后选择 `atomic`：
+
+```ts
+// 在 defineConfig({ ... }) 内
+deploy: { cloudflare: { mode: 'atomic' } },
+```
+
+对于使用了自定义 [Durable Objects](/docs/durable-state) 的 Worker，`deploy.cloudflare.mode: 'atomic'` 可以让每次部署都以原子方式进行。
+
+这个选择会作用于后续的 `void deploy`。原子部署会在新 Worker 通过就绪检查之前就把流量切过去；而 Durable Object 类迁移一旦跨过它的迁移边界就无法回滚。只想对单次部署生效请使用 `--atomic`。`deploy` 是 Void 自己的设置，不会传给 Cloudflare 的 Worker 配置。
+
+## routing
+
+边缘与路由配置：响应头、重定向、重写与缓存。
+
+### routing.alwaysUseHttps
+
+```ts
+export default defineConfig({
+  routing: { alwaysUseHttps: true },
+});
+```
+
+用 `308` 永久重定向把 HTTP 请求跳转到 HTTPS。省略或 `false` 表示关闭；需要 Cloudflare target，`localhost` 仍保持 HTTP。生效范围见[HTTP 到 HTTPS](/docs/edge/redirects)。
+
+### routing.trailingSlash
+
+```ts
+export default defineConfig({
+  routing: { trailingSlash: true },
+});
+```
+
+给页面 URL 加上结尾斜杠，并按目录索引预渲染：`/posts/` 产出 `posts/index.html`，`/posts` 重定向到 `/posts/`。默认 `false`，即产出 `posts.html`。API 路由保持原有 URL，第三方框架使用各自的路由设置。托管细节见[静态站点生成](/docs/ssg)。
+
+### routing.typedRoutes
+
+```ts
+export default defineConfig({
+  routing: { typedRoutes: true },
+});
+```
+
+开启后，链接、router 方法、重定向、rewrite、缓存重验证、岛屿表单与流客户端中的 URL 字符串都会与你的路由做类型比对。默认 `false`；`void init` 创建的新应用已启用。这只改变 TypeScript 检查，运行时的导航行为不变。细节见[检查 URL 字符串](/docs/type-safety)，其中说明可接受的 URL，以及对运行时才校验的值该如何断言。要检查 `routing.prerender`，请给它的路径加上标注（见下文）。
+
+### routing.headers
+
+自定义响应头。键是 URL 模式，值是一组 `"Name: value"` 字符串。细节见[自定义响应头](/docs/edge/headers)。
+
+```json title="void.config.json"
+{
+  "routing": {
+    "headers": {
+      "/assets/*": ["Cache-Control: public, max-age=31536000, immutable"],
+      "/*": ["X-Frame-Options: DENY", "X-Content-Type-Options: nosniff"]
+    }
+  }
+}
+```
+
+### routing.redirects
+
+URL 重定向。键是源 URL 模式，值是目标字符串（默认 302），或是带 `to` 与可选 `status`（`301`、`302`、`303`、`307`、`308`）的对象。细节见[重定向](/docs/edge/redirects)。
+
+```json title="void.config.json"
+{
+  "routing": {
+    "redirects": {
+      "/old": "/new",
+      "/blog/*": { "to": "/posts/:splat", "status": 301 }
+    }
+  }
+}
+```
+
+### routing.rewrites
+
+URL 重写。键是源 URL 模式，值是目标路径。它在不改变浏览器地址栏的情况下提供目标路径的内容。细节见[重写](/docs/edge/rewrites)。
+
+```json title="void.config.json"
+{
+  "routing": {
+    "rewrites": {
+      "/": "/en",
+      "/docs/*": "/en/docs/:splat"
+    }
+  }
+}
+```
+
+目标使用 `RewriteDestination` 形态——带类型的路由模式再并上 `string`，因此已知路由会自动补全，动态路径也仍然可用。见[中间件中的编程式重写](/docs/edge/rewrites)。
+
+### routing.fallbacks
+
+兜底重写。形态与 `rewrites` 相同，但规则只在既没有静态资源匹配、也没有 worker 路由匹配时才生效（也就是请求本来会 404）。适合 SPA 外壳或默认语言的兜底，它们不会抢在真正的路由前面。细节见[重写 → 兜底](/docs/edge/rewrites)。
+
+```json title="void.config.json"
+{
+  "routing": {
+    "fallbacks": {
+      "/*": "/index.html"
+    }
+  }
+}
+```
+
+### routing.isr
+
+Void 的 ISR 缓存总开关。省略或为 `true` 时，Void 会根据你的 revalidate 与 prerender 设置推断缓存策略。设为 `false` 会为整个应用关闭 ISR 与边缘预渲染，包括页面级导出：
+
+```json title="void.config.json"
+{
+  "routing": {
+    "isr": false
+  }
+}
+```
+
+`output: "static"` 的构建期 HTML 生成不受影响。把 `isr` 设回 `true` 即可重新启用你配置的缓存策略。
+
+### routing.revalidate
+
+ISR 重验证的 TTL（秒），可以全局设置，也可以按路径设置。细节见[重验证](/docs/edge/revalidation)。
+
+```json title="void.config.json"
+{
+  "routing": {
+    "revalidate": {
+      "/": 60,
+      "/docs/*": 31536000,
+      "*": 30
+    }
+  }
+}
+```
+
+### routing.revalidateQueryAllowlist
+
+需要保留在 ISR 缓存键中的查询参数。键是源 URL 模式，值是要保留的查询参数名。对于命中路径的每个请求，列出的参数都会进入缓存键；其他查询参数都不进入。省略时，ISR 缓存键会丢弃所有传入的查询参数，以避免缓存无限膨胀。
+
+```json title="void.config.json"
+{
+  "routing": {
+    "revalidateQueryAllowlist": {
+      "/search": ["q"],
+      "/products/*": ["variant", "currency"],
+      "*": []
+    }
+  }
+}
+```
+
+### routing.prerender
+
+部署时要预渲染成静态 HTML 的路径。每个路径必须以 `/` 开头。细节见[边缘预渲染](/docs/edge/prerendering)。
+
+```json title="void.config.json"
+{
+  "routing": {
+    "prerender": ["/", "/about", "/pricing"]
+  }
+}
+```
+
+在 `void.config.ts` 中，给数组加上 [`RouteUrl`](/docs/reference/api/types) 标注，这样开启 [`routing.typedRoutes`](#routingtypedroutes) 后 TypeScript 就会检查这些路径：
+
+```ts
+import type { RouteUrl } from 'void/routes';
+
+export default defineConfig({
+  routing: { prerender: ['/', '/about', '/pricing'] satisfies RouteUrl[] },
+});
+```
+
+`output: 'static'` 时，动态页面需要 `getPrerenderPaths()` 才能被预渲染；给它的返回类型标注 [`PageParams`](/docs/type-safety#预渲染路径) 即可检查参数名。
+
+### routing.notFound
+
+```json title="void.config.json"
+{ "routing": { "notFound": "404-page" } }
+```
+
+当 Worker 处理未匹配的请求时，用 `routing.notFound` 指定要提供的生成器 404 页面。
+
+覆盖资源层在「既没匹配到静态资源、也没匹配到 worker 路由」时的应答方式。取值之一是 `"single-page-application"`、`"404-page"` 或 `"none"`。省略时由 Void 推断——见[静态资源](/docs/edge/static-assets)。
+
+有 `404.html` 的生成式静态站点用 `"404-page"`；客户端路由用 `"single-page-application"`；想保留 Worker 自己的 404 就用 `"none"`。API 与中间件的路由行为不变。
+
+SvelteKit、Nuxt、Analog 与 Astro 使用它们自己的错误页面，会忽略这个设置。在直连 Cloudflare 部署 TanStack Start、React Router 或 vinext 时，请在框架自己的 Cloudflare 配置中写完整的资源策略。见[静态资源](/docs/edge/static-assets)。
+
+## inference
+
+构建期推断的配置，包括 Void 如何检测你的应用类型、绑定与构建流程。
+
+| 选项                  | 类型                                         | 说明                                                |
+| --------------------- | -------------------------------------------- | --------------------------------------------------- |
+| `inference.appType`   | `"void" \| "framework" \| "spa" \| "static"` | 应用类型。省略时自动检测。                          |
+| `inference.outputDir` | `string`                                     | 静态应用类型的输出目录，相对项目根目录，默认 `dist` |
+| `inference.database`  | `"d1" \| "pg" \| "mysql"`                    | 数据库方言                                          |
+
+详见[支持的应用类型](/docs/app-types#显式配置)。
+
+### inference.bindings
+
+显式控制被推断出的 Cloudflare 绑定。省略时，Void 会扫描源码中的绑定用法来[自动推断](/docs/reference/resource-inference)。显式的值会覆盖同名绑定；未列出的绑定仍然会被推断。即使 `db` 是 `false`，认证与检入版本库的迁移仍然需要数据库。
+
+每个绑定接受 `true`（使用默认名）、`false`（禁用）或字符串（自定义绑定名）：
+
+```json title="void.config.json"
+{ "inference": { "bindings": { "db": true, "kv": false, "storage": "MY_BUCKET", "ai": "MY_AI" } } }
+```
+
+| 键        | 默认绑定    | 类型          | 自定义名称               |
+| --------- | ----------- | ------------- | ------------------------ |
+| `db`      | `DB`        | `D1Database`  | `"db": "MY_DB"`          |
+| `kv`      | `KV`        | `KVNamespace` | `"kv": "MY_KV"`          |
+| `storage` | `STORAGE`   | `R2Bucket`    | `"storage": "MY_BUCKET"` |
+| `ai`      | `AI`        | `Ai`          | `"ai": "MY_AI"`          |
+| `email`   | —           | —             | 只能是布尔值             |
+
+自定义绑定名在开发与部署期间都适用于 `void/db`、`void/kv` 与 `void/storage`。自定义 AI 名称在直连 Cloudflare 部署时也适用于 `void/ai`；托管的 Workers AI 使用平台的代理。
+
+`email` 是一个布尔功能开关。设为 `true` 可以在没有 `void/email` 导入的情况下启用[邮件](/docs/email)与本地收件箱，设为 `false` 则关闭两者。在 Void 平台上，发送走平台代理。直连 Cloudflare 配置时会在 `void.lock.json` 中记录一个 `SEND_EMAIL` 绑定；见 [`email`](#email) 一节。
+
+### inference.build
+
+覆盖构建命令。适合自带 CLI 的框架（Nuxt、Astro）或有自定义构建脚本的静态应用。省略时，CLI 使用为当前应用类型检测到的默认构建命令。它对包括 `"void"`（默认 `vite build`）在内的所有应用类型都适用。
+
+```json title="void.config.json"
+{ "inference": { "build": "nuxt build --preset cloudflare-module" } }
+```
+
+命令从项目根目录经 shell 执行，`PATH` 中带有项目自己的 `node_modules/.bin`，因此裸二进制与 `&&` 链都能用：
+
+```json title="void.config.json"
+{ "inference": { "build": "vitepress build && vite build" } }
+```
+
+这条命令链正是静态站点生成器与 Void 后端一起发布的方式——见[为静态站点加上后端](/docs/app-types)。
+
+### inference.scanDirs
+
+覆盖为[绑定推断](/docs/reference/resource-inference)而扫描的目录。路径相对项目根目录，会替换当前模式下的默认目录。
+
+```json title="void.config.json"
+{ "inference": { "scanDirs": ["src", "lib", "workers"] } }
+```
+
+### inference.appType
+
+应用类型。省略时在首次部署时自动检测。见[支持的应用类型](/docs/app-types)。
+
+- `"void"`：worker 加静态资源，包含 API 路由、SSR 与 jobs
+- `"framework"`：元框架应用，例如 TanStack Start、React Router、SvelteKit、Nuxt 或 Astro
+- `"static"`：完全渲染好的 HTML 文件，来自 VitePress、纯 HTML 或外部工具。未匹配的路径返回 `404.html` 或 404 响应。
+- `"spa"`：静态产物加 SPA 兜底。非文件路径会以 `200` 状态回退到 `index.html`，让客户端路由开箱可用。
+
+### inference.outputDir
+
+静态部署的输出目录，相对项目根目录。只在 `inference.appType` 为 `"spa"` 或 `"static"` 时有意义，默认 `"dist"`。
 
 ## CLI 命令速查
 

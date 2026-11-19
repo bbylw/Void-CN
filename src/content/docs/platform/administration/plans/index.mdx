@@ -1,0 +1,154 @@
+---
+title: 计划与限额
+description: 为平台上的账户定义资源限额。计划不向用户收费，也不代购 Cloudflare 服务。
+---
+
+计划定义你分配给平台上各账户的资源限额。它们不向用户收费，也不购买 Cloudflare 服务。用管理员账户登录后，在管理后台打开 **Plans**，或者用 CLI：
+
+```sh
+void platform auth login
+void platform config plans
+```
+
+选择一个计划来查看或编辑，把它复制成新计划，或指定新账户的默认计划。改动不需要重新部署应用或平台。
+
+## 使用后台
+
+打开 **Plans** 可以看到每个计划的稳定 ID、账户数量与注册默认值。用 **Add plan** 复制一个已有计划，或用 **Edit** 修改它的显示名称、限额、构建规格、是否允许短项目 slug，以及 [AI Gateway 日志默认值](#ai-gateway-日志)。
+
+用 **Review changes** 对比当前与建议的设置，并查看受影响的账户数量。检查所有配额警告之后，再选择 **Apply changes**。如果在评审期间有人改了计划目录，请重新打开计划并新建一次评审。
+
+编辑页面还可以选择注册默认值、归档或恢复分配、重置内置计划，或在指定接替计划的前提下移除计划。每个操作都有一个评审步骤。
+
+账户更新会在结果页自动继续。如果你离开页面或更新暂停，重新打开 **Plans** 并选择 **Continue account updates**。在再次修改计划之前，请先完成待处理的账户更新。已记录的用量与账期都会保留。
+
+## 添加计划
+
+每个计划有稳定的 ID 和可编辑的显示名称。复制一个计划，就能沿用它的限额、构建规格、短 slug 权限与 AI 日志默认值：
+
+```sh
+void platform config plans add team --copy pro --name "Team" --plan
+void platform config plans add team --copy pro --name "Team" --yes
+```
+
+把它分配给已有账户，或设为新账户的默认计划：
+
+```sh
+void platform user plan <user-id> team --yes
+void platform config plans default team --yes
+```
+
+更换默认计划不会移动已有账户。重命名计划不会改变它的 ID 与分配关系。
+
+## 编辑限额
+
+交互菜单一次只改一项限额。要写脚本或一次改多项，请准备一个 JSON 文件：
+
+```json title="team-plan.json"
+{
+  "name": "Team",
+  "limits": {
+    "requestsPerMonth": 10000000,
+    "concurrentBuilds": 3,
+    "buildTimeoutMinutes": 15
+  },
+  "buildInstanceType": "standard-4"
+}
+```
+
+未写出的设置保持当前值。先预览，再应用：
+
+```sh
+void platform config plans set team --file team-plan.json --plan
+void platform config plans set team --file team-plan.json --yes
+```
+
+限额是非负整数；`0` 表示计划不限制。构建超时始终有 60 分钟的平台上限；`0` 表示使用该上限。你可以配置：
+
+| 设置                            | 含义                                       |
+| ------------------------------- | ------------------------------------------ |
+| `requestsPerMonth`              | 每个账户账期内的应用请求数                 |
+| `cpuMsPerRequest`               | 每个应用请求默认的 CPU 毫秒数              |
+| `maxCpuMsPerRequest`            | 应用能申请的最高 CPU 上限                  |
+| `subRequestsPerInvocation`      | 每次调用的子请求数                         |
+| `deploysPerDay`                 | 每天的部署次数                             |
+| `aiNeuronsPerMonth`             | 每个账户账期内的 AI neuron 数              |
+| `retainedDeployments`           | 保留的 Worker 部署数                       |
+| `sandboxRuntimeSecondsPerMonth` | 每个账户账期内的 Sandbox 运行秒数          |
+| `sandboxMaxConcurrentInstances` | 同时运行的 Sandbox 实例数                  |
+| `concurrentBuilds`              | 同时进行的构建数                           |
+| `buildTimeoutMinutes`           | 构建超时（分钟）                           |
+
+`cpuMsPerRequest` 不能超过 `maxCpuMsPerRequest`；默认 CPU 上限设为不限制时，上限也必须是不限制。构建实例规格有 `standard-3`（2 vCPU、8 GiB）与 `standard-4`（4 vCPU、12 GiB）。新的构建使用新的规格与超时，正在运行的构建沿用它们已记录的设置。
+
+更完整的文件还可以设置 `"allowShortSlugs": true` 来允许五个字符及以内的项目 slug，或设为 `false` 要求今后使用更长的 slug。已有项目的 URL 会保留。复制计划会继承这项设置；内置的 `free` 计划关闭它，其余内置计划开启它。
+
+D1、R2、KV 显示的存储数值仅供参考，不能作为强制配额编辑。静态部署沿用它们已有的保留策略。
+
+预览会显示受影响的账户数量，并抽查是否有账户已经超过建议的配额。调低配额可能限制已有应用，包括抽查样本之外的账户。用量历史与账期都会保留，因此改计划不会重置用量。管理员手动执行的停用继续生效。
+
+## AI Gateway 日志
+
+设置计划的 AI 日志默认值，可以控制 AI Gateway 为其项目记录什么。在后台编辑该计划的 **AI Gateway logging default**；在 CLI 里则把 `aiLogging` 写进计划文件：
+
+```json title="team-plan.json"
+{
+  "aiLogging": "metadata"
+}
+```
+
+```sh
+void platform config plans set team --file team-plan.json --plan
+void platform config plans set team --file team-plan.json --yes
+```
+
+`metadata` 保留请求详情但不含提示词与响应。用 `off` 不记录日志条目，用 `full` 记录提示词与响应，或用 `inherit` 遵循 gateway 自身的设置。全新安装上的 gateway 会记录提示词与响应。这些设置的完整范围见 [AI Gateway 日志](/docs/reference/cli/platform-users)。
+
+不写 `aiLogging` 会保留计划的当前值。项目[自己的日志设置](/docs/platform/administration/projects)会覆盖计划默认值。如果某账户所属的计划在目录中已不存在，它遵循注册默认计划。
+
+预览会显示新旧默认值，以及受影响的项目数量。应用之后，CLI 会发布这次改动并报告新请求预计何时生效：
+
+```text
+AI logging published to 120 projects; expected by 14:03:20 UTC (normally within 2 minutes).
+```
+
+在新设置发布完成之前，项目仍沿用之前的日志行为。改动通常在发布后 2 分钟内作用于新请求。用 `void platform project show <project-id>` 检查某个项目。
+
+如果发布中断，运行 `void platform config plans sync --yes`，或在 **Plans** 页面选择 **Continue AI logging publish**。平台每小时也会自动恢复未完成的工作。
+
+把账户移到另一个计划、为被移除的计划指定接替计划、或转移项目，都会套用新所有者的计划默认值。更换注册默认值，同样会改变那些计划已从目录中消失的账户的日志设置。
+
+用 `void platform config plans show <plan-id>` 或后台的用户详情页查看计划的默认值。如果 CLI 提示你的平台不支持计划默认值，请先运行 `void platform upgrade`。
+
+## 归档或移除计划
+
+归档一个计划可以停止把它分配给新账户，同时保留它当前的账户：
+
+```sh
+void platform config plans archive team --yes
+void platform config plans restore team --yes
+```
+
+在归档当前的默认计划之前，先另选一个默认计划。要移除仍有账户的计划，请先选择接替计划并评审改动：
+
+```sh
+void platform config plans remove team --replacement pro --plan
+void platform config plans remove team --replacement pro --yes
+```
+
+移除默认计划同样必须指定接替计划。既不是默认计划、又没有被使用的计划可以直接移除。账户转移到接替计划后保留自己的用量。用 `void platform config plans reset <plan-id>` 可把内置计划的限额与构建规格恢复为原值；自定义计划没有内置的重置值。
+
+移除评审会在你确认之前，显示接替计划及其限额、构建规格、短 slug 权限上的变化。
+
+## 完成待处理的更新
+
+应用改动后，CLI 会更新账户并发布 AI 日志默认值。如果更新失败或不再有进展，你的配置仍然保存，命令会报告待处理的工作并以非零状态退出。检查计划，然后继续：
+
+```sh
+void platform config plans show
+void platform config plans sync --yes
+```
+
+`sync` 会恢复已保存的更新。在再次编辑计划之前先完成待处理的工作。如果某次请求丢失了连接，请先检查计划与 [operator 事件](/docs/platform/administration/operations)再重试。
+
+所有命令都接受 `--connection <registered-id-or-url>` 与 `--json`。脚本化的改动必须带 `--yes`；用 `--plan` 做只读预览。

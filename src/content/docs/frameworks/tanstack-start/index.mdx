@@ -1,0 +1,106 @@
+---
+title: TanStack Start
+description: 在 TanStack Start 的 Vite 插件旁边加上 voidPlugin()，即可获得数据库、存储与部署能力，无需额外的 Cloudflare 适配器。
+---
+
+在 [TanStack Start](https://tanstack.com/start/latest) 的 Vite 插件旁边加上 `voidPlugin()`，就能使用 Void 的数据库、存储与部署能力，不需要再配置单独的 Cloudflare 适配器。
+
+## 接入步骤
+
+### 1. 创建新项目
+
+```bash
+npm create @tanstack/start@latest my-app
+cd my-app
+```
+
+### 2. 安装依赖
+
+```bash
+npm install -D void
+```
+
+### 3. 配置 `vite.config.ts`
+
+```ts
+import { tanstackStart } from '@tanstack/react-start/plugin';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  plugins: [
+    voidPlugin(), // 必须放在框架插件之前
+    tanstackStart(),
+    react(),
+  ],
+});
+```
+
+### 4. 部署
+
+```bash
+void auth login
+void deploy
+```
+
+## 使用 Void 能力
+
+多数 [Void 平台能力](/docs/app-types)都可以在 TanStack Start 中使用。把它们用在 server function 里。
+
+Void 托管的认证暂不支持框架模式，目前请直接使用 Better Auth 官方的 TanStack Start 集成。
+
+### 数据库
+
+```tsx
+import { users } from '@schema';
+import { createServerFn } from '@tanstack/react-start';
+import { db } from 'void/db';
+
+const getUsers = createServerFn().handler(async () => {
+  return db.select().from(users);
+});
+```
+
+### 其他资源
+
+在服务端代码中使用 [KV](/docs/kv)、[对象存储](/docs/storage) 与 [AI](/docs/ai)，导入方式和 Void 应用完全相同。在 `crons/` 中添加 [cron 任务](/docs/jobs)，在 `queues/` 中添加[队列消费者](/docs/queues)。
+
+### 环境变量
+
+在 `env.ts` 中声明变量，用 `import { env } from "void/env"` 读取。本地取值、生产密钥以及公开的 `VITE_*` 值参见[环境变量](/docs/env-vars)。
+
+## 自定义 Worker 入口
+
+当你的 Worker 需要自己的入口模块（例如要导出一个 Durable Object 类）时，在 `void.config.ts` 里设置 `cloudflare.main`：
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  cloudflare: { main: './server.ts' },
+});
+```
+
+路径相对于应用根目录。在这个模块里默认导出 TanStack 的请求处理器，并补上你自己的具名导出：
+
+```ts
+import handler from '@tanstack/react-start/server-entry';
+
+export { Counter } from './counter';
+export default handler;
+```
+
+不设置 `cloudflare.main` 时，Void 使用 TanStack 默认的服务端入口。你也可以直接指向依赖包里的入口，例如 `@tanstack/react-start/server-entry`。
+
+导出的 Durable Object 或 Workflow 类同样要在 `cloudflare` 下绑定，例如写在 `cloudflare.durable_objects` 里。这些配置在 `void deploy --platform cloudflare` 部署时生效。在 Void 平台上，请改用 [Durable State](/docs/durable-state)。
+
+## 直接访问绑定
+
+你也可以通过 `cloudflare:workers` 模块访问 Cloudflare 绑定：
+
+```tsx
+import { env } from 'cloudflare:workers';
+
+const { results } = await env.DB.prepare('SELECT * FROM users').all();
+```
