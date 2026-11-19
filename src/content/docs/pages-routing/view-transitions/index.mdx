@@ -1,0 +1,119 @@
+---
+title: View Transitions
+description: 用浏览器的 View Transition API 给导航加上动画。页面默认交叉淡入淡出，可用 CSS 自定义动画。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+用浏览器的 [View Transition API](https://developer.mozilla.org/en-US/docs/Web/API/View_Transition_API) 给页面切换加动画。页面默认交叉淡入淡出（cross-fade），用 CSS 即可自定义动画。
+
+## 启用 View Transitions
+
+给适配器插件传入 `viewTransitions: true`：
+
+```ts title="React"
+// vite.config.ts
+export default defineConfig({
+  plugins: [voidPlugin(), voidReact({ viewTransitions: true })],
+});
+```
+
+```ts title="Vue"
+// vite.config.ts
+export default defineConfig({
+  plugins: [voidPlugin(), voidVue({ viewTransitions: true })],
+});
+```
+
+```ts title="Svelte"
+// vite.config.ts
+export default defineConfig({
+  plugins: [voidPlugin(), voidSvelte({ viewTransitions: true })],
+});
+```
+
+```ts title="Solid"
+// vite.config.ts
+export default defineConfig({
+  plugins: [voidPlugin(), voidSolid({ viewTransitions: true })],
+});
+```
+
+启用后，所有导航都会使用 view transitions，包括 `Link` 点击、程序化的 `router.visit()` 调用，以及浏览器的前进 / 后退。
+
+## 单个链接的覆盖
+
+可以在个别链接上覆盖全局设置：
+
+```tsx title="React"
+<Link href="/settings" viewTransition={false}>
+  Settings
+</Link>;
+
+<Link href="/about" viewTransition>
+  About
+</Link>;
+```
+
+```vue title="Vue"
+<Link href="/settings" :view-transition="false">Settings</Link>
+
+<Link href="/about" view-transition>About</Link>
+```
+
+```svelte title="Svelte"
+<Link href="/settings" viewTransition={false}>Settings</Link>
+
+<Link href="/about" viewTransition>About</Link>
+```
+
+```tsx title="Solid"
+<Link href="/settings" viewTransition={false}>
+  Settings
+</Link>;
+
+<Link href="/about" viewTransition>
+  About
+</Link>;
+```
+
+也可以在代码里指定：
+
+```ts
+router.visit('/about', { viewTransition: true });
+router.visit('/settings', { viewTransition: false });
+```
+
+## 用 CSS 自定义
+
+默认过渡是交叉淡入淡出。用 `::view-transition-old` 与 `::view-transition-new` 伪元素自定义它：
+
+```css
+/* 更快的过渡 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.2s;
+}
+
+/* 用滑动代替淡入淡出 */
+::view-transition-old(root) {
+  animation: slide-out 0.3s ease-in;
+}
+::view-transition-new(root) {
+  animation: slide-in 0.3s ease-out;
+}
+```
+
+给需要独立动画的元素设置 `view-transition-name`（例如在页面之间变形的头图）：
+
+```css
+.hero-image {
+  view-transition-name: hero;
+}
+```
+
+<Callout type="tip">
+
+  View transitions 是渐进增强。不支持该 API 的浏览器会退回即时导航，不会报错。
+
+</Callout>

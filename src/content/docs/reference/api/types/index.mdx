@@ -1,0 +1,142 @@
+---
+title: 类型
+description: 处理器上下文、路由、URL 与 head 元数据的共享类型。
+---
+
+## `CloudContext`
+
+预先带上 [`CloudEnv`](#cloudenv) 类型的 Hono `Context`。所有路由处理器与中间件里 `c` 参数的类型就是它。
+
+```ts
+import type { CloudContext } from 'void';
+```
+
+## `CloudEnv`
+Void Worker 使用的 Hono 环境类型。它在 Hono 的 `Env` 之上扩展了 Cloudflare 绑定与上下文变量。
+
+```ts
+interface CloudEnv extends Env {
+  Bindings: {
+    DB: D1Database;
+    KV: KVNamespace;
+    STORAGE: R2Bucket;
+    AI: Ai;
+    SANDBOX: DurableObjectNamespace<import('void/sandbox').VoidPlatformSandbox>;
+    ASSETS: { fetch(request: Request): Promise<Response> };
+    [key: string]: unknown;
+  };
+  Variables: CloudContextVariables;
+}
+```
+
+## `CloudContextVariables`
+
+`c.set()` / `c.get()` 使用的上下文变量类型。增强这个接口，即可加入会在所有中间件与处理器之间流转的带类型变量：
+
+```ts
+interface CloudContextVariables {
+  user: AuthUser | null;
+  session: AuthSession | null;
+  [key: string]: unknown;
+}
+```
+
+**增强示例：**
+
+```ts
+declare module 'void' {
+  interface CloudContextVariables {
+    requestId: string;
+  }
+}
+
+// c.get("requestId") → string
+```
+
+细节见[类型安全](/docs/type-safety)。
+
+## `TypedHandler<V, R>`
+
+`defineHandler` 的返回类型，携带校验器类型（`V`）与处理器的返回类型（`R`）。
+
+```ts
+interface TypedHandler<V extends ValidatorSlots = {}, R = unknown> {
+  (c: CloudContext): Promise<Response> | Response | unknown;
+  readonly __validators: V; // 仅存在于类型层
+  readonly __output: R; // 仅存在于类型层
+}
+```
+
+## `HeadDescriptor`
+
+`defineHead` 返回的页面 head 元数据的结构。所有字段都是可选的。
+
+```ts
+interface HeadDescriptor {
+  title?: string;
+  meta?: Array<{ name?: string; property?: string; content?: string; charset?: string }>;
+  link?: Array<{ rel: string; href: string; [key: string]: string | undefined }>;
+  script?: Array<{ src?: string; innerHTML?: string; [key: string]: string | undefined }>;
+  htmlAttrs?: Record<string, string>;
+  bodyAttrs?: Record<string, string>;
+}
+```
+
+## `RouteMap`
+
+带类型 `fetch` 客户端使用的生成路由类型，包含每条路由的方法、输入与输出。
+
+键使用路由模式，例如 `/api/users/[id]` 与 `/docs/[...slug]`。
+
+```ts
+import type { RouteMap } from 'void/routes';
+```
+
+## `void/routes`
+
+### `routeUrl(path, options?)`
+
+从已知的页面、HTTP 或 WebSocket 路由模式构建相对 URL 字符串：
+
+```ts
+import { routeUrl } from 'void/routes';
+
+routeUrl('/users/[id]', {
+  params: { id: 42 },
+  query: { tab: 'activity' },
+  hash: 'details',
+});
+// /users/42?tab=activity#details
+```
+
+| 选项     | 类型         | 说明                                                                             |
+| -------- | ------------ | -------------------------------------------------------------------------------- |
+| `params` | 随路由而定   | 动态路由必填。每个参数接受 `string` 或 `number`。                                |
+| `query`  | `RouteQuery` | 查询参数。数组会变成重复的键；`null` 与 `undefined` 会被省略。                    |
+| `hash`   | `string`     | URL 片段，例如 `'details'` 或 `'#details'`。                                      |
+
+静态路由接受可选的 `query` 与 `hash` 选项。需要 URL 编码时，请传入原始的参数值。通配（catch-all）参数会保留各段之间的 `/` 分隔符。无效或缺失的路径参数会抛出 `TypeError`。
+
+返回的 [`RouteUrl`](#route-types) 可用于 `Link`、`<a>` 与 `c.redirect()`。配置与示例见[带类型的 URL 与导航](/docs/type-safety)。
+
+### Route types
+这些类型从 `void/routes` 导入：
+
+| 类型                  | 说明                                                                                     |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| `RoutePathMap`        | 生成的映射表：页面、HTTP 与 WebSocket 路由模式到它们参数名。                             |
+| `RoutePath`           | `RoutePathMap` 中已知路由模式的联合类型。                                                |
+| `PagePathMap`         | 生成的映射表：页面模式到它们的参数名。                                                   |
+| `PagePath`            | `PagePathMap` 中页面模式的联合类型；`useParams()` 接受它。                                |
+| `PageParams<P>`       | 页面 `P` 收到的参数，例如 `/users/[id]` 对应 `{ id: string }`。                          |
+| `RouteOptions<P>`     | 某个路由模式 `P` 的选项，包括必填的 `params`、可选的 `query` 与 `hash`。                 |
+| `RouteDestination<P>` | `{ pathname: P }` 加上 `RouteOptions<P>`。省略 `P` 时默认覆盖所有已知路由。              |
+| `RouteUrl`            | 你的某条路由的 URL，由 `routeUrl()` 返回。未开启 `typedRoutes` 时是 `string`。           |
+| `Href`                | 一个 `RouteUrl`、同页的查询串或 hash，或外部 URL。未开启 `typedRoutes` 时是 `string`。   |
+| `RouteUrlInput`       | `Href`、`URL` 或 `RouteDestination`；router 的导航方法与 `c.redirect()` 都接受它。       |
+| `RouteQuery`          | 查询键到 `RouteQueryValue`（或其只读数组）的映射。                                       |
+| `RouteQueryValue`     | `string`、`number`、`boolean`、`null` 或 `undefined`。                                   |
+
+把动态页面的 `getPrerenderPaths()` 标注为 `Promise<PageParams<P>[]>`，TypeScript 就会检查这些参数名。见[预渲染路径](/docs/type-safety)。
+
+`typedRoutes` 指的是 [`routing.typedRoutes`](/docs/config)。见[检查 URL 字符串](/docs/type-safety)。

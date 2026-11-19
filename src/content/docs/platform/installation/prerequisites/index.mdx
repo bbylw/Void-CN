@@ -1,0 +1,176 @@
+---
+title: 前置条件
+description: 在安装 Void 平台之前，确认 Cloudflare 账户、域名与 API 令牌所需的权限。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+运行一个 Void 平台，你需要：
+
+- 一个已启用 Workers for Platforms、R2 与 Analytics Engine 的 Cloudflare 账户。
+- 一个空的托管 PostgreSQL 数据库。
+- 一个你所选登录提供方的账户：GitHub、Google、OIDC 或 Cloudflare Access。
+- 一个给应用使用的域名，或者用于测试的 `workers.dev`。你也可以[稍后再添加域名](/docs/platform/installation/domains)。
+
+Void 会通过 CLI 创建 Worker、存储、队列、路由与数据库表。
+
+Workers for Platforms 需要它自己的付费方案。Analytics Engine 在 Workers Free 上可用，但你必须为该账户启用它。请查看 [Analytics Engine 定价与额度](https://developers.cloudflare.com/analytics/analytics-engine/pricing/)。你的数据库与 Cloudflare 用量单独计费。
+
+## 准备 Cloudflare 账户与域名
+
+在 [Cloudflare 控制台](https://dash.cloudflare.com/)中，选择平台要落地的账户：
+
+1. 打开 **Workers & Pages** 一次，让 Cloudflare 为该账户开通 Worker 能力。
+2. 打开 **Workers for Platforms** 并启用它的方案。确认之前先看一眼 [Workers for Platforms 定价](https://developers.cloudflare.com/cloudflare-for-platforms/workers-for-platforms/reference/pricing/)。
+3. 打开 **R2 Object Storage** 并完成激活。Void 稍后会创建 bucket。
+4. 打开 **Analytics Engine**，如果出现 **Enable** 就选择它。你不需要手动创建 dataset。如果该页面没有 **Enable** 操作且安装报出 code 10089，请按[下面的步骤](#如果-cloudflare-拒绝-analytics-engine)处理。
+5. 对于域名安装，选择一个你拥有的域名，例如 `example.app`；如果还没有，就在你偏好的注册商处注册一个。请使用备用域名的根域：应用会以 `my-app.example.app` 提供服务。如果用 workers.dev 测试，跳过这一步以及后面的 DNS 设置。
+
+如果这个域名已经在该 Cloudflare 账户里，就用它已有的 zone。否则，[把域名添加到 Cloudflare](https://developers.cloudflare.com/dns/zone-setups/full-setup/setup/)，并按 nameserver 指引做到 zone 生效为止。zone 是 Cloudflare 为某个域名维护的 DNS 配置，创建 zone 并不等于购买域名。
+
+你也可以让 Void 在安装过程中创建 zone。现在就把它们配置好，可以把 API 令牌限定到那个 zone 的范围，并且让安装不必卡在 DNS 上。平台 API 默认使用 `workers.dev`，因此它不需要额外的域名。
+
+### 如果 Cloudflare 拒绝 Analytics Engine
+
+平台把请求指标与日志存放在 Analytics Engine 中。如果安装因 "You need to enable Analytics Engine"（code 10089）停止，请打开错误信息里给出的 Analytics Engine 控制台链接，为该账户选择 **Enable**。Workers Free 上就能激活；这个报错不需要升级 Workers 方案，也不需要换一个 API 令牌。然后运行打印出来的 `void platform install --resume` 命令。
+
+如果你账户的控制台里没有 **Enable** 操作，请创建一个可丢弃的 Hello World Worker，在 **Settings** > **Bindings** 下给它加一个 Analytics Engine 绑定，并从控制台部署一次。之后恢复安装。这一步请用另一个独立的 Worker，不要改动平台自己的 Worker。
+
+## 安装 CLI 并预览
+
+在 Node.js 24.22+ 或 26.12+ 下安装 CLI：
+
+```sh
+pnpm add --global void
+void platform install --plan
+```
+
+按提示登录 Cloudflare，然后选择安装名与账户。`--plan` 会预览资源而不做任何改动，也不需要运行时密钥。完成的计划会保存在本地。再次运行 `void platform install` 即可选择某个已保存的计划；Void 会先检查当前的 Cloudflare 状态，再请你应用它。
+
+对于域名安装，按下表回答。测试模式会跳过应用域名、zone 与 catch-all 这几个问题：
+
+| 提示项                                  | 回答                                                |
+| --------------------------------------- | --------------------------------------------------- |
+| Installation name                       | 一个短名字，例如 `team`                             |
+| Application base domain                 | 你的域名，例如 `example.app`                        |
+| Cloudflare zone                         | 同一个域名                                          |
+| Platform display name                   | 团队能认出来的任意名字                              |
+| Optional custom API hostname            | 留空以使用 `workers.dev`                            |
+| Dedicate all unmatched traffic to Void? | 仅当整个 zone 都归属本平台时选 Yes                  |
+
+在账户里选一个没被用过的安装名。例如 `team` 会创建 `void-team-api`、`void-team-proxy` 这类资源。
+
+预览会列出你将需要的凭据。请先阅读[凭据](/docs/platform/installation/credentials)，然后运行最后打印出的安装命令。引导式安装会在需要时给出设置链接与登录回调地址。
+
+你也可以直接指定其中一条路径：
+
+```sh
+void platform install --application-domain example.app --plan
+void platform install --workers-dev --plan
+```
+
+`--workers-dev` 不能与 `--application-domain`、`--zone` 或 `--dedicated-zone` 同时使用。
+
+## 创建平台数据库
+
+使用一个专属于该平台、内容为空的 PostgreSQL 数据库。它存放用户、项目与部署；单个应用仍然可以使用 D1。Void 会创建表与 Hyperdrive 连接，但不会替你开通 PostgreSQL 服务器。
+
+任何允许从你的电脑和 Cloudflare 连接的 PostgreSQL 提供方都可以：
+
+1. 创建一个专属于平台的全新数据库或 project，其中不含任何既有应用表。使用一个能够创建并管理其表与 schema 的数据库角色。
+2. 打开提供方的连接详情并选择主数据库。使用直连或 session 模式的 pooler，不要用事务池化。这个连接必须在你的电脑和 Cloudflare 两侧都可用。
+3. 把 PostgreSQL 连接 URL（包含密码与 SSL 设置）复制进你的密码管理器。粘贴到 Void 的 `PostgreSQL DATABASE_URL` 提示里的只能是 URL——而不是外面包着的 `psql` 命令——并按提供方给出的原样填写，包含 `sslmode=verify-full` 这类 SSL 设置。Void 创建的 Hyperdrive 只信任公共证书颁发机构，因此如果你的数据库使用私有 CA，请改用下面描述的、由你另行管理的 Hyperdrive。
+
+| 提供方                                                                    | 连接设置                                                                                                                                                 |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [PlanetScale Postgres](https://planetscale.com/docs/postgres/connecting) | 选择 **Postgres**，不要选 Vitess/MySQL。打开 **Connect**，创建 role 凭据，并使用 `5432` 端口上的直连主库，而不是 `6432` 上的 PgBouncer。 |
+| [Neon](https://neon.com/docs/get-started-with-neon/connect-neon)         | 打开 **Connect**，选择数据库与 owner 角色，并关闭 **connection pooling**。                                                                               |
+
+在为数据库选型时，要把共享这台服务器的每个平台安装与每个应用的连接池都算进去。按服务器容量调整每个 Hyperdrive 的 [origin connection limit](https://developers.cloudflare.com/hyperdrive/configuration/tune-connection-pool/)，并为迁移、管理操作、提供方保留连接以及临时突发留出余量。
+
+一旦安装占用了这个数据库，后续的 resume 与维护命令都要继续使用同一个数据库。如果安装因为无法使用该数据库而停止（例如数据库非空），在恢复之前把 `VOID_PLATFORM_DATABASE_URL` 指向另一个数据库的 URL。卸载永远不会删除外部的 PostgreSQL。
+
+### 使用提供方 CLI
+
+你可以用任一提供方的 CLI 而不是控制台来创建数据库并取回它的连接 URL。
+
+<Callout type="info" title="PlanetScale Postgres">
+
+安装最新版 [PlanetScale CLI](https://planetscale.com/docs/cli/planetscale-environment-setup)。在 macOS 上用 `brew install pscale`；安装指南也覆盖 Linux 与 Windows。
+
+登录后列出你的组织与区域：
+
+```sh
+pscale auth login
+pscale org list
+pscale region list --org <organization>
+```
+
+把 `<organization>` 换成你的组织 slug 并选择一个区域。列出该区域可用的 Postgres 集群规格及价格：
+
+```sh
+pscale size cluster list --org <organization> --engine postgresql --region <region>
+```
+
+用你选定的集群规格创建一个专属 Postgres 数据库，再创建一个有权创建并迁移 Void 表的角色：
+
+```sh
+pscale database create void-platform \
+  --org <organization> \
+  --engine postgresql \
+  --region <region> \
+  --cluster-size <cluster-size> \
+  --wait
+
+pscale role create void-platform main void_owner \
+  --org <organization> \
+  --inherited-roles postgres
+```
+
+把创建角色命令打印出的 **DATABASE URL** 存进密码管理器，并粘贴到 Void 的 `PostgreSQL DATABASE_URL` 提示中。使用 `5432` 端口上的直连主库，并带 `sslmode=verify-full`。角色的密码只在创建时显示一次，因此在关闭终端前先保存好。
+
+更多选项见 PlanetScale 的 [database commands](https://planetscale.com/docs/cli/database) 与 [role commands](https://planetscale.com/docs/cli/role)。
+
+</Callout>
+
+<Callout type="info" title="Neon">
+
+安装最新版 [Neon CLI](https://neon.com/docs/cli/install) 并登录：
+
+```sh
+pnpm add --global neon@latest
+neon login
+```
+
+创建一个专属的 project、数据库与 owner 角色。把 `<region-id>` 换成 Neon 的某个[受支持区域](https://neon.com/docs/cli/projects#create)，例如 `aws-us-east-2`：
+
+```sh
+neon projects create --name void-platform \
+  --database void_platform \
+  --role void_owner \
+  --region-id <region-id>
+```
+
+用输出中的 project ID 取回一个带 TLS 证书校验的直连主库 URL：
+
+```sh
+neon connection-string --project-id <project-id> \
+  --database-name void_platform \
+  --role-name void_owner \
+  --endpoint-type read_write \
+  --ssl verify-full
+```
+
+把打印出的 URL 存进密码管理器，并粘贴到 Void 的 `PostgreSQL DATABASE_URL` 提示中。这个连接请保持不走连接池。更多选项见 Neon 的 [connection-string command](https://neon.com/docs/cli/connection-string)。
+
+</Callout>
+
+### 使用已有的 Hyperdrive
+
+安装器可以替你创建 Hyperdrive，也可以使用你自己另行管理的那个。对于已有配置：
+
+1. 让它指向专属的平台数据库，使用运行期用户，并关闭 SQL 结果缓存。
+2. 在安装器里选中它并核对数据库与运行期用户。检查 origin 的 host 与端口；如果是私有数据库，则检查它的 Workers VPC service ID。
+3. 在 PostgreSQL URL 提示处提供一个数据库 owner 连接，好让 Void 能应用迁移。
+
+如果想先自己创建一个，选择 **Set up a separately managed Hyperdrive**，按打印出的说明或 [Cloudflare 的安装指南](https://developers.cloudflare.com/hyperdrive/get-started/)操作，就绪后重跑安装器。Void 会把它的配置留在你的掌控中。若要无人值守安装，请使用[从 CI 安装](/docs/platform/installation/ci)中的 Hyperdrive 变量。

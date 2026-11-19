@@ -1,0 +1,171 @@
+---
+title: Live 事件流
+description: 让浏览器用一条 SSE 连接订阅多个主题，并从路由、定时任务或队列里发布事件。
+---
+
+`void/live` 让浏览器用一条 SSE 连接订阅多个主题。你可以从路由、定时任务或队列消费者中发布事件，Void 会借助 Durable Objects 把它投递给已连接的订阅者。
+
+例如，一个页面可以订阅某篇文章及其评论的更新，并在用户切换浏览内容时改变订阅项。如果单个请求就能产出整个流（例如 AI 响应），用 [`void/sse`](/docs/sse) 就够了。
+
+## 定义一个流
+
+在仅服务端的模块中定义流：
+
+```ts title="src/live.ts"
+import { defineLiveStream } from 'void/live';
+
+export const live = defineLiveStream({
+  id: 'app',
+  allowAnonymousControl: true,
+});
+```
+
+这个示例允许未登录的访客连接。没有 `onSubscribe` 时，任何连接都能订阅任何主题，因此在发布私有数据之前请先读[鉴权](#鉴权)。
+
+当某个[被扫描的文件](/docs/reference/resource-inference)导入了 `void/live`，Void 就会启用 live 流，所以请把这个模块放在 `src/` 或其他会被扫描的目录里。想放在 `lib/` 这样的非默认目录，请把该目录加入 [`inference.scanDirs`](/docs/reference/resource-inference)，并列出你仍在使用的默认目录，因为 `scanDirs` 会替换它们。
+
+再把它从一个普通路由暴露出去：
+
+```ts title="routes/live.ts"
+import { defineHandler } from 'void';
+import { live } from '../src/live';
+
+export const GET = defineHandler((c) => live.connect(c));
+export const POST = defineHandler((c) => live.control(c));
+```
+
+`GET` 打开 SSE 连接，`POST` 接收该连接的订阅与退订控制操作。
+
+## 在浏览器端订阅
+
+使用 `void/live/client` 提供的浏览器辅助函数：
+
+```ts
+import { connectLiveStream } from 'void/live/client';
+
+const stream = connectLiveStream('/live', {
+  withCredentials: true,
+  retryDelay: 1_000,
+  onError(error) {
+    console.error(error);
+  },
+});
+
+const unsubscribePost = await stream.subscribe({
+  id: 'post-card',
+  topic: 'post:12',
+  onEvent(event) {
+    if (event.type === 'updated') {
+      console.log(event.data);
+    }
+  },
+});
+
+const unsubscribeComments = await stream.subscribe({
+  id: 'comments',
+  topic: 'comment:2323',
+});
+
+await unsubscribeComments();
+await unsubscribePost();
+stream.close();
+```
+
+订阅 ID 的作用域是单个连接，重复使用同一个 ID 会替换它的订阅。重连之后，辅助函数会恢复当时生效的订阅，并把它们最新的 `eventId` 作为 `lastEventId` 发送出去。
+
+开启 [`routing.typedRoutes`](/docs/config) 后，TypeScript 会把 URL 与你的路由做比对。外部的 `http://` 与 `https://` 地址同样可用。对于运行时才校验的 URL，请使用 `void/routes` 的 `as RouteUrl` 跳过类型检查。
+
+## 发布
+
+从任何能拿到 Void runtime env 的服务端代码中发布：
+
+```ts
+import { live } from '../src/live';
+
+await live.publish(
+  'post:12',
+  { title: 'Updated title' },
+  { type: 'updated', eventId: 'post-12-v8' },
+);
+```
+
+主题名与 JSON 载荷都由你自己决定。Void 会把 `type` 与 `eventId` 放进事件信封，但不解释也不存储它们，也不会使用原生 SSE 的 `id` 字段。
+
+如果你不在某个请求或 runtime 上下文之内，请显式传入 env：
+
+```ts
+await live.withEnv(env).publish('post:12', { title: 'Updated title' });
+```
+
+## 鉴权
+
+只有连接的所有者才能修改它的订阅。上面的示例允许匿名连接；已认证的流默认使用当前的 Void 用户。
+
+所有者决定的是谁能修改某个连接的订阅，而不是这个连接能读哪些主题。
+
+对于已认证的流，请给 `connect()` 与 `control()` 传入同一个所有者键：
+
+```ts
+return live.connect(c, { owner: `user:${session.userId}` });
+return live.control(c, { owner: `user:${session.userId}` });
+```
+
+如果所有路由都要用同样的方式推导归属关系，可以用 `identifyConnection` 定义一次：
+
+```ts
+export const live = defineLiveStream({
+  id: 'app',
+  async identifyConnection(ctx) {
+    const session = await getSession(ctx.request);
+    return session ? `user:${session.userId}` : null;
+  },
+});
+```
+
+当 `identifyConnection` 返回 `null` 或 `undefined` 时，Void 会退回当前的已认证用户，并在该用户有字符串 `id` 时使用 `user:${user.id}`。如果两条路径都得不到所有者，且没有设置 `allowAnonymousControl`，请求会以 `403` 被拒绝。
+
+没有 `onSubscribe` 时，任何通过所有者检查的连接（任意已登录用户，或在设置了 `allowAnonymousControl` 时的任意访客）都能订阅任意主题，并收到发布到该主题的全部内容。主题名往往很容易被猜到，因此请用 `onSubscribe` 决定每个主题谁能读：返回一个 `Response` 即拒绝订阅，什么都不返回即允许。
+
+```ts
+export const live = defineLiveStream({
+  id: 'app',
+  async onSubscribe(ctx) {
+    const post = /^post:(.+)$/.exec(ctx.topic);
+    if (post && (await canReadPost(ctx.env, ctx.user, post[1]))) return;
+    const inbox = /^user:(.+):inbox$/.exec(ctx.topic);
+    if (inbox && ctx.owner === `user:${inbox[1]}`) return;
+    return new Response('Forbidden', { status: 403 });
+  },
+});
+```
+
+## 限制
+
+`void/live` 面向中小规模的扇出场景。默认情况下，一个流允许：
+
+- 每个浏览器连接 `256` 个生效订阅
+- 每个主题 `256` 个生效订阅
+- 每次控制请求 `100` 个订阅或退订操作
+- 每个连接 `100` 个排队事件
+- 每个编码后的事件信封 `64 KiB`
+
+每个生效主题最多支持 256 个订阅，与你使用多少个主题名无关。例如 `post:${postId}` 会让每篇文章各有自己的订阅上限。同一个用户开两个标签页会被算作两次。
+
+你可以按流调低限制：
+
+```ts
+export const live = defineLiveStream({
+  id: 'app',
+  limits: {
+    maxSubscriptionsPerTopic: 64,
+  },
+});
+```
+
+`maxSubscriptionsPerTopic` 不能调到 `256` 以上。更大规模的广播请把订阅者拆分到多个应用主题，或改用专门的实时系统。
+
+## 投递语义
+
+事件在同一个主题内有序，且至多投递一次。部署、回滚、重启与重连都可能丢失 live 状态，因此客户端可能错过事件。原生 HTTP 客户端在重连后必须重新订阅。
+
+要做回放，请把事件存储在应用侧，并用 `eventId` 与 `lastEventId` 续传。Void 不存储事件，也不管理客户端状态。

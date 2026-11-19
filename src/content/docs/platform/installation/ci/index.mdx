@@ -1,0 +1,58 @@
+---
+title: 从 CI 安装
+description: 在一次交互式配置之后，从 CI 安装或更新 Void 平台。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+首次安装请照 [交互式 setup](/docs/platform/installation/setup) 操作。本页用于把一个已配置好的安装自动化。
+
+<Callout type="info" title="非交互式输入">
+
+以下值请从受保护的 CI secret 中注入。不要把它们提交进 workflow 或明文密钥文件。
+
+| 环境变量                                     | 取自交互式 setup 的值                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`                       | 管理 API 令牌                                                                               |
+| `VOID_PLATFORM_RUNTIME_CLOUDFLARE_API_TOKEN` | 运行时 API 令牌                                                                             |
+| `VOID_PLATFORM_DATABASE_URL`                 | 专属 PostgreSQL URL                                                                         |
+| `VOID_PLATFORM_HYPERDRIVE_ID`                | 已存在、由外部管理的 Hyperdrive ID（如适用）                                                |
+| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_HOST`       | Hyperdrive origin 主机名（用于公开数据库 origin）                                           |
+| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_USER`       | Hyperdrive 运行期数据库用户                                                                 |
+| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_SERVICE_ID` | Workers VPC service ID（用于私有数据库 origin）                                             |
+| `VOID_PLATFORM_R2_ACCESS_KEY_ID`             | R2 Access Key ID                                                                            |
+| `VOID_PLATFORM_R2_SECRET_ACCESS_KEY`         | R2 Secret Access Key                                                                        |
+| `VOID_PLATFORM_JWT_SECRET`                   | 原始的 JWT 签名密钥                                                                         |
+| `VOID_PLATFORM_EMAIL_SIGNING_SECRET`         | 启用邮件时专用的邮件签名密钥                                                                |
+| `VOID_PLATFORM_PROJECT_SECRET_KEY`           | 原始的 base64 编码项目加密密钥                                                              |
+| `VOID_PLATFORM_RECOVERY_KEY`                 | 在没有 keychain 可用时，用于本地加密恢复状态的 base64 编码 32 字节密钥                      |
+| `VOID_EMAIL_SENDER_DOMAIN`                   | 可选的共享发信域名；需要 `VOID_EMAIL_SHARED_ZONE_ID`                                        |
+| `VOID_EMAIL_SHARED_ZONE_ID`                  | 该发信域名所在的 Cloudflare zone ID；需要 `VOID_EMAIL_SENDER_DOMAIN`                        |
+
+对于已有的 Hyperdrive，设置它的 ID 与运行期用户，再加上 origin host 或 Workers VPC service ID 中的一个。host 与 service ID 不要同时设置。另外在 `VOID_PLATFORM_DATABASE_URL` 中单独提供数据库 owner 连接，好让 Void 能应用迁移。
+
+使用默认的仅 GitHub 登录时，还要设置 `VOID_PLATFORM_GITHUB_CLIENT_ID`、`VOID_PLATFORM_GITHUB_CLIENT_SECRET` 与 `VOID_PLATFORM_ADMIN_GITHUB_LOGIN`。使用 Google、OIDC 或 Access 登录时，用[配置格式](/docs/platform/installation/setup)传入 `--auth-config <path>`，并从 CI 密钥管理器注入该文件中命名的每个 `clientSecretEnv`。自动配置 Access 保护可能还需要具备[setup 权限](/docs/platform/installation/setup)的 `VOID_PLATFORM_ACCESS_SETUP_TOKEN`。
+
+在每次需要它们的 resume 或 repair 中，都要使用该安装保存的签名与加密密钥。轮换密钥环之后，请使用[完整密钥环恢复输入](/docs/platform/installation/maintenance)。数据库占用与数据表在卸载后仍然存在；换一个安装请使用全新的数据库。
+
+同时设置邮件相关的两个值即可在安装或升级时启用邮件。后续升级会复用已记录的这两个值。如果一个启用了邮件的安装没有记录值，请在升级前把两者都提供出来。
+
+```sh
+void platform install \
+  --name team \
+  --display-name "Team Void" \
+  --account <account-id> \
+  --application-domain example.app \
+  --zone example.app \
+  --yes
+```
+
+在 CI 中，写操作必须带 `--yes`；只读的 `--plan` 不需要。自定义运行时还必须带 `--runtime <directory>`。对于新安装，请用与无人值守安装相同的账户、名字与域名参数先跑一次 `--plan`。如果你使用 `--auth-config`，两条命令要传同一个文件。手动创建登录提供方的 OAuth 或 OIDC client 时，请注册 `<platform-api-url>/auth/callback`；自动的 Access setup 会自行管理它的应用。自定义 API 主机名是可选项。
+
+在 CI 中，如果某个平台 Worker 曾通过 Cloudflare 控制台或 Cloudflare API 被改动过，或者它有一个没有 Void 部署记录的生效版本，那么 `upgrade`、`repair`、`enable`、`rollback` 与 `install --resume` 都会在改动平台 Worker 或暂停流量之前停止。参见[在 Void 之外改动过的平台 Worker](/docs/platform/installation/maintenance)。
+
+</Callout>
+
+## 定制平台
+
+要修改平台的实现或部署你自己的构建，请照[平台开发](/docs/platform/development)操作。它涵盖了本地开发、源码构建，以及 fork 的 CI。

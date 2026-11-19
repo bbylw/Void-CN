@@ -1,0 +1,147 @@
+---
+title: 项目结构
+description: 看看 routes、pages、middleware 等可选目录是如何对应到一个 Void 应用上的。
+---
+
+## 总览
+
+Void 应用用基于文件的约定定义路由、页面、中间件等。所有目录都是可选的，你只需要用到应用真正需要的那几部分。
+
+```text
+├── routes/              API 端点（基于文件的路由）
+├── pages/               全栈服务端渲染页面
+├── middleware/          全局请求中间件
+├── db/                  Drizzle schema 与 SQL 迁移
+├── crons/               定时 cron 任务
+├── queues/              异步队列消费者
+├── email/               收件邮件处理器
+├── durable-objects/     Durable State 模块
+├── src/                 共享的应用代码
+├── public/              静态资源（原样提供服务）
+├── .void/               自动生成（已 gitignore）
+├── vite.config.ts       包含 voidPlugin() 的 Vite 配置
+├── void.config.ts       Void 项目配置（可选）
+├── .env                 本地环境值
+├── env.ts               环境变量 schema
+├── package.json
+└── tsconfig.json
+```
+
+## `routes/`
+
+基于 [Hono](https://hono.dev) 的、按文件组织的 HTTP API 端点。每个文件导出以 HTTP 方法命名的处理器。
+
+```text title="routes/"
+└── api/
+    ├── hello.ts              → GET|POST /api/hello
+    ├── users/
+    │   ├── index.ts          → GET|POST /api/users
+    │   └── [id].ts           → GET|PUT|DELETE /api/users/:id
+    └── search/
+        └── [...query].ts     → GET /api/search/*（catch-all）
+```
+
+- **具名导出**：`export const GET = defineHandler(...)`、`export const POST = ...`
+- **扩展名**：`.ts`、`.tsx`、`.js`、`.jsx`、`.mts` 或 `.mjs`；JSX 处理器用 `.tsx` 或 `.jsx`
+- **动态段**：`[id]` 成为 `:id` 路由参数
+- **Catch-all**：`[...slug]` 匹配剩余的路径
+- **路由组**：`(admin)/` 用来整理文件，不影响 URL 路径
+- **以 `_` 开头的文件**会被忽略
+- **环境后缀**：`debug.dev.ts` 只在开发环境构建，`metrics.prod.ts` 只在生产环境构建
+
+完整指南见[服务端路由](/docs/server-routing)。
+
+## `pages/`
+
+带就近数据加载的全栈服务端渲染页面。Vue、React、Svelte 与 Solid 适配器均支持。
+
+```text title="pages/"
+├── layout.tsx             根布局（包裹所有页面）
+├── index.tsx              → /
+├── index.server.ts        / 的服务端 loader 与 action
+├── about.tsx              → /about
+├── users/
+│   ├── layout.tsx         /users/* 的嵌套布局
+│   ├── [id].tsx           → /users/:id
+│   └── [id].server.ts     /users/:id 的服务端 loader 与 action
+└── blog/
+    └── hello.md           → /blog/hello（Markdown 页面）
+```
+
+组件文件的扩展名随适配器而变（`.tsx`、`.vue`、`.svelte`），`.server.ts` 伴生文件则保持一致。
+
+- **`.server.ts`（或 `.tsx`、`.js`、`.jsx`、`.mts`、`.mjs`）文件**导出 `loader` 提供 `GET` 数据、导出 `action` 处理变更，与同名的页面组件配对
+- **布局**自动嵌套，并在导航之间保持存在
+- **Markdown** 页面支持 frontmatter
+- **环境后缀**：`debug.dev.tsx` 只在开发环境提供服务，`stats.prod.tsx` 只在生产环境
+
+完整指南见[页面路由](/docs/pages-routing)。
+
+## `middleware/`
+
+在每个请求上都运行的全局中间件。数字前缀决定执行顺序。
+
+```text title="middleware/"
+├── 01.logger.ts    最先执行
+└── 02.auth.ts      其次执行
+```
+
+每个文件默认导出一个 `defineMiddleware()` 处理器。用中间件设置所有路由都能取到的共享上下文（认证、日志、限流）。
+
+## `db/`
+
+D1、PostgreSQL 或 MySQL 的 [Drizzle schema](/docs/database) 与 SQL 迁移。
+
+```text title="db/"
+├── schema.ts        Drizzle schema（唯一事实来源）
+├── schema/          可选：拆分成多个文件
+└── migrations/
+    ├── 20260410161500_*.sql
+    └── 20260410161501_*.sql
+```
+
+- `db/schema.ts`：你的 Drizzle 表定义，也是数据库类型的事实来源
+- `db/schema/`：可选。把表拆分到多个文件，再从 `db/schema.ts` 重新导出
+- `db/migrations/`：生成的 SQL 迁移文件，部署时按顺序应用
+
+用 `void gen model` 生成 schema，或者手写。用 `void db generate` 生成迁移。
+
+## `crons/`
+
+[定时任务](/docs/jobs)。每个文件导出一个 `cron` 表达式与一个默认的 `defineScheduled()` 处理器。
+
+## `queues/`
+
+[队列消费者](/docs/queues)。每个文件默认导出一个 `defineQueue()` 处理器。
+
+## `email/`
+
+[收件邮件处理器](/docs/email/receiving)。文件名决定接收人；`_default.ts` 处理其他地址。
+
+## `durable-objects/`
+
+[Durable State](/docs/durable-state) 模块。每个文件默认导出一个 `defineDurableState()` 定义。
+
+## `src/`
+
+共享的应用代码，例如组件、工具函数与类型。这个目录没有特殊约定，随你怎么组织。
+
+## `public/`
+
+在根路径上原样提供服务的静态资源。这里的文件不经过 Vite 处理。
+
+## `.void/`
+
+生成的类型与本地开发状态（已 gitignore）。运行 `void prepare` 创建这些类型，或者让 `vite dev` 与 `vite build` 顺带更新它们。
+
+## 配置文件
+
+| 文件             | 用途                                                                                                                     |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `vite.config.ts` | Vite 配置。必须包含 `voidPlugin()`。                                                                                     |
+| `void.config.ts` | 可选的 Void 配置，用于[路由](/docs/config)、[推断](/docs/config)与 [worker 设置](/docs/config)                        |
+| `tsconfig.json`  | TypeScript 配置。继承 `.void/tsconfig.json` 以获得自动生成的类型；已有配置使用了 `extends` 时运行 `void init --tsconfig`。 |
+| `.env`           | 仅本地开发用的值（已 gitignore；永不部署）                                                                               |
+| `env.ts`         | 提交进仓库的环境变量名、类型、默认值与必填性                                                                             |
+
+本地值、生产 secret 与客户端构建时的行为见[环境变量](/docs/env-vars)。

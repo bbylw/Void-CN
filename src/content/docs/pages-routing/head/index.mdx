@@ -1,0 +1,180 @@
+---
+title: Head 管理
+description: 用 head()、中间件或站点级默认值设置页面标题与元数据。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+用 `head()`、中间件或站点级默认值来设置页面标题与元数据。页面里的取值优先于中间件与配置。
+
+## 页面标题与元数据
+
+从 `.server.ts` 文件导出一个 `head()` 函数。它会收到 Hono context 与解析后的 loader props，返回一个 `HeadDescriptor`：
+
+```ts title="pages/posts/[slug].server.ts"
+import { defineHandler, defineHead } from 'void';
+import type { PageParams } from 'void/routes';
+
+export interface Props {
+  post: { title: string; excerpt: string; slug: string };
+}
+
+export const loader = defineHandler<Props>(async (c) => {
+  const { slug } = c.req.param() as PageParams<'/posts/[slug]'>;
+  const post = await getPost(slug);
+  return { post };
+});
+
+export const head = defineHead<Props>((c, props) => {
+  return {
+    title: props.post.title,
+    meta: [
+      { name: 'description', content: props.post.excerpt },
+      { property: 'og:title', content: props.post.title },
+    ],
+  };
+});
+```
+
+`head()` 只在服务端运行，在 loader 解析完成之后调用。
+
+## 站点默认值
+
+在 `void.config.ts` 中设置站点级的 head 默认值：
+
+```json title="void.config.ts"
+{
+  "head": {
+    "titleTemplate": "%s | My Site",
+    "htmlAttrs": { "lang": "en" },
+    "meta": [
+      { "charset": "utf-8" },
+      { "name": "viewport", "content": "width=device-width, initial-scale=1" }
+    ]
+  }
+}
+```
+
+`titleTemplate` 包裹页面标题，`%s` 会被 `head()` 返回的 `title` 替换。按上面的模板，返回 `{ title: "About" }` 的页面产出 `<title>About | My Site</title>`。
+
+## 中间件默认值
+
+在中间件里设置 `headDefaults`，即可为每个页面追加默认值。例如让主题脚本在首次绘制之前执行：
+
+```ts title="middleware/01.head.ts"
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(async (c, next) => {
+  c.set('headDefaults', {
+    script: [
+      {
+        innerHTML: `const t = localStorage.getItem("theme");
+        if (t) document.documentElement.dataset.theme = t;`,
+      },
+    ],
+  });
+  await next();
+});
+```
+
+`headDefaults` 同样接受 `titleTemplate`，它会覆盖配置里的模板，作用范围是该中间件命中的请求。可以用它给站点的某个板块加上自己的标题后缀：
+
+```ts title="middleware/admin.ts"
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(async (c, next) => {
+  if (c.req.path.startsWith('/admin')) {
+    c.set('headDefaults', { ...c.get('headDefaults'), titleTemplate: '%s | Admin' });
+  }
+  await next();
+});
+```
+
+`/admin` 下返回 `{ title: "Users" }` 的页面产出 `<title>Users | Admin</title>`，其他页面仍使用配置的模板。
+
+想为某个板块彻底去掉后缀（包括配置里的那个），把模板设为空字符串：`c.set('headDefaults', { ...c.get('headDefaults'), titleTemplate: '' })`。此时 `/admin` 下返回 `{ title: "Users" }` 的页面产出 `<title>Users</title>`。
+
+## 优先级
+
+多个层同时提供 head 数据时，按下面的规则合并：
+
+| 字段        | 行为                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| `title`     | 页面优先。`titleTemplate` 取中间件的，否则取配置的，用来包裹胜出的标题。                   |
+| `meta`      | 按 `name` 或 `property` 去重。页面条目覆盖相同的键，不冲突的条目追加在后面。              |
+| `link`      | 依次拼接：先配置，再中间件，最后页面。                                                     |
+| `script`    | 依次拼接：先配置，再中间件，最后页面。                                                     |
+| `htmlAttrs` | 浅合并，冲突时页面优先。                                                                   |
+| `bodyAttrs` | 浅合并，冲突时页面优先。                                                                   |
+
+## 社交预览 URL
+
+社交预览图片可以写相对路径，Void 会用进来的请求把它补成绝对 URL：
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  head: {
+    meta: [{ property: 'og:image', content: '/og-image.jpg' }],
+  },
+});
+```
+
+对 `https://example.com/posts/hello` 的请求会得到：
+
+```html
+<meta property="og:image" content="https://example.com/og-image.jpg" />
+```
+
+配置、中间件与页面 head 数据中都生效，客户端导航同样处理。Void 会解析下面这些标签：
+
+- `og:image`、`og:image:url`、`og:image:secure_url`
+- `og:video`、`og:video:url`、`og:video:secure_url`
+- `og:audio`、`og:audio:url`、`og:audio:secure_url`
+- `og:url` 与 `twitter:image`
+
+绝对 URL 与其他标签保持你提供的取值。预渲染的页面请直接提供绝对 URL，例如 `https://example.com/og-image.jpg`：构建时并不知道站点的源，相对路径会原样留下。
+
+## HeadDescriptor
+
+```ts
+interface HeadDescriptor {
+  title?: string;
+  meta?: Array<{
+    name?: string;
+    property?: string;
+    content?: string;
+    charset?: string;
+  }>;
+  link?: Array<{ rel: string; href: string; [key: string]: string | undefined }>;
+  script?: Array<{ src?: string; innerHTML?: string; [key: string]: string | undefined }>;
+  htmlAttrs?: Record<string, string>;
+  bodyAttrs?: Record<string, string>;
+}
+```
+
+## Markdown 页面
+
+Markdown 页面（`.md` 文件）会根据 frontmatter 自动生成 head 标签，不需要 `.server.ts` 文件：
+
+```md
+---
+title: Getting Started
+description: Learn how to use Void
+---
+
+Your content here...
+```
+
+这会产出 `<title>Getting Started</title>` 与 `<meta name="description" content="Learn how to use Void">`，如果配置了 `titleTemplate` 也会一并应用。
+
+## 客户端更新
+
+标题、meta 标签与 link 会在客户端导航时自动更新。
+
+`script`、`htmlAttrs` 与 `bodyAttrs` 只在 SSR 时生效，客户端导航不会重新应用它们。
+
+<Callout type="info">
+`head()` 在服务端运行且能拿到解析后的 loader props，因此它无法读取只在浏览器里才有的状态；需要这类信息时改用客户端脚本。
+</Callout>

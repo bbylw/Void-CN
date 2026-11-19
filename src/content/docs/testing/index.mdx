@@ -1,0 +1,62 @@
+---
+title: 测试
+description: 用 Vitest 与 Vite+ 运行测试，mock Cloudflare 绑定，并用内置测试装置测试邮件。
+---
+
+Void 应用使用 [Vitest](https://vitest.dev/)。用 Vite+ 时，运行测试：
+
+```sh
+vp test
+```
+
+从 `vite-plus/test` 导入 `it`、`expect` 等测试 API。如果你当初选的是 Vite 而不是 Vite+，请把 `vitest` 装成 dev 依赖，并在导入和命令里都用 `vitest`。
+
+Vitest 使用你的 `vite.config.ts`。`void/*`、`@schema` 这类导入无需额外的测试配置就能工作。
+
+把测试放在 `tests/`，或者放在被测代码旁边的 `src/` 里。不要把测试文件放进[约定目录](/docs/reference/structure)（例如 `routes/` 和 `pages/`），否则 Void 会把它们当成应用路由。
+
+## 绑定
+
+测试在 Node.js 中运行，不会启动 Worker，也不会应用本地迁移。要测试用到 D1、KV、R2 或其他绑定的代码，请用 [`vi.mock()`](https://vitest.dev/api/vi#vi-mock) mock 掉对应模块。
+
+比如下面这个函数用 KV 统计访问次数：
+
+```ts
+// src/visits.ts
+import { kv } from 'void/kv';
+
+export async function countVisit(): Promise<number> {
+  const visits = ((await kv.get<number>('visits')) ?? 0) + 1;
+  await kv.put('visits', visits);
+  return visits;
+}
+```
+
+在测试里用一个内存 Map 替换 KV：
+
+```ts
+// src/visits.test.ts
+import { expect, it, vi } from 'vite-plus/test';
+import { countVisit } from './visits';
+
+vi.mock('void/kv', () => {
+  const values = new Map<string, unknown>();
+  return {
+    kv: {
+      get: async (key: string) => values.get(key) ?? null,
+      put: async (key: string, value: unknown) => {
+        values.set(key, value);
+      },
+    },
+  };
+});
+
+it('counts visits', async () => {
+  await countVisit();
+  expect(await countVisit()).toBe(2);
+});
+```
+
+## 邮件
+
+`void/email/testing` 能在测试中捕获发出与收到的邮件。参见发送邮件的[测试](/docs/email/sending)与接收邮件的[测试入站处理器](/docs/email/receiving)。

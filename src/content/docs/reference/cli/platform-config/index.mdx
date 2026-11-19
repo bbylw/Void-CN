@@ -1,0 +1,88 @@
+---
+title: 平台配置命令
+description: 在 administrator 会话下创建与编辑平台的套餐及其限额。
+---
+
+这些命令使用你的 administrator 会话。平台选择、预览与确认规则见[平台管理](/docs/reference/cli/platform)。
+
+## 套餐
+
+`void platform config plans` 会用你的 administrator 会话打开一个交互式套餐菜单。套餐有稳定的 ID 和可编辑的显示名。你可以复制现有套餐来新增一个、不重新部署就修改限额、归档以停止新的分配，或在为其账户指定明确替代套餐后删除它。
+
+```sh
+void platform config plans show [plan-id]
+void platform config plans add <plan-id> --copy <existing-id> --name "Team"
+void platform config plans set <plan-id> [--name "Team"] [--file plan.json]
+void platform config plans reset <builtin-plan-id>
+void platform config plans archive <plan-id>
+void platform config plans restore <plan-id>
+void platform config plans remove <plan-id> [--replacement <plan-id>]
+void platform config plans default <plan-id>
+void platform config plans sync
+```
+
+先用 `--plan` 预览变更与受影响的账户，再在脚本中用 `--yes` 应用。每条命令都支持 `--connection <slug-or-url>` 与 `--json`。
+
+### 查看与管理套餐
+
+- `show` 报告限额、注册默认套餐、分配情况与待处理的更新。`show <plan-id>` 还包含该套餐的 AI 日志默认值。
+- `reset` 恢复内置套餐原本的限额与构建规格。
+- `archive` 停止新的分配，同时保留已有账户。归档当前默认套餐之前，请先另选一个注册默认套餐。
+- `remove` 在该套餐仍有账户、或它是注册默认套餐时，必须给出替代套餐。
+- `default` 选定新账户使用的套餐。它同时会变更那些所分配套餐已从目录中缺失的账户的 AI 日志设置。
+
+### 套餐文件
+
+`add` 与 `set` 的 `--file` 读取一个 JSON 对象。所有字段都是可选的；省略的字段保留当前值或所复制套餐的值。
+
+| 字段                | 取值                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| `name`              | 显示名                                                                                        |
+| `limits`            | 资源限额的部分对象，取非负整数；`0` 表示该套餐不限制                                          |
+| `buildInstanceType` | `standard-3` 或 `standard-4`                                                                  |
+| `allowShortSlugs`   | `true` 允许今后使用五个字符或更短的项目 slug；`false` 要求更长的名称                          |
+| `aiLogging`         | `off`、`metadata` 或 `full`；`inherit` 会清除该套餐的覆盖设置                                 |
+
+构建超时由平台设定上限为 60 分钟；`0` 表示使用该上限。存储配额不可编辑。修改 `allowShortSlugs` 会保留已有的 URL。受支持的限额与文件示例见[套餐与限额](/docs/platform/administration/plans)，日志模式见 [AI Gateway 日志](/docs/reference/cli/platform-users)。
+
+### 应用与继续变更
+
+如果在你预览之后有人改动了套餐，请重新创建一次预览再应用。更低的配额可能限制住已经超过它的账户。使用历史与计费周期保持不变。
+
+CLI 会更新受影响的账户并发布 AI 日志默认值，随后报告新的 AI 请求预计何时开始遵循这些设置。如果更新失败或不再推进，命令以非零状态退出，配置仍保持已保存。运行 `void platform config plans sync --yes` 继续，然后再编辑套餐。连接丢失后，请先检查 `show` 与 [operator 事件](/docs/platform/administration/operations)再重试。
+
+## 认证配置
+
+`void platform config auth` 打开交互式配置。这些命令使用 `void platform auth login` 得到的 administrator 会话：
+
+```sh
+void platform config auth list
+void platform config auth show company
+void platform config auth add google
+void platform config auth add oidc --id company
+void platform config auth add cloudflare-access --id access
+void platform config auth configure company
+void platform config auth test company
+void platform config auth link company
+void platform config auth enable company
+void platform config auth disable github
+void platform config auth admission
+void platform config auth protection show
+void platform config auth protection enable --installation <id>
+void platform config auth protection disable --installation <id>
+void platform config auth recover company --installation <id> --file recovery.json
+```
+
+首次为某个已存在的 installation 做配置时，先运行 `void platform config auth initialize`，然后重新登录。它当前的登录方式与注册策略会被保留。
+
+新增或编辑一种登录方式只会保存一份待生效的配置。启用它之前会在浏览器中验证登录，通过后才会应用。把已验证的身份关联到你的账户是另一项独立的显式操作。停用某种登录方式之前，请确认已有另一种被关联的可用方式；最后一种方式无法停用。停用会登出所有通过它登录的用户，管理员也不例外。项目范围的部署 token 仍然有效；被用作 `VOID_TOKEN` 的登录 token 会被吊销。
+
+命令接受 `--connection <slug-or-url>` 与 `--json`。变更类命令接受 `--plan` 或 `--yes`。脚本化配置时，用 `--file <path>` 提供非机密字段，用 `--client-secret-env <name>` 指明存放机密的环境变量名。编辑时省略机密即保留已保存的值。在脚本中执行 `enable` 或 `link` 时，请传入来自已完成测试的 `--test-id <id>`。`test --json` 会返回浏览器 URL、test ID 与过期时间，而不等待测试完成。
+
+`admission` 选择「仅邀请/白名单」、「公司审批」或「公开注册」。公司审批式注册在用户通过所配置的公司规则时自动创建普通账户。请选择一个已启用、且限定公司的 OIDC 或 Google Workspace 方式，或一个已启用的 Cloudflare Access 闸门。在脚本中，`admission --file <path> --yes` 读取形如 `{"mode":"company","connections":["company"],"access":false}` 的策略。
+
+`protection enable` 独立于登录方式创建或连接 Cloudflare Access application。它的 `--file` 接受[安装配置](/docs/platform/installation/setup)中描述的 `cloudflareAccess` 对象。防护变更要求你是该 installation 的所有者、持有保存下来的 recovery 凭据，并且已以 administrator 登录。它们会登出所有用户。在移除防护之前，请先改掉任何依赖该闸门的注册规则。Cloudflare 侧的 application 会被保留，交由你自行清理。
+
+`recover <connection-id>` 在正常登录不可用时恢复一位已有的 administrator。其文件包含 `administratorUserId`、可选的非机密提供方 `configuration`，以及在使用 `--yes` 时带有精确 `issuer` 与 `subject` 的 `expectedIdentity` 对象。恢复要求 Cloudflare 的 management/database 权限、原始的 recovery key，以及一次成功的浏览器提供方测试。新增或轮换凭据请用 `--client-secret-env <name>`。
+
+自动化相关内容见 [operator 认证](/docs/reference/cli/platform)。

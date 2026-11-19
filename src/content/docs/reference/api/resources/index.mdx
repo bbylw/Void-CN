@@ -1,0 +1,126 @@
+---
+title: 资源客户端
+description: 用于 KV、对象存储、AI、缓存重验证与日志的客户端。
+---
+
+## KV
+从 `"void/kv"` 导入。
+
+### `kv`
+针对推断出的 `KV` 绑定的、带类型的 JSON 感知客户端。
+
+```ts
+import { kv } from 'void/kv';
+
+await kv.put('settings', { theme: 'dark' });
+const settings = await kv.get<{ theme: string }>('settings');
+```
+
+**主要导出：** `kv`、`createKV(namespace)`、`KVClient`、`KVMap`、`PutOptions`、`ListOptions`。
+
+`kv.map(prefix)` 创建一个带类型的命名空间视图，其中每个键都存储在 `prefix:` 之下。
+
+## 存储
+从 `"void/storage"` 导入。
+
+### `storage`
+针对推断出的 `STORAGE` 绑定的默认 [R2 桶](https://developers.cloudflare.com/r2/)代理。
+
+```ts
+import { storage } from 'void/storage';
+
+await storage.put('avatars/alice.png', file);
+const object = await storage.get('avatars/alice.png');
+```
+
+**主要导出：** `storage`、`createStorage(bucket)`。
+
+## AI
+从 `"void/ai"` 导入。
+
+### `ai`
+面向 Cloudflare AI 模型与服务商原生 AI Gateway 请求的带类型 AI 客户端。
+
+```ts
+import { ai } from 'void/ai';
+
+const result = await ai.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
+  messages: [{ role: 'user', content: 'Summarize this release note.' }],
+});
+
+const response = await ai.provider('openai').fetch('/chat/completions', {
+  body: {
+    model: 'gpt-4o',
+    messages: [{ role: 'user', content: 'Summarize this release note.' }],
+  },
+});
+```
+
+**主要导出：** `ai`、`VoidAi`、各服务商的请求类型。服务商配置与流式示例见 [AI](/docs/ai)。
+
+AI 方法返回 Promise，并在超出用量限制时用 `void/limits` 中的 `UsageLimit` 拒绝。对于未被捕获的限制，Void 路由与 Pages action 会返回结构化的 HTTP 429。可选的 `instanceof UsageLimit` 处理方式见[用量限制](/docs/ai)。
+
+### 服务商密钥
+`ai.provider()` 默认使用的密钥名称。想改用其他名称请用 `apiKeyEnv`。
+
+| 服务商标识             | 环境变量                |
+| ---------------------- | ----------------------- |
+| `openai`               | `OPENAI_API_KEY`        |
+| `anthropic`            | `ANTHROPIC_API_KEY`     |
+| `google-ai-studio`     | `GOOGLE_API_KEY`        |
+| `deepseek`             | `DEEPSEEK_API_KEY`      |
+| `groq`                 | `GROQ_API_KEY`          |
+| `mistral`              | `MISTRAL_API_KEY`       |
+| `grok`                 | `GROK_API_KEY`          |
+| `openrouter`           | `OPENROUTER_API_KEY`    |
+| `perplexity`           | `PERPLEXITY_API_KEY`    |
+| `cohere`               | `COHERE_API_KEY`        |
+| `cerebras`             | `CEREBRAS_API_KEY`      |
+| `huggingface`          | `HUGGINGFACE_API_KEY`   |
+| `replicate`            | `REPLICATE_API_KEY`     |
+| `baseten`              | `BASETEN_API_KEY`       |
+| `cartesia`             | `CARTESIA_API_KEY`      |
+| `deepgram`             | `DEEPGRAM_API_KEY`      |
+| `elevenlabs`           | `ELEVENLABS_API_KEY`    |
+| `fal`                  | `FAL_API_KEY`           |
+| `ideogram`             | `IDEOGRAM_API_KEY`      |
+| `parallel`             | `PARALLEL_API_KEY`      |
+
+## ISR
+从 `"void/isr"` 导入。
+
+### `revalidate(options)`
+按需重验证被 ISR 缓存的页面。本地开发中这是一个空操作，因为本地没有边缘 ISR 缓存。
+
+```ts
+import { revalidate } from 'void/isr';
+
+await revalidate({ paths: ['/', '/blog/hello'] });
+await revalidate({ all: true });
+```
+
+开启 [`routing.typedRoutes`](/docs/config) 后，每个路径都必须匹配你的某条路由。请用 `routeUrl()` 构建路径，或对你自行校验过的路径使用 `as RouteUrl`。未开启该设置时，`RouteUrl` 就是 `string`。
+
+**签名：**
+
+```ts
+function revalidate(options: { paths?: RouteUrl[]; all?: boolean }): Promise<void>;
+```
+
+## 日志
+从 `"void/log"` 导入。
+
+### `logger`
+结构化日志器，每次调用输出一行 JSON，因此线上日志可以按消息与字段过滤。
+
+```ts
+import { logger } from 'void/log';
+
+logger.info('checkout completed', { orderId, userId });
+logger.error('webhook failed', { provider: 'stripe', attempt: 3 });
+
+const log = logger.child({ component: 'queue', queue: 'tasks' });
+log.info('task.started', { taskId });
+```
+
+**方法：** `logger.error(message, fields?)`、`logger.warn(message, fields?)`、`logger.info(message, fields?)`、`logger.child(fields)`。

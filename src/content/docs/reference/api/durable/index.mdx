@@ -1,0 +1,45 @@
+---
+title: Durable State 与 WebSocket API
+description: 来自 void/durable 的持久化对象与类型化 WebSocket 连接。
+---
+
+从 `"void/durable"` 导入。完整的文件约定与部署支持见 [Durable State](/docs/durable-state)。
+
+## `defineDurableState(definition)`
+
+定义一个带类型、可持久化的 Durable Object 状态机。返回的对象必须是 `durable-objects/` 下某个模块的默认导出；同时在应用中以具名导出导出同一个对象，就能在别处进行类型化的 RPC 调用。
+
+```ts
+function defineDurableState<TState, TEnv, TMethods>(definition: {
+  name?: string;
+  initialState: TState | ((env: TEnv) => TState | Promise<TState>);
+  version?: number;
+  migrations?: Array<{
+    version: number;
+    migrate(state: unknown): TState | Promise<TState>;
+  }>;
+  methods: TMethods;
+  fetch?: (context, request: Request) => Response | Promise<Response>;
+  alarm?: (context) => void | Promise<void>;
+  storageKey?: string;
+}): DurableStateApi<TMethods>;
+```
+
+`DurableStateApi` 暴露 `class`、`get(name)`、`get(namespace, name)`、`getById(id)` 与 `getById(namespace, id)`。这些查找辅助方法返回的 stub 包含 definition 中的方法，参数类型保持不变，返回值被包装成 `Promise`。
+
+`name` 可以（可选地）固定持久化资源的身份，而不是从文件名推导。在重命名一个已部署的 definition 之前，先运行 `void info`，把它显示出的名字固定下来。传给 `get()` 的实例名要保持不变。参见[迁移流程](/docs/durable-state)。
+
+## WebSocket
+
+从 `"void/ws"` 导入。`defineRoom()` 为钩子上下文添加共享 room 的辅助方法；`defineWebSocket()` 提供连接的 socket 辅助方法。两者都要求提供 `messages.client` 与 `messages.server` 两个 Standard Schema 校验器，并支持 [WebSocket 指南](/docs/websockets)中描述的钩子。
+
+两个辅助方法都接受以下可选的资源设置：
+
+```ts
+name?: string;
+key?: (context: { params: Record<string, string> }) => string;
+```
+
+`name` 固定 Worker 类与绑定的身份。不设置时，Void 从路由文件推导该身份。在移动一个已部署的路由之前先运行 `void info`，并把它显示出的名字固定下来。
+
+`key` 选择路由实例及其 `ctx.id`。不设置时，路由按顺序使用参数的名称与取值（例如 `room=general`；没有参数时为 `default`）。回调必须以同步方式返回一个稳定的字符串。重命名参数时，保留完整的旧 key 才能保住状态。参见[移动路由](/docs/websockets)与[重命名路由参数](/docs/websockets)。

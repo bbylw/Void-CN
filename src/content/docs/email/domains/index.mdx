@@ -1,0 +1,119 @@
+---
+title: 邮件域名与配置
+description: 在 Void 平台上注册邮件域名，或在你自己的 Cloudflare 账户中配置收发邮件。
+---
+
+根据你的部署方式选择配置路径：在 Void 平台上注册域名，或在你自己的 Cloudflare 账户中配置邮件。要使用平台提供的共享发件人，请阅读[发送邮件](/docs/email/sending)。
+
+## 在平台上使用你自己的域名
+
+共享发件人使用平台配置好的邮件域名。要想在你自己拥有的域名上发送——以及接收——邮件，先把它的 Cloudflare zone 注册到项目：
+
+```sh
+void email domain add acme.com
+```
+
+`add` 会打开一个 Cloudflare API token 模板。创建 token 之前，把它限制在所选的账户与邮件 zone 上；Workers Scripts 权限作用于整个账户。CLI 接受打码后的粘贴内容或刚复制的 token，并让你确认这些限制。平台会加密这份凭据用于 zone 连接，因此共享同一个 zone 的项目不需要各自创建 ingress Worker。
+
+对于入站邮件，请使用没有现存邮件服务的 Cloudflare zone 顶点域名，例如 `example.com`。每个顶点域名只属于一个项目，而一个项目可以注册多个域名。已有的 MX 记录或指向别处的 catch-all 会阻止注册，以保护你现有的邮件服务。
+
+如果想让邮件继续由其他服务商接收，请平台管理员把该域名注册为[仅出站](/docs/platform/administration/email)。你也可以使用平台的共享邮件地址。
+
+如果配置过程中断了，用 `void email domain status <domain>` 查看已保存的操作状态，再重试。
+
+`void email domain status <domain>` 会报告三项相互独立的结果：
+
+- **Inbound（入站）**：邮件能否到达项目的处理器。
+- **Outbound（出站）**：发送是否就绪，是仅限已验证目的地、待处理，还是被阻断。
+- **Management（管理）**：保存的 Cloudflare 凭据能否管理该连接。
+
+用 `void email domain sync <domain>` 完成配置并刷新就绪状态。状态输出会列出仍需在控制台或凭据上处理的步骤。入站就绪后用 `rotate-secret` 轮换连接密钥，或用 `remove` 解除域名绑定。请在 Cloudflare 中吊销不再使用的 API token，参见[邮件域名命令](/docs/reference/cli/email)。
+
+入站就绪后，发往该域名任意地址的邮件都会进入你的 `email/` 处理器。要向任意收件人发送，还要求出站也已就绪；仅限已验证目的地的域名仍然需要逐个验证收件人。平台的配额与停用策略同时适用于共享发件人和自定义发件人。
+
+在由管理员管理的平台上，`add` 会为新的域名打印出管理员需要执行的命令。已有的、由所有者管理的连接继续对其所有者可用。你的管理员可能允许向特定收件人域名或任意收件人使用共享发件人发送邮件；发往平台共享邮件域名的地址仍需要显式验证。
+
+## 你自己的 Cloudflare 账户
+
+在你拥有的 Cloudflare zone 上设置发件人：
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  email: { from: 'Acme <support@mail.acme.com>' },
+});
+```
+
+使用邮件子域名，可以让 `acme.com` 上的现有邮件继续留在当前服务商那里。Void 不会替换其他服务商的 MX 记录。
+
+### 配置
+
+用 `void cloudflare login` 登录，或者使用一个 `CLOUDFLARE_API_TOKEN`，除部署权限外还要具备 **Zone Read** 与 **Email Sending Edit**。带有 `email/` 处理器的应用还需要 **Email Routing Edit**。如果你的浏览器会话缺少邮件相关权限，请退出后重新登录。不支持 Global API Key。
+
+运行 `void deploy --platform cloudflare`。Void 会展示它将要配置的域名、路由、发送、DNS 与处理器地址。确认后即完成邮件配置并部署。之后的部署会复用这份配置。如果你拒绝首次配置，应用照样部署，但不带邮件能力。
+
+没有 `email/` 处理器的应用使用仅发送的配置。Void 只检查发送域名与绑定，不启用入站路由或 plus addressing，因此来信可以继续留在你现有的服务商那里。就绪状态确认的是配置，而不是收件箱收信。
+
+没有 `email.from` 时，Void 跳过自动配置，并保留你自己编写的 `cloudflare.send_email` 绑定与 `cloudflare.addresses`；就绪状态需要你自己检查。即使如此，`--require-email` 在无法验证自动配置时仍会拒绝部署。
+
+如果子域名配置需要在控制台里手动完成，按 **Email → Settings → Subdomains** 下的清单操作，然后重试。DNS 改动之后，用下面的命令检查就绪状态：
+
+```sh
+void email status --platform cloudflare
+```
+
+### 入站地址
+
+当 `email.from` 设在 `mail.acme.com` 上时，处理器收到的地址如下：
+
+| 处理器                            | 子域名地址              | zone 顶点地址      |
+| --------------------------------- | ----------------------- | ------------------ |
+| `support.ts`、`support+[ticket].ts` | `support@mail.acme.com` | `support@acme.com` |
+| `_default.ts`                     | 无 catch-all 规则       | `*@acme.com`       |
+| `[user].ts`、`[user]+[tag].ts`    | 不支持                  | `*@acme.com`       |
+
+Cloudflare 的 catch-all 只覆盖 zone 顶点域名。在子域名上，`_default.ts` 只能处理由显式规则放进来的邮件，无法接收任意地址。
+
+配置会启用该 zone 的 plus addressing，因此 `support+T-42@mail.acme.com` 能到达 `support+[ticket].ts`。这个设置同样作用于顶点域名和其他子域名。
+
+`replyEmail()` 默认把发件人设为收到这封邮件的地址。转发则要求收件地址在 Cloudflare 中已验证。
+
+### 发送
+
+在 Workers Free 上，带 `email/` 处理器的应用可以向 Cloudflare 控制台中 **Email Routing → Destination addresses** 下列出的已验证目的地发送。没有 `email/` 处理器的应用通过 Email Sending 发送，这需要 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans)。
+
+按 [Cloudflare 的邮件认证指南](https://developers.cloudflare.com/email-service/concepts/email-authentication/)配置你发件域名的 SPF、DKIM 与 DMARC 记录，然后在一封已收到的邮件的原始邮件头中检查认证结果。`sendEmail()` 返回成功只说明服务商已接受这封邮件，不代表一定送达，也不代表认证已就绪。
+
+向任意收件人发送需要 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans) 以及完成 Email Sending onboarding。升级之后运行 `void email setup --platform cloudflare`。配置保存后，后续部署不会重试 onboarding。
+
+已有的 DMARC 或退信域名记录可能阻断 onboarding；清单会指出需要解决的冲突。带 `email/` 处理器的应用会保留入站邮件。
+
+`void email usage`、`logs`、`destinations`、`allow` 与 `disallow` 这些命令只适用于 Void 平台。
+
+### 配置变更
+
+配置完成后请把 `void.lock.json` 提交到版本库。Void 从你的处理器推导路由地址，并在部署时创建对应规则。
+
+已属于其他 Worker 或转发服务的现有规则会保持原样。如果你自己维护 `cloudflare.addresses`，请按清单操作，而不要把它和自动邮件配置混用。
+
+删除某个处理器之后，检查被报告出的过期地址，并按需设置 `cloudflare.addresses`。删除路由规则需要在交互式终端中确认。
+
+要彻底移除所有邮件配置，请在 `void.lock.json` 的 `resolved` 中删除 `addresses`、`send_email` 与 `vars.__VOID_EMAIL_FROM`，删除 `void.config.ts` 中对应的覆盖项，并在 Cloudflare 中删除路由规则。
+
+### CI
+
+先在本地完成邮件配置：
+
+```sh
+void email setup --platform cloudflare
+void email status --platform cloudflare
+```
+
+提交 `void.lock.json`，然后在 CI 中用下面的命令部署：
+
+```sh
+void deploy --platform cloudflare --require-email
+```
+
+CI 无法回答配置过程中的交互提问。缺少 `--require-email` 时，未配置邮件的应用也能部署成功，只是不带邮件。如果配置已保存但 DNS 尚未生效，部署会等待后续重试。对于带入站处理器的应用，Workers Free 下针对已验证收件人的配置即可满足 `--require-email`。仅发送的应用则需要一个已 onboard 的发送域名（Workers Paid）和一个已配置的发送绑定。

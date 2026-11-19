@@ -1,0 +1,137 @@
+---
+title: Astro
+description: 在 Astro 应用里接入 Void，获得资源探测、带类型的数据库查询、迁移与部署能力。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+把 Void 用在 [Astro](https://astro.build/) 应用里，可以获得资源探测、带类型的数据库查询以及迁移能力。Astro 保留自己的构建流程和 Cloudflare 集成，Void 则接入它的 Vite 配置。
+
+<Callout type="warn" title="需要 Astro 7">
+  必须使用 [Astro 7+](https://astro.build/blog/astro-7/)，因为 Void 需要 Vite 8。此外还要在 Cloudflare 配置的
+  `compatibility_flags` 中开启 `"nodejs_als"`。
+</Callout>
+
+## 接入步骤
+
+### 1. 创建新项目
+
+```bash
+npm create astro@latest my-app
+cd my-app
+```
+
+### 2. 安装依赖
+
+```bash
+npm install -D @astrojs/cloudflare void
+```
+
+### 3. 配置 `astro.config.mjs`
+
+```js
+import cloudflare from '@astrojs/cloudflare';
+import { defineConfig } from 'astro/config';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  adapter: cloudflare({ configPath: './.void-wrangler.jsonc' }),
+  vite: { plugins: [voidPlugin()] },
+});
+```
+
+### 4. 创建 `void.config.ts`
+
+开发与部署期间，Void 都用这份配置来驱动 Cloudflare 适配器：
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  cloudflare: {
+    name: 'my-app',
+    compatibility_date: '2026-02-24',
+    compatibility_flags: ['nodejs_als'],
+  },
+});
+```
+
+在 Astro 中，`void/*` 运行时辅助函数（例如 `void/db`、`void/kv`）必须有 `nodejs_als`。
+
+### 5. 部署
+
+```bash
+void auth login
+void deploy
+```
+
+## 使用 Void 能力
+
+只要使用 Astro 7+ 并开启 `nodejs_als`，多数 [Void 平台能力](/docs/app-types)在本地开发和生产中都能在 Astro 里工作。
+
+Void 托管的认证暂不支持框架模式，目前请直接使用 Better Auth 官方的 Astro 集成。
+
+访问运行时绑定的页面与 API 路由必须退出预渲染：
+
+```astro
+---
+export const prerender = false;
+---
+```
+
+### 数据库
+
+在 API 路由与服务端代码中使用 `void/db`：
+
+```ts
+import { users } from '@schema';
+import type { APIRoute } from 'astro';
+import { db } from 'void/db';
+
+export const prerender = false;
+
+export const GET: APIRoute = async () => {
+  const rows = await db.select().from(users);
+  return Response.json(rows);
+};
+```
+
+### 其他资源
+
+在服务端代码中使用 [KV](/docs/kv)、[对象存储](/docs/storage) 与 [AI](/docs/ai)，导入方式和 Void 应用完全相同。在 `crons/` 中添加 [cron 任务](/docs/jobs)，在 `queues/` 中添加[队列消费者](/docs/queues)。
+
+### 环境变量
+
+在 `env.ts` 中声明变量，用 `import { env } from "void/env"` 读取。本地取值、生产密钥以及公开的 `VITE_*` 值参见[环境变量](/docs/env-vars)。
+
+Void 在为客户端暴露的 schema 键名上始终使用 `VITE_*`，Astro 项目也一样。Astro 自己的 `PUBLIC_*` 约定仍然适用于直接访问 `import.meta.env` 的场景，但它不会改变 `void/env` 的服务端/客户端边界。
+
+访问环境变量时，`void/env` 取代 [`astro:env`](https://docs.astro.build/en/guides/environment-variables/)。需要直接访问原始绑定（D1、KV、R2 等）时，使用 `cloudflare:workers` 里的 `env`。
+
+## 直接访问绑定
+
+用 `cloudflare:workers` 提供的 `env` 访问绑定（开发与生产都可用）：
+
+```ts
+import type { APIRoute } from 'astro';
+import { env } from 'cloudflare:workers';
+
+export const prerender = false;
+
+export const GET: APIRoute = async () => {
+  const { results } = await env.DB.prepare('SELECT * FROM users').all();
+  return Response.json(results);
+};
+```
+
+在 `.astro` 页面里（记得设置 `prerender = false`）：
+
+```astro
+---
+import { env } from 'cloudflare:workers';
+
+export const prerender = false;
+
+const { results } = await env.DB.prepare("SELECT * FROM users").all();
+---
+```

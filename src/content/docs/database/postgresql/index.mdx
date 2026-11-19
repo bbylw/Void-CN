@@ -1,0 +1,95 @@
+---
+title: PostgreSQL
+description: 通过 Cloudflare Hyperdrive 连接 PostgreSQL，并用与 D1 相同的 Drizzle schema 与查询流程访问它。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+通过 [Cloudflare Hyperdrive](https://developers.cloudflare.com/hyperdrive/) 连接你的 PostgreSQL 数据库，之后使用与 D1 相同的 Drizzle schema 和查询流程。
+
+## Hyperdrive 是什么？
+
+Hyperdrive 在 Worker 与 PostgreSQL 之间做连接池。请求会复用已有连接，而不是每次都新建一条 TCP 与 TLS 连接。
+
+Void 能根据你的连接字符串自动创建 Hyperdrive 配置。直连 Cloudflare 部署在首次创建时还需要一个 API token，见 [Cloudflare 指南](/docs/integrations/cloudflare)。
+
+## 配置
+
+### 1. 设置数据库
+
+在 `void.config.ts` 中加入：
+
+```json
+{
+  "database": "pg"
+}
+```
+
+### 2. 添加连接字符串
+
+本地开发时，把 `DATABASE_URL` 加到 `.env`：
+
+```dotenv
+DATABASE_URL=postgresql://user:password@host:5432/mydb?sslmode=require
+```
+
+在本地 Vite 开发期间，它会直连你的 Postgres 数据库。
+
+### 3. 部署
+
+对于 Void 平台，部署时会按需提示你输入连接字符串，也可以用 `void db set-url` 设置。直连 Cloudflare 部署时，请在 shell 中导出生产环境的 `DATABASE_URL`。
+
+Void 会创建 Hyperdrive，并且不会把连接字符串存进项目配置。`postgres://` 与 `postgresql://` 两种 URL 都支持，也包含类似 `?sslmode=require` 的服务商查询参数。
+
+Void 创建的 Hyperdrive 使用 Cloudflare 默认的 `require` 模式建立 TLS 连接。Hyperdrive 不会采用你连接字符串里的 `sslmode=verify-ca`、`sslmode=verify-full` 或 `sslrootcert` 设置。若要让 Hyperdrive 在直连 Cloudflare 部署时用特定的证书颁发机构校验你的数据库，请[用该证书在 Cloudflare 创建 Hyperdrive](https://developers.cloudflare.com/hyperdrive/configuration/tls-ssl-certificates-for-hyperdrive/)，并把它 ID 填进 [`cloudflare.hyperdrive`](/docs/integrations/cloudflare)。
+
+## 定义 schema
+
+从 `void/schema-pg` 导入 schema 辅助函数：
+
+```ts title="db/schema.ts"
+import { pgTable, serial, text, timestamp, boolean } from 'void/schema-pg';
+
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  role: text('role').notNull().default('user'),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+```
+
+`database` 设为 `"pg"` 时，`void gen model` 会生成适配 PostgreSQL 的代码。
+
+## 迁移
+
+迁移流程与 D1 相同：
+
+```bash
+# 根据 schema 变更生成迁移文件
+void db generate
+
+# 在本地应用待处理的迁移
+void db migrate
+
+# 检查迁移状态
+void db status
+```
+
+主要区别在于 PostgreSQL 支持**事务性 DDL**。每个迁移都会被 `BEGIN` 和 `COMMIT` 包裹，因此失败时会回滚整个迁移，而不会把数据库留在半更新状态。
+
+<Callout type="tip">
+  `void deploy` 会在让新版本上线之前应用待处理的迁移，见[部署](/docs/deployment)。
+</Callout>
+
+## 更新连接字符串
+
+要更新已关联的 Void 项目的连接（例如把数据库迁到了另一台主机）：
+
+```bash
+void db set-url
+```
+
+它会提示你输入新的连接字符串，并更新 Hyperdrive 配置。

@@ -1,0 +1,40 @@
+---
+title: 插件与配置
+description: 在 Vite 中接入 Void。插件负责搭建路由、迁移支持与 Cloudflare Workers 运行时。
+---
+
+import ApiTable from '@/components/docs/ApiTable.astro';
+
+## `voidPlugin(options?)`
+
+从 `"void"` 的具名导出。返回一组 Vite 插件，负责搭建基于文件系统的路由、迁移支持与 Cloudflare Workers 运行时。应用级配置从 [`void.config.ts`](/docs/config) 读取；可选的 `options` 对象控制 Vite/Cloudflare 插件的行为。
+
+```ts
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  plugins: [voidPlugin()],
+});
+```
+
+<ApiTable
+  rows={[
+    { name: 'persistTo', type: 'string', description: '持久化本地开发状态（D1、KV、R2）的目录路径，默认项目根目录下的 .void/' },
+    { name: 'auxiliaryWorkers', type: 'AuxiliaryWorkerConfig[]', description: '与你的应用一起运行的额外 Worker，例如共享绑定的独立 API Worker 与管理后台。每一项接受 configPath（JSON、JSONC 或 TOML）、config（配置对象或回调）、viteEnvironment 与 devOnly' },
+  ]}
+/>
+
+## 项目配置
+### `defineConfig(config)`
+在根目录的 `void.config.ts` 中从 `void/config` 导入。它返回带有编辑器补全与 TypeScript 检查的配置。Void 在加载配置时会再次校验结果，包括运行时计算出的值。
+
+```ts
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  cloudflare: { name: 'my-app' },
+  routing: { revalidate: 60 },
+});
+```
+
+全部字段见[配置参考](/docs/config)。

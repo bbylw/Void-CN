@@ -1,0 +1,70 @@
+---
+title: 边缘预渲染
+description: 在部署时预渲染页面，让第一位访客拿到的就是缓存好的 HTML。
+---
+
+在部署时预渲染页面，让第一位访客拿到的就是缓存好的 HTML。
+
+- [Markdown 页面](/docs/pages-routing/markdown)会自动预渲染。
+- 没有配套 loader、也没有动态参数的[岛屿页面](/docs/pages-routing/islands)同样会自动预渲染。
+
+## 静态页面（无参数）
+
+在配套的 `.server.ts` 文件中导出 `prerender = true`：
+
+```ts title="pages/about.server.ts"
+export const prerender = true;
+```
+
+没有动态参数的页面不需要 `getPrerenderPaths()`。
+
+## 动态页面（带参数）
+
+动态页面需要导出 `getPrerenderPaths()` 来选择要渲染哪些路径。给它的返回类型标注 [`PageParams`](/docs/reference/api/types)，TypeScript 就会检查参数名：
+
+```ts title="pages/blog/[slug].server.ts"
+import type { PageParams } from 'void/routes';
+
+export const prerender = true;
+
+export async function getPrerenderPaths(): Promise<PageParams<'/blog/[slug]'>[]> {
+  return [{ slug: 'hello-world' }, { slug: 'getting-started' }];
+}
+```
+
+每个路径返回一个对象，包含所有必填参数。取值可以是字符串或数字，Void 会对它们做 URL 编码。如果值里含有 `/`，请使用 `pages/docs/[...slug]` 这样的 catch-all 页面，例如 `{ slug: 'guides/intro' }`。
+
+只有写上类型标注，TypeScript 才会检查键名。部署时，Void 会带上服务端文件名和下标报告非法条目。
+
+## 自定义 SSR
+
+在自定义 SSR 模式（`src/main.ssr.ts`）下，在顶层导出 `getPrerenderPaths()`。由于没有文件路由，返回的是完整路径字符串：
+
+```ts title="src/main.ssr.ts"
+export const prerender = true;
+
+export async function getPrerenderPaths(): Promise<string[]> {
+  return ['/', '/about', '/blog/hello-world'];
+}
+```
+
+## 与重验证的关系
+
+在 `void.config.ts` 中设置 `routing.isr: false` 会关闭 ISR，也就关闭这套边缘预渲染行为，包括各个页面的导出。它不会关闭 `output: "static"` 的构建期 HTML 生成。
+
+预渲染页面的重新验证 TTL 默认是一年。部署会清空 ISR 缓存。
+
+可以按页面覆盖 TTL：
+
+```ts title="pages/about.server.ts"
+export const prerender = true;
+export const revalidate = 3600;
+```
+
+如果缓存页面在你下一次部署之前就过期了，那么下一个请求会等待一次全新的渲染。
+
+## 行为细节
+
+- 预渲染在每次部署时执行一次，发生在流量切到新版本之前。预渲染好的页面会缓存在边缘。
+- 只有 revalidate TTL 为正数的路径会被预渲染（TTL 为 `0` 会被跳过）。
+- 预渲染失败只会记录日志，永远不会阻塞部署。页面会在第一个请求到达时照常渲染。

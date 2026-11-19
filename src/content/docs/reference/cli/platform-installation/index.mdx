@@ -1,0 +1,139 @@
+---
+title: 平台安装命令
+description: 从 CLI 安装一个 Void 平台，设置它的域名，并执行它的 lifecycle 命令。
+---
+
+```sh
+void platform install [options] [--yes]
+```
+
+| 选项                                      | 用途                                                                               |
+| ----------------------------------------- | ---------------------------------------------------------------------------------- |
+| `--name <slug>`                           | 安装名，用于 `void-<name>-<role>` 形式的资源名；请选一个未被使用的名字            |
+| `--display-name <name>`                   | 供人阅读的平台名称                                                                 |
+| `--account <id>`                          | Cloudflare 账户 id                                                                 |
+| `--auth-config <path>`                    | 登录方式、注册策略，以及指向提供方机密的环境变量引用                               |
+| `--login-methods <methods>`               | 以逗号分隔的登录方式，可取 `github`、`google`、`oidc` 或 `cloudflare-access`      |
+| `--access-protection`                     | 用 Cloudflare Access 保护平台 UI 与 API                                            |
+| `--no-access-protection`                  | 跳过 Cloudflare Access 保护                                                        |
+| `--app-access <public\|platform\|custom>` | 公开应用、平台自己的 Access 策略，或单独选择的应用策略                             |
+| `--hyperdrive <create\|id>`               | 创建 Hyperdrive，或使用指定的已有配置                                              |
+| `--application-domain <domain>`           | 已部署应用的基础域名                                                               |
+| `--workers-dev`                           | 显式的测试模式；之后可再添加应用域名                                               |
+| `--zone <domain>`                         | 包含应用域名的 Cloudflare zone                                                     |
+| `--dedicated-zone`                        | 添加整 zone 范围的 catch-all 路由；仅当应用域名就是整个 zone 时有效                |
+| `--no-dedicated-zone`                     | 跳过整 zone 范围的应用 catch-all 路由                                              |
+| `--custom-domains`                        | 允许项目添加自己的域名；需要独占的 zone                                            |
+| `--runtime-logs <full\|minimal>`          | `minimal` 不会把请求 URL 与日志、异常消息写入运行时日志                            |
+| `--storage-location <hint\|automatic>`    | 新项目 R2 bucket 的默认位置提示；`automatic` 会清除它                             |
+| `--control-plane-domain <domain>`         | 可选的 API 自定义 hostname；默认为 `workers.dev`                                   |
+| `--no-control-plane-domain`               | 使用默认的 `workers.dev` API hostname                                              |
+| `--dashboard-url <origin>`                | 单独部署的可选 dashboard 的 HTTPS origin                                           |
+| `--plan`                                  | 预览 Cloudflare 变更并在本地保存安装选项                                           |
+| `--resume`                                | 继续与之对应的、已保存检查点的安装                                                 |
+| `--runtime <path>`                        | 部署一个本地构建、经过完整性校验的 runtime 目录                                    |
+| `--yes`                                   | 在非交互使用中确认 Cloudflare 变更                                                 |
+
+第一次安装请照着[安装一个 Void 平台](/docs/platform)操作。交互式安装器会推荐使用域名，并把 **Use workers.dev for testing** 作为可见的备选提供出来。Void 会创建平台基础设施与数据表。两种模式都要求外部 PostgreSQL 和一个已配置的登录方式。请勾选你想启用的所有登录方式；初始状态一个都不选。非交互安装在没有提供登录配置时默认使用 GitHub。`--workers-dev` 会跳过 zone/DNS/证书相关操作，且不能与 `--application-domain`、`--zone` 或 `--dedicated-zone` 同时使用。
+
+只读的 plan、使用默认 API hostname 的 workers.dev 安装，以及受支持的 lifecycle 操作，都可以用 Cloudflare 浏览器登录加系统钥匙串。要写入 DNS 或创建 zone 的安装则需要一个 management API token。交互式安装器会引导你创建一个并粘贴到掩码提示中；脚本使用 `CLOUDFLARE_API_TOKEN` 或 `CF_API_TOKEN`。
+
+安装好的平台需要一个独立的 runtime token，用于给应用开通资源。交互式安装器会提示输入它和其他配置值。非交互安装请注入[从 CI 安装](/docs/platform/installation/ci)中列出的变量。
+
+要在安装或升级期间启用邮件，请同时设置 `VOID_EMAIL_SENDER_DOMAIN` 与 `VOID_EMAIL_SHARED_ZONE_ID`。Void 会记录这一对值供后续升级使用；只提供其中一个会报错。
+
+当单独部署可选的用户 dashboard 时，使用 `--dashboard-url https://dash.example.com`。该 URL 必须是不带凭据、path、query 或 fragment 的 HTTPS origin。Void 会允许来自该 origin 的登录回调，并为后续维护保存它；它不会部署 dashboard 的 Worker。省略时保留已有安装保存的 dashboard origin。
+
+`--plan` 会预览资源名、登录方式、默认应用访问策略、登录回调 URL、数据库配置与凭据要求。已存在的 Hyperdrive 会显示它的数据库与配置名。在引导式凭据配置过程中会显示配置链接。已完成的预览会在本地保存非机密的安装选项。重新运行 `void platform install` 可以选择一个已保存的 plan 并重新检查 Cloudflare 状态，或者直接运行末尾打印的 install 或 resume 命令。已开始的安装使用自己保存的检查点；已完成的安装不出现在选择列表中。登录配置请使用 `--auth-config`，或者 `--login-methods` 搭配 Access 保护相关 flag，二者选其一。
+
+应用访问策略在开放流量之前配置。启用平台保护时，安装器建议复用公司自己的策略；否则默认使用公开应用。用 `--app-access custom` 选择托管账户中单独的策略。Default-Deny 账户中的公开应用会获得范围受限的公开 Access 规则。需要时，安装器会说明并收集加密后的管理凭据；脚本则提供 `VOID_PLATFORM_APP_ACCESS_TOKEN`，或在认证文件中写 `appAccess.tokenEnv`。升级会保留 administrator 的设置。
+
+新资源使用 `void-<name>-<role>` 形式的名字；请选一个未被使用的安装名。安装器会为缺失的凭据打开配置页面，并复用已经提供的值。
+
+在 Access 配置过程中，可以选择已有的公司策略，或者选择 **Create in Cloudflare** 获取手动配置说明与账户 dashboard 链接。保存策略并确认完成之后，Void 会重新加载列表，让你在同一次运行中选中它并继续。当由 Void 创建 Access application 时，**Allow my company’s email domain** 会为你输入的域名创建一条 Allow 策略并选中它。**Refresh list** 会重新加载在别的窗口里创建的策略。你的 identity-provider 选择以及仍然可用的策略选择会被保留。如果所选策略不会把登录限制为公司身份，Void 会解释原因并重新询问。
+
+安装进度与部分凭据会被加密保存在本地。重新运行安装器可继续未完成的配置，或传入 `--resume --name <id>`。已完成的安装请使用 lifecycle 命令。
+
+请使用一个空的、专属于该安装的 PostgreSQL 数据库。初次连接失败时你还可以纠正，但一旦数据库被占用或 Hyperdrive 已开通，命令就会拒绝其他 URL。
+
+选择由 Void 创建 Hyperdrive，还是使用已有配置。已有的 Hyperdrive 必须指向平台数据库，并且关闭 SQL 结果缓存。迁移还需要提供数据库 owner 的 URL。配置方式见[使用已有的 Hyperdrive](/docs/platform/installation/prerequisites)，无人值守的输入见[从 CI 安装](/docs/platform/installation/ci)。
+
+Recovery secret 用你的系统钥匙串加密。没有钥匙串时，请提供一个 base64 编码的 32 字节 `VOID_PLATFORM_RECOVERY_KEY`。请把原始凭据保存在受保护的 CI secrets 中，以便恢复。
+
+如果新创建的 zone 正在等待注册商委派，请在它生效之后继续：
+
+```sh
+void platform install --resume --name <installation-id>
+```
+
+前置条件、token 范围、确切占用、域名行为与端到端流程见[自托管一个 Void 平台](/docs/platform)。
+
+## `void platform domain set`
+
+```sh
+void platform domain set <domain> [--installation <id>] [--zone <domain>] [--dedicated-zone] [--plan] [--yes]
+```
+
+给一个 workers.dev 测试平台添加应用域名。基于域名的安装仍然是推荐默认。该命令会尽可能探测 zone，在确认后创建缺失的 DNS 与路由，并在把该域名设为正式地址之前检查 HTTPS 与项目 Zero Trust 防护。如果 DNS、证书或防护尚未就绪，请重新运行同一条命令继续。`--plan` 是只读的；非交互的变更必须带 `--yes`。
+
+已有的 workers.dev URL 仍然可用，平台 API origin、OAuth 回调、项目与部署都保持不变。该命令会校验当前 runtime token 对新 zone 的 Cache Purge 权限。已被停用的平台保持停用。从另一台机器做管理时，请使用原安装时的数据库 URL。不支持替换一个已经配置好的应用域名。见[添加域名](/docs/platform/installation/domains)。
+
+## Lifecycle 命令
+
+用这些命令恢复、更新、暂停或移除一个安装：
+
+```sh
+void platform discover [--account <id>] [--installation <id-or-name>]
+void platform upgrade [id] [--runtime <path>] [--dashboard-url <origin>] [--custom-domains] [--runtime-logs <full|minimal>] [--storage-location <hint|automatic>] [--plan] [--yes]
+void platform rollback [id] --runtime <earlier-path> [--from-runtime <current-path>] [--plan] [--yes]
+void platform repair [id] [--runtime <path>] [--dashboard-url <origin>] [--custom-domains] [--auth-config <path>] [--plan] [--yes]
+void platform disable [id] [--plan] [--yes]
+void platform enable [id] [--runtime <path>] [--plan] [--yes]
+void platform uninstall [id] [--plan] [--purge-data | --purge-resources] [--yes]
+```
+
+`discover --installation` 会把恢复与端点校验限定到共享 Cloudflare 账户中的某一个安装。
+
+请使用 `void platform list` 中显示在名字旁边的安装 slug。安装 ID 与已保存的连接 ID 同样可用。lifecycle 命令需要本地的安装记录；在另一台机器上请用 `discover` 恢复它们。只配置了一个安装时可以省略 `id`，也可以从交互式选择器中选。存在多个安装时，非交互命令必须给出 slug 或 ID。会发生变更的命令还必须带 `--yes`；`--plan` 只预览变更。
+
+`upgrade --runtime-logs <full|minimal>` 改变运行时日志记录的内容；不带它时升级保持当前设置。见[选择运行时日志记录的内容](/docs/platform/installation/setup)。
+
+`upgrade --storage-location <hint|automatic>` 改变新项目 R2 bucket 的默认位置提示。省略时保持当前设置；`automatic` 清除它。已有 bucket 原地保留。见[选择默认存储位置](/docs/platform/installation/setup)。
+
+安装之后要添加或显式更换单独部署的 dashboard，请使用 `repair --dashboard-url <origin>` 或 `upgrade --dashboard-url <origin>`。先用 `--plan` 预览。已有的 Access 防护必须覆盖配置好的 dashboard origin，维护才能继续。见[可选 Dashboard](/docs/platform/installation/domains)。
+
+在首位 administrator 配置尚未完成期间，`repair --auth-config <path>` 会用一份安装格式的文件替换登录设置，并打印一个新的 setup code。交互式 repair 提供同样的变更，并预填已保存的值。登录方式与 Access 保护保持安装时的状态。请在当初安装该平台的电脑上运行它。见[首位 administrator 登录失败](/docs/platform/installation/maintenance)。
+
+在另一台机器上完成 discovery 之后，请设置 `VOID_PLATFORM_DATABASE_URL`。重建缺失 Worker 所需的 secrets 见[从另一台机器管理安装](/docs/platform/installation/maintenance)。
+
+| 命令        | 行为                                                                                                        |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| `discover`  | 校验远端归属并恢复本地安装记录，不下载任何 secrets                                                          |
+| `repair`    | 重建缺失的、由安装器拥有的资源                                                                              |
+| `upgrade`   | 部署选定的 runtime 与受支持的待处理迁移                                                                     |
+| `rollback`  | 恢复到声明兼容的较早 runtime，但不逆转 PostgreSQL 迁移                                                      |
+| `disable`   | 阻断应用流量与平台 API 但不删除数据；只有 admin 状态与登录仍然可用                                          |
+| `enable`    | 重新部署并校验平台 Workers，然后恢复流量                                                                    |
+| `uninstall` | 阻断流量并移除符合条件的资源，默认保留数据                                                                  |
+
+repair 与 upgrade 会保留停用状态。全新的、继续的以及此前被停用的安装，在所有目标 Worker 通过校验之前都会阻断用户流量；安装器的健康探测仍可运行。路由与自定义域名保持挂载。
+
+替换在 Void 之外改动过的平台 Worker 配置需要交互式批准。当维护流程提出这一要求时，请按照 [Void 之外改动过平台 Worker](/docs/platform/installation/maintenance) 处理。
+
+`--runtime` 选择一个自定义的平台构建。相对路径基于当前目录解析。Void 在做任何变更之前会校验该构建；创建方法见[平台开发](/docs/platform/development/runtime)。
+
+不带 `--runtime` 时，CLI 使用它内置打包的平台版本。
+
+平台迁移只会向前。Void 在更新数据库之前检查兼容性，如果需要先经过某个中间版本会告诉你。
+
+升级在新 Worker 通过健康检查之后才算完成。如果滚动发布失败，Void 会尝试恢复之前的 Worker。重试不会重复已完成的迁移。
+
+`platform rollback` 恢复到一个兼容的较早 runtime，而不逆转数据库迁移。用 `--runtime` 传入它的文件；如果当前安装的是自定义版本，还要用 `--from-runtime` 提供那个版本。Void 会拒绝不兼容的目标。
+
+如果项目 Zero Trust 已开启且平台还没有任何用户，uninstall 会先关闭它并删除其 Access application。请在当初安装该平台的电脑上运行。
+
+Uninstall 在删除任何内容之前会校验远端归属。除非传入 `--purge-data`，数据资源都会被保留。Worker、它们使用的 Queues、R2、AI Gateway、DNS 记录、路由、自定义域名、被接管的资源、外部 PostgreSQL 与 zone 都会被保留以供人工检查。`--keep-zone` 已废弃且没有任何效果；uninstall 始终保留 zone。
+
+`--purge-resources` 包含 `--purge-data`，并额外删除该安装创建的所有其他资源，包括 Worker、Queues、R2、AI Gateway、平台 DNS 记录、路由、自定义域名，以及由安装器创建的 Access 资源。它只移除把邮件送到平台邮件网关的那几条 Email Routing 规则，并保留 zone、被接管的资源、外部 PostgreSQL、其他 Email Routing 设置与 API token。与安装记录不再匹配的路由、自定义域名、DNS 记录或 Access 资源会被保留并列出来。当项目仍然存在或资源读取被拒绝时，它在做任何变更之前就拒绝执行。请使用 `--plan` 列出的 Edit 权限；只读检查无法验证这些权限，因此被拒绝的删除可能在变更已经开始之后中止 uninstall。中断之后，或在使用普通 uninstall 或 `--purge-data` uninstall 中止之后，重新运行同一条命令即可继续。
+
+完整的移除策略与清理顺序见[停用与卸载](/docs/platform/installation/uninstall)。

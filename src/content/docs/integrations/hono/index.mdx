@@ -1,0 +1,130 @@
+---
+title: Hono
+description: Void 的路由处理器运行在 Hono 之上。当你的代码直接从 hono/* 导入时，先把 hono 加进应用依赖。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+Void 的处理器运行在 [Hono](https://hono.dev) 上。Void 内部依赖 Hono，但如果你的应用直接从 `hono/*` 导入，请先把 `hono` 加到应用自己的依赖里。
+
+```bash
+npm install hono
+```
+
+一旦应用里装好了 `hono`，就可以直接使用内置中间件、辅助函数，以及第三方 Hono 包。
+
+## 内置中间件
+
+在全局中间件文件或单个路由上使用 Hono 的内置中间件：
+
+```ts
+// middleware/01.cors.ts
+import { cors } from 'hono/cors';
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(cors({ origin: 'https://example.com' }));
+```
+
+```ts
+// routes/api/products.ts（按路由使用 cache）
+import { cache } from 'hono/cache';
+import { defineHandler } from 'void';
+import { listProducts } from '../../lib/products';
+
+export const GET = defineHandler(
+  cache({ cacheName: 'products', cacheControl: 'max-age=3600' }),
+  async () => ({ products: await listProducts() }),
+);
+```
+
+<Callout type="warn">
+  `cache()` 按 URL 只保存一份响应，并把它返回给所有访客。它会跳过带 `Authorization`
+  头的请求，但不会跳过带 cookie 的请求。只在响应人人相同的 routes 上使用，绝不用于读取当前登录用户的路由。
+  要缓存页面，请使用[再验证](/docs/edge/revalidation)，它会跳过携带 cookie 的请求。
+</Callout>
+
+```ts
+// routes/api/webhooks/stripe.ts（按路由使用）
+import { bearerAuth } from 'hono/bearer-auth';
+import { defineHandler } from 'void';
+
+export const POST = defineHandler(bearerAuth({ token: 'webhook-secret' }), async (c) => {
+  const body = await c.req.json();
+  return { received: true };
+});
+```
+
+## 响应辅助函数
+
+每个处理器的 `c` 上都可以使用 Hono 的 context 辅助函数：
+
+```ts
+// routes/api/download.ts
+import { stream } from 'hono/streaming';
+import { defineHandler } from 'void';
+
+export const GET = defineHandler((c) => {
+  return stream(c, async (stream) => {
+    await stream.write('chunk 1');
+    await stream.write('chunk 2');
+  });
+});
+```
+
+```ts
+// routes/api/data.ts
+import { defineHandler } from 'void';
+
+export const GET = defineHandler((c) => {
+  c.header('X-Custom', 'value');
+  c.status(201);
+  return c.json({ created: true });
+});
+```
+
+## 第三方中间件
+
+任何 `hono/*` 或 `@hono/*` 包都可以用。先在应用里安装该包，然后直接使用：
+
+```ts
+// middleware/01.rate-limit.ts
+import { rateLimiter } from 'hono-rate-limiter';
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(rateLimiter({ windowMs: 60_000, limit: 100 }));
+```
+
+## 工具函数
+
+Hono 的独立辅助函数在任何地方都能用：
+
+```ts
+import { HTTPException } from 'hono/http-exception';
+
+throw new HTTPException(404, { message: 'User not found' });
+```
+
+内置中间件的完整列表见 [Hono 文档](https://hono.dev/docs/middleware/builtin)。
+
+### 重定向
+
+从处理器返回 `c.redirect()` 可以把访客送到另一个 URL。如果某个辅助函数需要中断处理器，就抛出 `HTTPException`，并把重定向响应放在 `res` 里：
+
+```ts
+// lib/require-page-user.ts
+import { HTTPException } from 'hono/http-exception';
+import type { CloudContext } from 'void';
+import { getUser } from 'void/auth';
+
+export function requirePageUser(c: CloudContext) {
+  const user = getUser();
+  if (!user) {
+    throw new HTTPException(302, { res: c.redirect('/login') });
+  }
+  return user;
+}
+```
+
+这在 loader、action 与中间件里都有效，包括客户端的页面导航。如果要在写入操作之后重定向，使用 `new HTTPException(303, { res: c.redirect('/login', 303) })`，这样下一次请求是 GET。
+
+对于上面这类登录检查，[`requireAuth(c, { throwRedirect: '/login' })`](/docs/reference/api/auth) 提供同样的守卫，并替你选好重定向状态码。

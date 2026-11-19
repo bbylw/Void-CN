@@ -1,0 +1,40 @@
+---
+title: 自定义域名命令
+description: 为托管项目或直连 Cloudflare 的部署添加、删除与查看自定义域名。
+---
+
+## `void domain add`
+
+```sh
+void domain add <hostname> [--project <name>]
+```
+
+给已保存的目标添加一个自定义域名。托管的 Void 项目会打印 SaaS hostname 校验所需的 DNS 记录。直连 Cloudflare 的项目会添加一条 `custom_domain` 路由，并只同步路由配置本身，不改动 cron、queue 与 workflow 触发器；DNS 记录与 TLS 证书由 Cloudflare 在被固定账户的 zone 上管理。请先把遗留的单数 `route` 字段改成 `routes` 数组，否则添加域名可能遮蔽已有路由。
+
+> 不支持通配符自定义主机名（`*.example.com`），请逐个注册子域名。
+
+## `void domain delete`
+
+```sh
+void domain delete <hostname> [--project <name>]
+```
+
+直连 Cloudflare 的项目会立即应用该变更。删除最后一个自定义域名时，会使用 `void cloudflare login` 得到的浏览器会话，或具备 Workers Scripts: Edit 权限的 API token。如果 Cloudflare 拒绝了变更，Void 会尝试恢复之前的域名配置，并报告恢复是否成功。
+
+## `void domain list`
+
+```sh
+void domain list [--project <name>]
+```
+
+列出全部自定义域名。托管项目会显示平台侧的 active/pending 状态；直连 Cloudflare 的项目列出 `void.config.ts` 中当前配置的 custom-domain 路由。
+
+## `void domain status`
+
+```sh
+void domain status <hostname> [--project <name>] [--verbose]
+```
+
+显示域名校验与 TLS 证书状态，包括需要配置的 DNS 记录以及任何待办操作。校验与证书签发完成后，域名会自动激活。
+
+对直连 Cloudflare 的项目，status 报告的是该路由是否存在于 Void 生成的 Cloudflare 配置中，并不声称能查看远端证书签发状态——这部分由 Cloudflare 持有，在它的 dashboard 中查看。`--project` 仅对托管项目可用。

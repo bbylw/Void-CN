@@ -1,0 +1,94 @@
+---
+title: 运行时与源码构建
+description: 从你的 checkout 构建平台运行时，并把这份构建部署到你的 Cloudflare 账户中。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 部署你的运行时
+
+构建运行时。在 Git checkout 中，构建会自动把当前 commit 记录进运行时清单；未提交的 checkout 会带上 `-dirty` 后缀：
+
+```sh
+vp run build:core
+```
+
+构建系统在需要用另一个不可变 revision 覆盖自动检测时，可以设置 `VOID_PLATFORM_SOURCE_REVISION`。缺少 Git 元数据的源码归档照样能构建，但不会记录 revision。
+
+运行时输出在 `packages/platform/dist/runtime`。用构建出的 CLI 基于这些文件预览一次新安装：
+
+```sh
+void-dev platform install \
+  --name my-team \
+  --application-domain example.app \
+  --zone example.app \
+  --runtime packages/platform/dist/runtime \
+  --plan
+```
+
+在应用这份计划之前，先完成[安装指南](/docs/platform)。去掉 `--plan` 运行同一条命令即可安装。如果你的域名还没就绪、想先做测试，把 `--application-domain` 与 `--zone` 换成 `--workers-dev`；PostgreSQL 以及运行时、登录提供方和 R2 的凭据仍然是必需的。在 install 与 resume 命令中用 `void-dev` 代替 `void`，并始终保留 `--runtime packages/platform/dist/runtime`。如果安装被中断，在那次安装完成之前要一直保留这份运行时构建。
+
+之后运行 `void-dev platform domain set example.app`。域名设置使用的是已经安装好的运行时，不需要 `--runtime`、不需要重新构建、也不需要重新部署应用。它会保留平台 API 地址以及原来的 workers.dev 应用地址。
+
+对于已有的安装，用它的连接 ID 预览一次升级：
+
+```sh
+void-dev platform upgrade <installation-id> \
+  --runtime packages/platform/dist/runtime --plan
+```
+
+随后去掉 `--plan` 运行以应用这次升级。源码构建的运行时与发布版运行时走完全相同的产物、数据库、归属与健康检查。CLI 会保留被禁用安装的状态，并在它的安装 checkpoint 中记录源码 revision。
+
+## 面向受 Access 保护 API 的可选 GitHub Webhook 入口
+
+核心安装器不会部署 dashboard、GitHub App、构建 Container 或 webhook 入口。通过 `--runtime` 传入一份源码构建，并不会为它们开通基础设施、绑定、凭据或平台能力。仓库里自带的托管部署脚本面向 Void Cloud；它们并不是把这些服务加入自托管平台的通用安装流程。除非你的 fork 自行提供并维护那套可选集成，否则请使用核心的 CLI 部署流程。
+
+如果你的 fork 已经加上了托管 GitHub 构建，并且 Cloudflare Access 保护着它的 API 主机名，那么 GitHub 无法直接投递到 `/webhooks/github`：GitHub 不会携带你的 Access 凭据。不要给 API 应用添加 Everyone 规则或绕过策略。
+
+把可选的 webhook 入口部署到一个独立的公开主机名上。它在 `POST /github` 接收带签名的 GitHub 投递，并通过 service binding 转发给你的 API。如果没有 Access 保护，就直接使用 API 的 `/webhooks/github` 端点。
+
+部署这个可选入口：
+
+1. 在你的 fork 中开通 GitHub App、构建执行器、API 绑定、凭据与托管构建能力，然后用这个内部操作部署它的源码 API 运行时。仅做核心安装或升级并不会带来托管构建。
+2. 编辑 `platform/packages/api/wrangler.github-webhook-ingress.jsonc`。给这个入口取一个在本次安装内唯一的名字，并把它的 `API` service binding 设为已安装的确切 API Worker 名。让它的主机名与所有被 Access 覆盖的人员/API 主机名分开。
+3. 在仓库根目录部署它：
+
+   ```sh
+   vp run --filter @voidcloud/api deploy:github-webhook-ingress --env production
+   ```
+
+   要用同一份配置里的 staging 条目时，改成 `--env staging`。
+
+4. 在 Cloudflare 控制台里添加加密的 Worker secret。把 GitHub App 已有的 `GITHUB_WEBHOOK_SECRET` 同时设置到 API 与入口两个 Worker 上。另外生成一个高熵值，例如 `openssl rand -base64 32`，并把它作为 `GITHUB_WEBHOOK_INGRESS_SECRET` 设置到这两个 Worker 上。这个值不要复用平台管理、JWT、Access 或 GitHub webhook 的任何凭据。
+5. 在 GitHub App 设置中，保持 **Content type** 为 `application/json`，保持同一个 webhook secret，并把 **Webhook URL** 改为以 `/github` 结尾的独立入口地址。用 GitHub 的 test delivery 验证并确认返回 2xx，之后再依赖 push 构建。
+
+该入口接受最大 25 MiB 的载荷，参见 [GitHub 的载荷上限](https://docs.github.com/en/webhooks/webhook-events-and-payloads#payload-cap)。
+
+## 从 CI 部署源码构建
+
+从你的 checkout 构建 `@void/platform`，并用 `--runtime` 把它的运行时目录传给 `install`、`upgrade`、`repair`、`enable` 或 `rollback`。自定义运行时会接受与打包发布版相同的完整性、迁移、健康与回滚检查。
+
+使用干净的 Git checkout，或设置 `VOID_PLATFORM_SOURCE_REVISION`，用来标识你部署的是哪个 revision。
+
+全新的 CI runner 每次都可以重新发现这次安装。在它的受保护环境中设置 `CLOUDFLARE_API_TOKEN` 与 `VOID_PLATFORM_DATABASE_URL`，然后：
+
+<Callout type="info" title="CI 命令与恢复输入">
+
+```sh
+vp run build:core
+
+export VOID_PLATFORM_REGISTRY_DIR="$RUNNER_TEMP/void-platform-registry"
+export VOID_PLATFORM_RECOVERY_KEY="$(openssl rand -base64 32)"
+node packages/void/dist/cli/cli.mjs platform discover --account "$CLOUDFLARE_ACCOUNT_ID" \
+  --installation "$VOID_PLATFORM_INSTALLATION"
+node packages/void/dist/cli/cli.mjs platform upgrade "$VOID_PLATFORM_INSTALLATION" \
+  --runtime packages/platform/dist/runtime --plan
+node packages/void/dist/cli/cli.mjs platform upgrade "$VOID_PLATFORM_INSTALLATION" \
+  --runtime packages/platform/dist/runtime --yes
+```
+
+只有当账户里存在一个可发现的安装时，才可以省略安装选择器。同一时间只对一个安装执行一次部署，等它结束后再开始下一个。在迁移或 Worker 滚动过程中取消，可能让一次安装停留在等待恢复的状态。
+
+把管理令牌、数据库 URL、JWT 签名密钥、开启邮件时的邮件签名密钥，以及完整的项目加密密钥环，都保存在受保护的 CI 环境中。升级会继承已部署 Worker 的 secrets。当某个 Worker 缺失需要重建时，必须用到原始的这些值；显式轮换凭据时同样需要这些配置凭据。
+
+</Callout>

@@ -1,0 +1,366 @@
+---
+title: D1（SQLite）
+description: 使用 Cloudflare D1，也就是 Void 默认的 SQLite 数据库。Void 在本地运行它，并在你部署时把它创建出来。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+[Cloudflare D1](https://developers.cloudflare.com/d1/) 是 Void 默认的 SQLite 数据库。先从 [schema 定义](/docs/database)开始，Void 会在本地运行数据库，并在你部署时把它创建出来。
+
+## 本地数据库
+
+dev server 和本地的 `void db` 命令共用同一个数据库。如果 `void.config.ts` 里的 `cloudflare.d1_databases` 声明了这个 D1 绑定，Void 会使用它的 ID；本地开发期间 `preview_database_id` 优先。
+
+要把本地数据存到 `.void` 之外，在 Vite 配置里设置 `voidPlugin({ persistTo: 'local-state' })`。先启动一次 dev server 记录该目录，然后再运行数据库命令；改过 Vite 配置之后要再次启动它来刷新。自行管理 Cloudflare runtime 的框架使用 `.wrangler/state`。
+
+## 迁移与原型验证
+
+用 `void db push` 在本地应用 schema 变更，不生成迁移文件。部署之前，请生成并提交迁移：
+
+```sh
+void db generate
+void db migrate # 在本地应用
+void deploy     # 在远端应用并部署
+```
+
+完整流程见[数据库命令](/docs/reference/cli/database)。
+
+## 批量操作
+
+D1 支持把多条语句合并成一次往返：
+
+```ts
+import { users, posts } from '@schema';
+import { db, eq } from 'void/db';
+
+await db.batch([
+  db.delete(posts).where(eq(posts.userId, userId)),
+  db.delete(users).where(eq(users.id, userId)),
+]);
+```
+
+## 读副本
+
+<Callout type="warn" title="已部署过的数据库可能已经开启副本">
+  Void **0.21.3** 曾自动开启 D1 读副本。如果你用该版本或之后的版本、在副本改为显式开启之前部署过，你的数据库可能已经启用了副本，而副本会在请求之间提供陈旧数据。
+
+  除非你的应用确实要用副本并按下文处理一致性，否则我们建议：升级到支持 `database.readReplication` 的 Void 版本，在 `void.config.ts` 中把它设为 `false`，然后运行 `void deploy`。
+
+  ```ts title="void.config.ts"
+  import { defineConfig } from 'void/config';
+
+  export default defineConfig({
+    database: { readReplication: false },
+  });
+  ```
+
+  如果你自托管 Void 平台，部署前也要一并升级它。平台无法应用 `database.readReplication` 时，`void deploy` 会在上传任何东西之前报错停下。只升级版本、或者删掉这个选项，都**不会**关闭已经开启的副本。
+</Callout>
+
+[D1 读副本](https://developers.cloudflare.com/d1/best-practices/read-replication/)需要显式开启。在 `void.config.ts` 里设置后运行 `void deploy`：
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  database: { readReplication: true },
+});
+```
+
+这会对直连 Cloudflare 部署和 Void 平台部署中新建与已有的应用 D1 数据库开启副本。想关闭副本，把 `readReplication: false` 写进配置再部署一次。
+
+省略 `readReplication` 时，部署不会改动数据库已有的副本设置。新建数据库默认不带副本；对已经开启副本的数据库删掉这个选项，副本会继续保持开启。
+
+通过 `void/db` 的 `db` 发起的查询，会为每个 Void 请求使用一个 D1 session。开启副本后，读取可以在靠近请求的位置执行，且同一请求中后续的查询能看到至少相同的数据。没有 Void 请求作用域的框架处理器会让每个数据库操作从主库开始；`createDb` 则为你传入的绑定开启一个可用副本的 session。
+
+<Callout type="warn">
+  副本在请求之间可能滞后。请[携带 bookmark](#在后续请求里看到自己的写入)来保留先前观察到的数据库状态，或者在需要最新主库数据时使用[primary-first session](#用-primary-first-session-避开陈旧读)。
+</Callout>
+
+原始 D1 调用或其他查询库要用 `withSession()` 才能读到副本。裸的 D1 绑定始终从主库读取。
+
+### 用 primary-first session 避开陈旧读
+
+认证会话检查始终从主库开始，因此被撤销的会话不会因为副本滞后而被接受。其他必须拿到最新主库数据的读取，请在请求内新建一个客户端：
+
+```ts
+import { users } from '@schema';
+import { env } from 'cloudflare:workers';
+import { defineHandler } from 'void';
+import { createDb } from 'void/db';
+
+export const GET = defineHandler(async () => {
+  const primaryDb = createDb(env.DB, { session: 'first-primary' });
+  return primaryDb.select().from(users).all();
+});
+```
+
+`session: 'first-primary'` 让第一个查询走主库，后续查询看到至少相同的数据。默认值 `'first-unconstrained'` 允许第一个查询使用副本。
+
+### 在后续请求里看到自己的写入
+
+要在保存之后的下一个请求读到那次保存，就在请求之间携带 [D1 bookmark](https://developers.cloudflare.com/d1/best-practices/read-replication/#start-a-session-from-previous-context-bookmark)。bookmark 会让 D1 只能使用至少已追平你先前观察到的数据库状态的副本。
+
+已保存的 bookmark 只适用于签发它的那个数据库。不同数据库与环境要用不同的 cookie 名或浏览器存储 key，切换到别的数据库时请清掉已存的 bookmark。清除 bookmark 即开启一条新的一致性链，后续请求不再带有先前 bookmark 的保证。请把它当作不透明字符串，不要解析或自行构造。
+
+<Callout type="warn">
+  bookmark 约束的是数据库查询，不是缓存的响应。缓存的响应可以早于你的写入而完全不执行查询。参与的页面要关闭 ISR（在页面的 `.server.ts` 文件里 `export const revalidate = 0`），并绕过这些路由上已有的响应缓存。只设置响应头不足以绕过 ISR 命中。
+</Callout>
+
+用中间件在处理器或 Pages loader 运行之前设定默认 `db` 的 session，并在它们的查询结束后返回对应的 bookmark。对于浏览器应用，用一个 cookie 在重定向与页面跳转之间携带它。
+
+下面的例子把 `/profile` 及其子路径纳入 bookmark 处理，并返回 `Cache-Control: private, no-store`，阻止浏览器与共享响应缓存存储这些结果。请修改路径，覆盖你真正需要参与一致性处理的读取、写入与重定向目标。范围之外的路由保持原有缓存策略。
+
+本地通过 `void/client` 发起的 server-side 请求共享同一个 session：如果中间件重跑，重复一个已满足的 session 要求会保留该 session 及其数据库进度。要做独立的主库优先读取，或在使用 `db` 之后取到更新的 bookmark，请改用 `createDb`。
+
+一致性关键的数据库操作要在处理器或 loader 返回之前 await。中间件取回响应 bookmark 之后才结束的延后或后台查询，不保证被反映进去。
+
+<Callout type="warn">
+  并发的响应可能用较旧的 bookmark 覆盖这个 cookie。[基于请求头的配方](#并发客户端的-api-请求)能在并发的 API 响应之间保留最新的 bookmark。清除 bookmark 存储或让它过期，会开启一条新的 bookmark 链。
+</Callout>
+
+<Callout type="info">
+  要把 cookie 与 API 请求头一起使用，见[同时支持两种传输方式](#同时支持两种传输方式)。
+</Callout>
+
+```ts title="middleware/01.database.ts"
+import { getCookie, setCookie } from 'hono/cookie';
+import { defineMiddleware } from 'void';
+import { getBookmark, setSession } from 'void/db';
+
+export default defineMiddleware(async (c, next) => {
+  const path = c.req.path;
+  if (path !== '/profile' && !path.startsWith('/profile/')) {
+    await next();
+    return;
+  }
+
+  const incoming = getCookie(c, 'db-bookmark');
+  setSession(incoming === undefined ? 'first-unconstrained' : { bookmark: incoming });
+  await next();
+
+  const bookmark = getBookmark();
+  if (bookmark) {
+    setCookie(c, 'db-bookmark', bookmark, {
+      httpOnly: true,
+      secure: new URL(c.req.url).protocol === 'https:',
+      sameSite: 'Lax',
+      path: '/',
+    });
+  }
+  c.header('Cache-Control', 'private, no-store');
+});
+```
+
+#### 并发客户端的 API 请求
+
+对于浏览器发起的 API 请求，可以交换 `X-DB-Bookmark` 请求头并保留最新的那个 bookmark。[D1 bookmark 可按字典序排序](https://developers.cloudflare.com/d1/reference/time-travel/#bookmarks)，因此来自同一数据库的较旧响应不能覆盖较新的 bookmark。
+
+对于下面这个浏览器 fetch 包装器发出的请求，用这个中间件交换 bookmark。它只把 `/api/profile` 及其子路径纳入 bookmark 处理并返回不缓存的响应，请按你参与一致性处理的路由调整路径。
+
+<Callout type="warn">
+  这个配方只通过下面的 fetch 包装器携带 bookmark，不覆盖普通的页面跳转、表单提交或 Pages 请求，也不与基于 cookie 的配方共享 bookmark。
+</Callout>
+
+<Callout type="info">
+  要把 cookie 与 API 请求头一起使用，见[同时支持两种传输方式](#同时支持两种传输方式)。
+</Callout>
+
+```ts title="middleware/01.database.ts"
+import { defineMiddleware } from 'void';
+import { getBookmark, setSession } from 'void/db';
+
+export default defineMiddleware(async (c, next) => {
+  const path = c.req.path;
+  if (path !== '/api/profile' && !path.startsWith('/api/profile/')) {
+    await next();
+    return;
+  }
+
+  const incoming = c.req.header('X-DB-Bookmark');
+  setSession(incoming === undefined ? 'first-unconstrained' : { bookmark: incoming });
+  await next();
+  const bookmark = getBookmark();
+  if (bookmark) {
+    c.header('X-DB-Bookmark', bookmark);
+  }
+  c.header('Cache-Control', 'private, no-store');
+});
+```
+
+在浏览器端，发送已保存的 bookmark，并用 [Web Locks](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) 原子地保留返回的最新值。这需要 HTTPS（或 localhost）、浏览器存储以及对 Web Locks 的支持。请为具体的数据库与登录账号使用唯一的 scope；同源、同 scope 的多个标签页会共享进度。
+
+```ts title="src/bookmark-fetch.ts"
+export function createBookmarkFetch(scope: string) {
+  const key = `d1-bookmark:${scope}`;
+
+  return async function bookmarkFetch(path: string, init: RequestInit = {}): Promise<Response> {
+    const url = new URL(path, location.origin);
+    if (url.origin !== location.origin || !url.pathname.startsWith('/api/')) {
+      throw new Error('bookmarkFetch requires a same-origin /api/ URL.');
+    }
+
+    const bookmark = localStorage.getItem(key);
+    const headers = new Headers(init.headers);
+    headers.delete('X-DB-Bookmark');
+    if (bookmark) headers.set('X-DB-Bookmark', bookmark);
+
+    const response = await fetch(url, {
+      ...init,
+      headers,
+      credentials: 'same-origin',
+      cache: 'no-store',
+      redirect: 'error',
+    });
+
+    const returned = response.headers.get('X-DB-Bookmark');
+    if (returned) {
+      await navigator.locks.request(key, () => {
+        const current = localStorage.getItem(key);
+        if (current === null || returned > current) {
+          localStorage.setItem(key, returned);
+        }
+      });
+    }
+
+    return response;
+  };
+}
+```
+
+每个参与一致性处理的 API 请求都要用这个包装器。例如已有 profile API：
+
+```ts
+import { createBookmarkFetch } from './bookmark-fetch';
+
+export async function saveAndReadProfile(accountId: string, name: string) {
+  const api = createBookmarkFetch(`app-db:${accountId}`);
+  const saved = await api('/api/profile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: name,
+  });
+  if (!saved.ok) throw new Error(`Save failed: ${saved.status}`);
+
+  // 至少带上已完成那次写入的 bookmark。
+  const response = await api('/api/profile');
+  if (!response.ok) throw new Error(`Read failed: ${response.status}`);
+  return response.json();
+}
+```
+
+这个包装器会在 Promise resolve 之前保存最新的 bookmark，因此即使并发响应乱序到达，后续请求也能继承它的进度。
+
+请使用返回数据的 API 端点，不要用重定向。
+
+#### 同时支持两种传输方式
+
+把上面的 fetch 包装器与下面这个单独的中间件一起用，就能在 API 请求之外同时支持浏览器页面跳转与表单。它会为同一个数据库挑选最新的入站 bookmark，并通过两种传输方式把它返回。
+
+只有 `/profile`、`/api/profile` 及其子路径参与处理，并返回 `Cache-Control: private, no-store`。请按你的应用调整这份列表，在参与的页面上关闭 ISR，并保持无关路由的缓存策略不变。
+
+<Callout type="warn">
+  fetch 包装器能在并发响应之间保留最新的 bookmark，但 cookie 仍可能被乱序覆盖。如果重定向的目标页必须读到最新数据，请使用 primary-first session。
+</Callout>
+
+```ts title="middleware/01.database.ts"
+import { getCookie, setCookie } from 'hono/cookie';
+import { defineMiddleware } from 'void';
+import { getBookmark, setSession } from 'void/db';
+
+export default defineMiddleware(async (c, next) => {
+  const path = c.req.path;
+  const participates = ['/profile', '/api/profile'].some(
+    (base) => path === base || path.startsWith(`${base}/`),
+  );
+  if (!participates) {
+    await next();
+    return;
+  }
+
+  const incoming: string[] = [];
+
+  // Cookie 输入：页面跳转、表单与同源 fetch 请求。
+  // 只用请求头时删掉这一段。
+  const cookieBookmark = getCookie(c, 'db-bookmark');
+  if (cookieBookmark) incoming.push(cookieBookmark);
+
+  // 请求头输入：fetch 包装器已保存的进度。
+  // 只用 cookie 时删掉这一段。
+  const headerBookmark = c.req.header('X-DB-Bookmark');
+  if (headerBookmark) incoming.push(headerBookmark);
+
+  // 同一数据库的 bookmark 按从旧到新排序。
+  const newest = incoming.sort().at(-1);
+  setSession(newest === undefined ? 'first-unconstrained' : { bookmark: newest });
+  await next();
+
+  const bookmark = getBookmark();
+  if (bookmark) {
+    // Cookie 输出：供后续页面跳转与表单使用的进度。
+    // 只用请求头时删掉这一段。
+    setCookie(c, 'db-bookmark', bookmark, {
+      httpOnly: true,
+      secure: new URL(c.req.url).protocol === 'https:',
+      sameSite: 'Lax',
+      path: '/',
+    });
+
+    // 请求头输出：供 fetch 包装器使用的进度。
+    // 只用 cookie 时删掉这一段。
+    c.header('X-DB-Bookmark', bookmark);
+  }
+
+  c.header('Cache-Control', 'private, no-store');
+});
+```
+
+#### 使用 `createDb`
+
+对于其他 D1 绑定或框架自己持有的端点（例如 Astro API 路由），用传入的 bookmark 建立客户端。查询之后，把 `getBookmark(client)` 写回响应头：
+
+```ts
+import { users } from '@schema';
+import { createDb, getBookmark } from 'void/db';
+
+export async function readUsers(request: Request, binding: D1Database) {
+  const incoming = request.headers.get('X-DB-Bookmark');
+  const client = createDb(binding, {
+    session: incoming === null ? 'first-unconstrained' : { bookmark: incoming },
+  });
+  const result = await client.select().from(users).all();
+
+  const headers = new Headers({ 'Cache-Control': 'private, no-store' });
+  const bookmark = getBookmark(client);
+  if (bookmark) headers.set('X-DB-Bookmark', bookmark);
+  return Response.json(result, { headers });
+}
+```
+
+## 其他查询层
+
+用 `cloudflare:workers` 中的 `env.DB` 可以配合其他查询库或原始 D1 API：
+
+### Kysely
+
+```ts
+import { env } from 'cloudflare:workers';
+import { Kysely } from 'kysely';
+import { D1Dialect } from 'kysely-d1';
+
+const db = new Kysely<Database>({ dialect: new D1Dialect({ database: env.DB }) });
+```
+
+### 原始 D1
+
+```ts
+import { env } from 'cloudflare:workers';
+
+const { results } = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).all();
+```
+
+无论使用哪种查询层，Void 仍然负责绑定推断与部署。
+
+<Callout type="warn" title="元框架的限制">
+  Nuxt 与 SvelteKit 2 在本地开发期间不支持 `cloudflare:workers` 导入。请改用 `void/db` 或框架自己的绑定访问 API。SvelteKit 3 支持这些导入。
+</Callout>

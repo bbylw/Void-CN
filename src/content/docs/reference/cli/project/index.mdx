@@ -1,0 +1,192 @@
+---
+title: 项目命令
+description: 把目录关联到托管项目，然后查看部署、日志、访问权限与回滚。
+---
+
+## `void project status [name]`
+
+显示已配置目标的部署情况。
+
+- Void 目标显示近期的托管部署；`[name]` 按 slug 查找项目，不给出时使用已关联的项目。
+- Cloudflare 目标列出 Worker Versions，标出当前生效的版本，并显示记录在案的迁移数量。这里不接受项目名，因为 Worker 名来自 `void.config.ts` 中的 `cloudflare.name`。
+- 所有者与管理员还会看到一条警告，说明平台无法完成[替换项目凭据](/docs/project-collaboration)。
+
+## `void project link [name]`
+
+按 slug 把当前目录关联到一个已存在的托管 Void 项目；省略名字时交互式选择。状态保存在 `.void/project.json`。直连 Cloudflare 的应用使用 `void.config.ts` 中的 `cloudflare.name`，不需要关联。
+
+## `void project list`
+
+列出所有你有权限访问的托管项目（slug、角色、类型、URL）。包含共享给你的项目，角色列可以把它们与你自己拥有的项目区分开。对于保存的 Cloudflare 目标，这里显示的是当前 Worker 的版本列表，因为不存在 Void 项目注册表。
+
+## `void project team`
+
+管理 Void 平台上某个项目的访问权限：
+
+```sh
+void project team list [--project <slug>]
+void project team invite <email> --role <reader|collaborator|admin> [--project <slug>]
+void project team invitations [--project <slug>]
+void project team role <user-id> <reader|collaborator|admin> [--project <slug>]
+void project team remove <user-id> [--project <slug>]
+void project team revoke <invitation-id> [--project <slug>]
+void project team leave [--project <slug>]
+void project team pending
+void project team accept <invitation-id>
+void project team decline <invitation-id>
+```
+
+项目级命令依次使用 `--project`、`VOID_PROJECT`、已关联的项目。邀请只能指向该平台上已注册到某个用户的邮箱地址；它们不会创建账户，也不会开放注册权限。只有被邀请的账户本人能接受或拒绝该邀请。`list` 会显示与 `void project status` 相同的凭据警告。
+
+reader 可以查看项目但不能部署。collaborator 可以部署并管理部署的前置条件。项目管理员还能管理域名、邮件收件人、GitHub 配置与项目团队。只有所有者可以删除项目。完整的角色边界见[项目协作](/docs/project-collaboration)。
+
+项目级的团队管理命令不适用于直连部署到 Cloudflare 的项目。账户级的 `pending`、`accept`、`decline` 使用 `void connect <url>` 选定的当前连接，与当前项目的关联或部署目标无关。`VOID_API_URL` 优先；未限定范围的 `VOID_TOKEN` 会选中 Void Cloud。这些命令会显示自己所在的平台，接受邀请不会改动目录关联。要关联被邀请的应用，请在该应用未关联的检出目录中运行 `void project link`。
+
+## `void project zero-trust`
+
+查看或覆盖 Void 平台上某个项目的防护：
+
+```sh
+void project zero-trust status [--project <slug>]
+void project zero-trust protect [--project <slug>]
+void project zero-trust public [--project <slug>]
+void project zero-trust reconcile [--project <slug>]
+```
+
+项目选择依次使用 `--project`、`VOID_PROJECT`、已关联的项目。
+
+reader 可以查看状态。所有者或项目管理员可以保护项目、设为公开，或修复配置漂移。`public` 不会改变平台对未来项目的默认设置。部署与回滚会等待防护变更完成；如果被拒绝，在你重试之前，所有者或项目管理员可以运行 `void project zero-trust reconcile`。这些命令不适用于直连 Cloudflare 的部署。
+
+## `void project token <create|list|renew|revoke>`
+
+为单个 Void 平台项目管理可吊销的 `aud: deploy` 凭据。该凭据只能调用 `void deploy` 用到的端点；不能访问 operator、账户、写入密钥、删除项目或其他项目的路由。
+
+```sh
+void project token create --name github-actions --expires-in 30
+void project token list
+void project token renew <credential-id> --expires-in 30
+void project token revoke <credential-id>
+```
+
+在关联项目之外使用时传 `--project <name>`。有效期限制在 1–90 天。create 与 renew 只展示一次 bearer 值；续期之后请立即替换保存的 secret，因为旧凭据在同一操作中就被吊销了。项目删除与所有者被停用同样会让凭据失效。禁用某种登录方式不会吊销这些独立的部署凭据。
+
+把打印出的 `VOID_TOKEN` 与 `VOID_API_URL` 存入 CI 的密钥管理服务。Access 键对负责通过外围防护；这个范围受限的 Void 凭据只授权该项目的部署工作流。当受 Access 保护的平台使用了预渲染或远端代理绑定时，请把 `VOID_ACCESS_CREDENTIALS` 存成一个按 origin 索引的 JSON secret，包含两个精确的 HTTPS origin，即使两者使用同一对 service token 也要写两份：
+
+```json
+{
+  "https://void-company-api.example.workers.dev": {
+    "CF_ACCESS_CLIENT_ID": "<service-token client ID>",
+    "CF_ACCESS_CLIENT_SECRET": "<service-token client secret>"
+  },
+  "https://void-company-proxy.example.workers.dev": {
+    "CF_ACCESS_CLIENT_ID": "<service-token client ID>",
+    "CF_ACCESS_CLIENT_SECRET": "<service-token client secret>"
+  }
+}
+```
+
+`VOID_ACCESS_ORIGIN` 会把一对凭据限定到单个 origin，因此对于会调用代理的工作流，只选 API origin 是不够的。当两边的 Access 策略要求不同时，请在两个条目中使用不同的凭据对。
+
+## `void project logs`
+
+```sh
+void project logs [--level <level>] [--filter <text>] [--range <duration>] [--deployment <id>]
+```
+
+显示部署目标上的运行时日志。托管的 Void 目标查询保留的日志历史。Cloudflare 目标会为 `void.config.ts` 中命名的 Worker 开启实时 tail，不提供历史日志存储。
+
+| Flag                 | 用途                                                                                                                                                     | 默认值 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--range <duration>` | 往前回溯多久。格式：`<number><unit>`（m/h/d）。最大 7d。                                 | `1h`   |
+| `--level <level>`    | 按日志级别过滤。可取 `error`、`warn`、`info`、`log`、`debug`、`all`。`error` 还包含未捕获异常、非 `ok` 的结果以及任何 5xx 响应——即使 worker 既没抛出也没记录。 | `all`  |
+| `--filter <text>`    | 对日志文本与异常名/消息做不区分大小写的**子串**匹配——不是级别过滤。命中时会展示完整的请求条目。        | 无     |
+| `--deployment <id>`  | 只查看某个部署 ID 的日志。                                                                 | 无     |
+
+输出每个请求一行（`HH:MM:SS METHOD URL STATUS`），其下缩进显示 console 日志与异常行。错误与异常标红，警告标黄。
+
+示例：
+
+```sh
+void project logs --level error --range 12h
+void project logs --level error --filter websocket
+```
+
+日志包含顶层的 `console.*` 调用，以及 Cloudflare Tail 捕获的未捕获错误。如果你捕获了错误却只存进数据库，它不会出现在这里。请同时用 `console.error()` 或 `void/log` 的 `logger.error()` 记录它。在托管的 Void 目标上，把 `Error` 对象本身传给 `console.error()`，例如 `console.error('Save failed:', error)`，才能在该行日志下方看到堆栈跟踪。只记录 `error.message` 是看不到堆栈的。
+
+对于根本到不了 Worker 的错误，例如边缘路由错误或静态站点请求，请用 `void project requests --status 5xx`。
+
+在直连 Cloudflare 的目标上，`--filter` 变成 Cloudflare 的实时搜索，`--deployment` 选择一个 Worker Version，`--level error` 选择错误调用。其他单个 console 级别无法过滤，`--range` 也不会选取历史。`void project requests` 仅托管项目可用。
+
+## `void project requests`
+
+```sh
+void project requests [--status <filter>] [--range <duration>]
+```
+
+显示已关联项目的请求流量，包括静态资源与不会出现在 Worker 日志里的边缘错误。
+
+| Flag                 | 用途                                                                                     | 默认值 |
+| -------------------- | ---------------------------------------------------------------------------------------- |
+| `--status <filter>`  | 按状态码过滤：一个区间（`2xx`、`3xx`、`4xx`、`5xx`）或精确的三位数字（例如 `500`）。     | 无     |
+| `--range <duration>` | 往前回溯多久。格式：`<number><unit>`（m/h/d）。最大 7d。                  | `1h`   |
+
+输出每个请求一行（`HH:MM:SS METHOD STATUS TYPE DURATION`）。5xx 标红，4xx 标黄。注意：请求路径不会被记录，因此这个视图展示的是状态与类型而非 URL——对于确实到达 worker 的请求，需要逐 URL、逐条日志的细节时请用 `void project logs`。
+
+示例：
+
+```sh
+void project requests --status 5xx
+void project requests --range 24h
+```
+
+## `void project rollback [deployId]`
+
+```sh
+void project rollback [deployId] [--platform cloudflare]
+```
+
+回滚到一次更早的部署或 Worker Version。
+
+- 省略 `[deployId]` 时，展示一个交互式选择菜单，列出仍保留的部署
+- 如果目标部署已应用的迁移少于当前部署，确认之前会先显示一条列出迁移差异的警告
+
+在 Void 平台上可以选择一个保留的部署。在 Cloudflare 上请使用完整的 Worker Version ID 或无歧义的前缀。Void 会把该版本按 100% 激活。当两个版本都有完整的触发器快照时，它还会恢复所选版本的 schedules、queues、workflows、routes 与自定义域名。否则回滚只保留当前触发器，仅恢复代码，也包括那些最初不是在 Void 里部署的版本。
+
+对一次性的 Cloudflare 部署，回滚时请传 `--platform cloudflare`。
+
+数据库恢复与代码回滚是分开处理的。当较早的代码可能与当前 schema 不兼容时，Void 会请求确认。对 Cloudflare 上的 D1，请用 [`void db restore`](/docs/reference/cli/database) 配合部署期间打印的还原点。
+
+## `void project cancel [deployId]`
+
+```sh
+void project cancel [deployId]
+```
+
+取消一次进行中的部署。
+
+- 省略 `[deployId]` 时，目标是已关联项目正在进行的部署
+- 给出 `[deployId]` 时，目标是该部署；它必须仍处于进行中状态
+
+Void 在发起取消请求之前会先请求确认。
+
+该命令仅托管项目可用。直连 Cloudflare 的部署是本地操作，没有可供取消的远端构建。
+
+## `void project delete [name]`
+
+永久删除一个托管 Void 项目及它的全部资源（数据库、KV namespace、R2 bucket、部署）。需要手动输入项目 slug 确认；`--force`（`-f`）可跳过提示。
+
+省略 `[name]` 时使用已关联的项目。
+
+对直连 Cloudflare 的目标，该命令会拒绝执行。推断出来的资源可能被共享，因此 Void 从不自动拆除；请自行确认归属，并用 Cloudflare 的工具显式删除资源。
+
+## `void project purge-cache`
+
+```sh
+void project purge-cache [--project <name>]
+```
+
+清除已关联项目的全部缓存页面，边缘缓存会在数秒内失效。
+
+提供 `--project` 时，清除的是该项目的缓存而不是已关联项目的缓存。
+
+该命令仅托管项目可用。直连 Cloudflare 的目标，请重新部署，或自行清除配置好的 ISR KV namespace。

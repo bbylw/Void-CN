@@ -1,0 +1,156 @@
+---
+title: 数据库与数据填充 API
+description: 用 void/db 提供的 Drizzle 客户端查询 D1、PostgreSQL 或 MySQL，并用脚本填充数据。
+---
+
+从 `"void/db"` 导入。`db` 导出是针对所配置数据库 dialect 的 [Drizzle ORM](https://orm.drizzle.team) 实例：默认是 [Cloudflare D1](https://developers.cloudflare.com/d1/)，设置 `"database": "pg"` 时使用 PostgreSQL，设置 `"database": "mysql"` 时使用 MySQL。
+
+## `db`
+
+默认的 Drizzle 实例，已经预先接好 `db/schema.ts` 中的 schema。
+
+```ts
+import { users } from '@schema';
+import { db } from 'void/db';
+
+const allUsers = await db.select().from(users).all();
+```
+
+`db` 使用你配置的 dialect 与 schema。
+
+- D1 项目解析 `DB` 绑定，暴露 `DrizzleD1Database<Schema>`。
+- PostgreSQL 项目在本地开发时使用 `DATABASE_URL`，在生产环境使用 Hyperdrive 的 `connectionString`，暴露 `NodePgDatabase<Schema>`。
+- MySQL 项目使用相同的连接来源，暴露 `MySql2Database<Schema>`。
+
+## `createDb(database)`
+
+为当前 dialect 创建一个 Drizzle 实例。
+
+在 D1 项目中传入具体的 D1 绑定。当你有多个 D1 数据库，或需要使用非默认绑定时就用它。
+
+```ts
+import { env } from 'cloudflare:workers';
+import { createDb } from 'void/db';
+
+const db = createDb(env.MY_OTHER_DB);
+```
+
+若要以最新的 D1 读取开始，传入 `{ session: 'first-primary' }`，并在请求内部创建客户端。默认值 `'first-unconstrained'` 允许第一个查询使用只读副本。两种写法都保留你的 schema 与查询类型。参见[避免读到过期数据：优先主库会话](/docs/database/d1)。
+
+`session` 选项也接受 `{ bookmark }`，用于从上一次请求的 D1 bookmark 继续。查询之后调用 `getBookmark(client)` 取得要返回给客户端的 bookmark 字符串。示例见[使用 `createDb`](/docs/database/d1)。
+
+在 PostgreSQL 与 MySQL 项目中，传入连接字符串。
+
+```ts
+import { createDb } from 'void/db';
+
+const db = createDb('postgres://user:password@host:5432/app');
+```
+
+**签名：**
+
+```ts
+// D1
+type DbSessionStart = 'first-primary' | 'first-unconstrained' | { bookmark: string };
+
+function createDb(
+  d1: D1Database,
+  options?: { session?: DbSessionStart },
+): DrizzleD1Database<Schema>;
+
+// PostgreSQL
+function createDb(connectionString: string): NodePgDatabase<Schema>;
+
+// MySQL
+function createDb(connectionString: string): MySql2Database<Schema>;
+```
+
+## `setSession(start)`
+
+仅 D1。为默认请求的 `db` 设置起始 bookmark 或一致性约束。请在中间件中、首次使用 `db` 之前调用它。它不会改变显式创建的客户端，也不会影响后续请求。
+
+传入 `'first-primary'`、`'first-unconstrained'` 或 `{ bookmark: string }`。bookmark 字符串必须包在对象里，包括 `getBookmark()` 返回的字符串。如果没有可用的传入 bookmark，就传 `'first-unconstrained'`。
+
+bookmark 只能与其发出的那个数据库一起使用。客户端存储要按数据库区分保存，切换数据库时清掉已保存的 bookmark；清除后即开启新的一致性链。
+
+会话在你读取数据库属性时打开，包括取出某个方法或访问 `$client`；它不会等到查询真正执行。`await` 或检查 `db` 对象本身不会打开会话。
+
+传入 `'first-unconstrained'` 会保留已经配置好的 bookmark 或主库优先要求，即使此时还没有首次使用 `db`。其他起始值会在会话打开之前覆盖该配置。
+
+会话打开之后，如果要求已经满足，重复调用会保留该会话：起始值不变、传入 `'first-unconstrained'`，或传入不晚于会话当前 bookmark 的 bookmark。这样中间件在本地服务端 fetch 期间再次执行时，不会重置数据库进度。重复传入 `'first-primary'` 不会强制再来一次主库读取。
+
+传入更晚的 bookmark，或把已打开的会话改为 `'first-primary'`，都会抛出异常。请在使用 `db` 之前完成这类配置，或者用 `createDb(binding, { session })` 建立独立的会话。
+
+```ts
+function setSession(start: DbSessionStart): void;
+```
+
+## `getBookmark(client?)`
+
+仅 D1。返回默认请求会话的 bookmark；也可以传入 `createDb()` 返回的客户端来读取该客户端的 bookmark。没有可用 bookmark 时返回 `null`。读取默认 bookmark 不会打开数据库会话。
+
+在捕获要发给客户端的 bookmark 之前，先 `await` 完那些对一致性敏感的数据库操作。捕获之后才结束的延迟或后台查询，不保证被包含在该 bookmark 中。
+
+```ts
+function getBookmark<TSchema extends Record<string, unknown>>(
+  client?: DrizzleD1Database<TSchema>,
+): D1SessionBookmark | null;
+```
+
+`setSession()` 与不带参数的 `getBookmark()` 需要 Void 的请求作用域。对于由元框架自己接管的端点，例如 Astro 的 API 路由，请改用[显式客户端](/docs/database/d1)。
+
+cookie 与 header 中间件、浏览器 fetch 包装器，以及两种传输方式如何一起使用，参见[在后续请求中看到自己的写入](/docs/database/d1)。
+
+## 查询操作符
+
+`void/db` 重新导出了常用的 [Drizzle 操作符](https://orm.drizzle.team/docs/operators)，你无需直接依赖 `drizzle-orm`：
+
+```ts
+import { db, eq, and, or, desc, like, inArray, sql } from 'void/db';
+```
+
+**完整列表：** `sql`、`eq`、`ne`、`gt`、`gte`、`lt`、`lte`、`and`、`or`、`not`、`desc`、`asc`、`like`、`ilike`、`notLike`、`inArray`、`notInArray`、`isNull`、`isNotNull`、`between`、`notBetween`、`exists`、`notExists`、`count`、`sum`、`avg`、`min`、`max`。
+
+用导出的 Drizzle 类型 `SQL`、`SQLWrapper`、`AnyColumn` 与 `BatchItem` 为查询辅助函数与批处理标注类型：
+
+```ts
+import { posts } from '@schema';
+import { db, sql, type BatchItem, type SQL, type SQLWrapper } from 'void/db';
+
+function contains(column: SQLWrapper, text: string): SQL {
+  return sql`instr(${column}, ${text}) > 0`;
+}
+
+// 仅 D1：`db.batch()` 至少接受一个查询。
+const writes: [BatchItem<'sqlite'>, ...Array<BatchItem<'sqlite'>>] = [
+  db.update(posts).set({ published: true }).where(contains(posts.title, 'void')),
+];
+await db.batch(writes);
+```
+
+## 数据填充
+
+从 `"void/seed"` 导入。
+
+### `defineSeed(fn)`
+
+供 `void db seed` 使用的编程式 seed 模块的身份辅助函数（不改变传入的函数）。
+
+```ts
+import { defineSeed } from 'void/seed';
+
+export default defineSeed<typeof import('./schema')>(async ({ db, schema }) => {
+  await db.insert(schema.users).values([
+    { name: 'Alice', email: 'alice@example.com' },
+    { name: 'Bob', email: 'bob@example.com' },
+  ]);
+});
+```
+
+回调参数包括：
+
+- `dialect`：`"sqlite"`、`"postgresql"` 或 `"mysql"`
+- `db`：当前 dialect 对应的本地 Drizzle 实例
+- `schema`：`db/schema.ts` 或 `db/schema/` 的导出
+
+seed 模块可以导出 `default`，也可以导出名为 `seed` 的函数。

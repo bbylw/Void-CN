@@ -1,0 +1,83 @@
+---
+title: 平台运维命令
+description: 查看部署、日志与平台健康状态，并在应用之前预览变更。
+---
+
+这些命令使用你的 administrator 会话。平台选择、预览与确认规则见[平台管理](/docs/reference/cli/platform)。
+
+查找一个部署、检查它的 manifest，或请求取消：
+
+```sh
+void platform deployment list [--project <id-or-slug>] [--status <status>] [--search <text>] [--page <n>] [--limit <n>]
+void platform deployment show <id>
+void platform deployment cancel <id>
+void platform deployment migrate-assets <id> [--cursor <cursor>] [--plan|--yes]
+```
+
+取消在部署处于 pending、uploading、migrating 或 prerendering 时有效，并且在它正在取消的过程中可以再次请求。已经开始切换流量、正在为失败做补偿、或已经结束的部署无法通过这条命令取消。
+
+`migrate-assets` 把某个部署的旧版 assets 复制到范围受限的 R2 存储中，不改变应用流量。用 `--plan` 预览，用 `--cursor` 从已成功的一批之后继续。原始 assets 原地保留。
+
+用这条命令读取它的运行时日志：
+
+```sh
+void platform deployment logs <id> [--since <time>] [--cursor <cursor>] [--limit <n>] [--follow]
+```
+
+默认是最后一小时、由最旧开始、最多 100 条记录。`--since` 接受 `10m`、`2h`、`1d` 这样的时长、一个 ISO 日期或 epoch 毫秒。`--limit` 取值 1 到 500，并把响应中的 `nextCursor` 作为 `--cursor` 传入以读取下一页。
+
+`--follow` 会读完剩余的页，并每两秒检查一次新日志，直到你按下 Ctrl+C。它会检查五分钟的窗口重叠以捕捉延迟到达的记录，并抑制重复的行。更晚到达的记录可能需要之后再做一次历史查询。如果某个窗口超过 10,000 条记录，跟踪会以错误停止；这时请改用范围更小的历史查询。
+
+## 构建
+
+检查一次构建或读取它的输出：
+
+```sh
+void platform build show <id>
+void platform build logs <id> [--since <sequence>] [--limit <n>] [--follow]
+```
+
+构建日志从序号 `0` 开始，一次最多返回 500 行。把返回的 `lastSeq` 作为 `--since` 可继续读取；`--limit` 接受 1 到 500。获取 container 日志需要启用托管构建。GitHub Actions 构建返回的是一个外部日志 URL。
+
+跟踪会在构建进入终态之后等待最后的日志。如果两分钟内无法确认完成，命令以错误退出。
+
+## 系统
+
+查看活动、检查服务健康，或回顾管理侧的变更：
+
+```sh
+void platform system overview
+void platform system health
+void platform system cli-versions
+void platform system asset-migrations [--page <n>] [--limit <n>]
+void platform system events [--page <n>] [--limit <n>]
+void platform system backfill-queue-tokens
+void platform system sandbox-drain [--cursor <opaque-cursor>]
+void platform system rotate-proxy-tokens [--project <id> | --all]
+```
+
+`overview` 显示平台总量与近期活动。`health` 检查已配置的服务与数据库，任一检查失败即以非零状态退出。`cli-versions` 报告各部署所使用的 CLI 版本。
+
+`asset-migrations` 清点已存储的部署 assets，并报告 `needsMigration` 与 `invalid` 的数量。请使用响应中的分页字段读完全部条目。
+
+`events` 显示变更的操作者、对象与结果。pending 的事件表示结果尚未记录。预览与会话登录/登出不会生成这些事件。`backfill-queue-tokens` 修复缺少认证 token 的较早队列条目，并支持在应用修复之前先 `--plan`。
+
+`sandbox-drain` 移除遗留的、由租户拥有的 Sandbox 资源。用 `--plan` 预览、用 `--yes` 应用，然后把 `nextCursor` 作为 `--cursor` 传入以继续。清理期间应用流量保持暂停。
+
+`rotate-proxy-tokens` 为项目在当前线上 Worker 以及为回滚保留的 Worker 上换发新的平台凭据，无需重新部署。当某台为回滚保留的 Worker 的 author 已无部署权限时，它保留旧凭据。用 `--project <id>` 指定单个项目，或用 `--all` 覆盖全部项目，配合 `--plan` 预览、`--yes` 应用。只传 `--plan` 会列出所有仍在进行的轮换。每次运行处理一个有上限的批次，其余由平台在后台完成；每个项目的轮换约需 6 分钟，若同时有部署在跑则更久。请用 `--plan` 检查进度，直到没有 pending 或 failed。在某次轮换仍在进行时再次带 `--project` 或 `--all` 运行 `--yes`，会为该项目多启动一次轮换。轮换完成后，旧凭据即刻失效。每次轮换都会为项目的线上 Worker 启动一个新版本，因此 WebSocket 连接会重连一次。
+
+维护你这套安装的 Worker 请使用[平台 lifecycle 命令](/docs/reference/cli/platform-installation)。
+
+## 托管 Worker
+
+下面这些命令管理 Void Cloud 托管平台的 Worker。自托管安装上不可用；那里请改用 [lifecycle 命令](/docs/reference/cli/platform-installation)。
+
+```sh
+void platform worker list [--environment <production|staging>]
+void platform worker show <worker-name> [--environment <production|staging>]
+void platform worker rollback <worker-name> <version-id> [--environment <production|staging>]
+void platform worker rollback-all [--environment <production|staging>]
+void platform worker events [batch-id] [--environment <production|staging>]
+```
+
+请使用 `worker list` 中的名字，例如 `api` 或 `proxy`。`show` 会列出它的版本与当前部署。两种 rollback 都可以先用 `--plan` 预览，然后交互式执行或在脚本中带 `--yes`。`events` 列出 worker 操作事件，或按 ID 检查其中一批。

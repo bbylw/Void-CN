@@ -1,0 +1,39 @@
+---
+title: 项目 Zero Trust
+description: 在 administrator 会话下为项目主机名开启或关闭 Cloudflare Access。
+---
+
+这些命令使用你的 administrator 会话。平台选择、预览与确认规则见[平台管理](/docs/reference/cli/platform)。
+
+配置整个安装范围的 Cloudflare Access 策略以及项目级覆盖：
+
+```sh
+void platform zero-trust status [--check]
+printf '%s' "$ACCESS_API_TOKEN" | void platform zero-trust configure \
+  --identity-providers <id[,id...]> \
+  --policies <id[,id...]> \
+  [--existing-projects <protected|public>] \
+  [--protect-new-projects] \
+  --token-stdin \
+  --yes
+void platform zero-trust reconcile
+void platform zero-trust disable
+
+void platform zero-trust project-status <project-id>
+void platform zero-trust project-protect <project-id>
+void platform zero-trust project-public <project-id>
+void platform zero-trust project-reconcile <project-id>
+```
+
+新的安装在 `void platform install` 中配置应用访问权限；这些命令用于事后查看或修改。要为 Default-Deny 账户配置或续期「仅公开」规则，请省略 identity policy 并使用 `--public-apps`：
+
+```sh
+printf '%s' "$ACCESS_API_TOKEN" | void platform zero-trust configure \
+  --public-apps --token-stdin --yes
+```
+
+从已关闭的配置开启时，请加上 `--existing-projects public`。「仅公开」规则不能与受保护项目的选择同时使用。要把一个已经受保护的配置切换成「仅公开」规则，请先将它 disable；在 Default-Deny 账户中，这段切换期间 Access 可能拦截流量。
+
+变更类操作支持 `--plan`、`--yes` 与 `--timeout`；用 `--plan` 而不是 `--yes` 可以只检查这次变更而不应用。Access 管理 token 只接受通过标准输入传入。Zero Trust 使用的是承载平台的那个 Cloudflare 账户。省略 `--protect-new-projects` 会让新建项目默认为公开。`--existing-projects` 在开启 Zero Trust 时必填，开启之后再次传入会被拒绝；后续的配置变更会保留每个项目各自的防护状态。`status` 报告已保存的状态；`--check` 还会把它与 Cloudflare Access 的实际状态做对比。如果状态一直停留在 `configuring` 或 `disabling`，请运行 `void platform zero-trust reconcile` 以继续那个已保存的操作。受保护的项目最多支持 100 个自定义域名。
+
+这个 token 需要 **Access: Apps and Policies Write**，外加 **Access: Organizations, Identity Providers, and Groups Read**，并限定到平台所在的 Cloudflare 账户。请至少选择一个按身份匹配人员的 Allow 策略；Void 会拒绝 Bypass 与 Service Auth 策略，以及允许 Everyone 或任意 service token 的规则。要求与恢复流程见[项目 Zero Trust](/docs/platform/administration/zero-trust)。

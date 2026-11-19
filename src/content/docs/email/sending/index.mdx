@@ -1,0 +1,261 @@
+---
+title: 发送邮件
+description: 用 sendEmail 发送事务性邮件。开发期间 Void 会把邮件捕获到本地收件箱。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+用 `sendEmail` 发送事务性邮件。本地开发期间，Void 会把邮件捕获到本地收件箱。
+
+```ts
+import { sendEmail } from 'void/email';
+
+const result = await sendEmail({
+  from: 'Acme <acme+noreply@mail.example.com>', // 使用你项目的发件地址
+  to: 'user@example.com',
+  subject: 'Welcome',
+  text: 'Thanks for signing up!',
+  // html: '<p>Thanks for signing up!</p>', // 可选——与 text 同时提供时按 multipart/alternative 发送
+});
+
+if (!result.ok) {
+  if ('error' in result) {
+    // 请求级失败；OUTCOME_UNKNOWN 情况下邮件可能已经提交。
+    console.error(result.error.code, result.error.message);
+  } else {
+    for (const d of result.deliveries.filter((d) => !d.ok)) {
+      console.error(d.recipient, d.error.code, d.error.message);
+    }
+  }
+}
+```
+
+两种失败形态都要检查：`result.error` 报告请求失败，`result.deliveries` 报告单个收件人的失败。未验证的收件人会在 `deliveries` 里失败。
+
+## 配置
+
+在启用了邮件的平台上，直接部署即可，无需额外的邮件配置。向你的管理员索取平台的共享邮件域名。管理员在[安装或升级时启用邮件](/docs/platform/installation/credentials)。
+
+启用邮件的平台上的每个项目都有：
+
+- **默认发件人：** `<your-slug>+noreply@<mail-domain>`。slug 超过 56 个字符的老项目必须显式传入 `from`。
+- **以你的账户邮箱作为收件人：** 它在项目创建时就被登记。如果 Cloudflare 尚未在平台下验证它，请先点击邮件里的验证链接，再运行 `void email destinations`，然后才能向它发送。
+
+共享发件人只能向已验证的收件人发送。发送前先验证你自己的地址，或[添加其他收件人](#添加收件人)。
+
+改为部署到你自己的 Cloudflare 账户（`void deploy --platform cloudflare`）时，需要在 `void.config.ts` 中配置发件人并完成邮件设置——参见[你自己的 Cloudflare 账户](/docs/email/domains)。
+
+## 添加收件人
+
+Cloudflare 的 `send_email` 绑定只会投递给你已登记为收件人的地址。用 CLI 添加：
+
+```sh
+void email allow user@acme.com
+```
+
+Cloudflare 会给收件人发一封带验证链接的邮件。等对方点击、并且 `void email destinations` 记录了这次点击之后，你就可以从项目向该地址发送。如果链接没有收到或已过期，在地址仍处于待验证状态时再次运行 `void email allow <address>`——CLI 会重发链接，或告诉你要如何获取新的链接。列出项目的收件人：
+
+```sh
+void email destinations
+```
+
+<Callout type="warn" title="什么时候适合用它">
+  共享发件人适合团队告警、项目通知，以及回复入站邮件。
+
+  要给任意用户发邮件，请[注册你自己的域名](/docs/email/domains)、在你自己的 Cloudflare 账户上使用 [Workers Paid](/docs/email/domains)，或者在处理器里调用其他邮件服务商。
+</Callout>
+
+## 选项
+
+| 选项               | 类型                          | 说明                                                                                                            |
+| ------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `from`             | `string \| { email, name? }`  | 可选。被固定为项目发件人——见下文。                                                                             |
+| `to`               | `Address \| Address[]`        | 必填。一个或多个收件人。                                                                                        |
+| `subject`          | `string`                      | 必填。支持 UTF-8（按 RFC 2047 编码）。                                                                          |
+| `text`             | `string`                      | `text` / `html` 至少要有一个。                                                                                  |
+| `html`             | `string`                      | 两者都提供时按 `multipart/alternative` 发送。                                                                   |
+| `replyTo`          | `Address`                     | 可选的 `Reply-To` 头部。                                                                                        |
+| `cc`、`bcc`        | `Address \| Address[]`        | 可选。每个收件人会各自生成一份邮件信封。                                                                        |
+| `headers`          | `Record<string, string>`      | 自定义头部；保留头部（From、Date 等）会被忽略。                                                                 |
+| `threading`        | `{ inReplyTo?, references? }` | 可选。把邮件挂到先前的一条会话下。见[稍后回复](#稍后回复)。                                                    |
+| `attachments`      | `Attachment[]`                | 见[附件](#附件)。                                                                                               |
+| `idempotencyKey`   | `string`                      | 在 Void Platform 上可选：1–128 个可见的非空格 ASCII 字符。同一次发送重试时请复用同一个值。                     |
+
+`to`、`cc`、`bcc` 加起来最多 50 个收件人。请使用 local-part 为 ASCII 的标准邮箱地址，国际化域名用 punycode 表示。
+
+`Address` 既可以传字符串（`"hello@acme.dev"` 或 `"Name <hello@acme.dev>"`），也可以传对象（`{ email, name? }`）。显示名支持 Unicode。
+
+在平台上，发件人被固定为你的项目。`from` 必须是你项目自己的平台地址——`<project-slug>@<mail-domain>` 或 `<project-slug>+<tag>@<mail-domain>`，可以带显示名——或者是用 `void email domain add` 注册的域名下的任意地址（见[在平台上使用你自己的域名](/docs/email/domains)）。例如平台的邮件域名是 `mail.example.com`，你可以写 `Acme <acme+noreply@mail.example.com>`。其他任何地址都会被拒绝并返回 `INVALID_FROM`。省略 `from` 时，Void 会自动填入 `<project-slug>+noreply@<mail-domain>`。如果项目所有者设置了[邮件别名](/docs/reference/cli/email)，`<alias>@<mail-domain>` 与 `<alias>+<tag>@<mail-domain>` 同样可被接受；默认地址仍是 slug 地址。
+
+在你自己的 Cloudflare 账户上，`from` 默认取 `void.config.ts` 里的 `email.from`，且必须属于你账户有权发送的域名；其他发件人会被 Cloudflare 拒绝，`sendEmail` 报为 `INVALID_FROM`。
+
+## 稍后回复
+
+要在队列任务或别的后续任务中回复邮件，先保存来信的会话 ID，再传给 `sendEmail`：
+
+```ts
+// email/support.ts
+export default defineEmail(async (message) => {
+  await tickets.save({
+    from: message.from,
+    subject: message.headers.get('Subject') ?? '',
+    messageId: message.headers.get('Message-ID') ?? '',
+    references: message.headers.get('References') ?? '',
+  });
+});
+
+// 之后，在队列任务里
+await sendEmail({
+  to: ticket.from,
+  subject: `Re: ${ticket.subject}`,
+  text: 'We fixed it.',
+  threading: {
+    inReplyTo: ticket.messageId,
+    references: `${ticket.references} ${ticket.messageId}`,
+  },
+});
+```
+
+邮件客户端用 `threading` 把回复显示在同一个会话里。`inReplyTo` 设为父邮件的 `Message-ID`。对于更长的会话，把 `references` 按顺序设为先前的各个 ID，最后一项是父邮件；不设置时它默认取 `inReplyTo`。
+
+请用 `threading`，而不是自己写 `In-Reply-To` 或 `References` 头部。无效的会话 ID 会被忽略，但不会中断发送。要在入站处理器内立刻回复，请使用 [`replyEmail()`](/docs/email/receiving)。
+
+## 附件
+
+```ts
+await sendEmail({
+  to: 'user@example.com',
+  subject: 'Your receipt',
+  text: 'Receipt attached.',
+  attachments: [
+    {
+      filename: 'receipt.pdf',
+      content: pdfBytes, // string | Uint8Array | ArrayBuffer | Blob
+      contentType: 'application/pdf',
+    },
+  ],
+});
+```
+
+对于内嵌图片（比如 HTML 里引用的 logo），设置 `disposition: 'inline'` 和 `contentId`：
+
+```ts
+await sendEmail({
+  to: 'user@example.com',
+  subject: 'Hello',
+  html: '<img src="cid:logo" alt="Acme">',
+  attachments: [
+    {
+      filename: 'logo.png',
+      content: logoBytes,
+      contentType: 'image/png',
+      contentId: 'logo',
+      disposition: 'inline',
+    },
+  ],
+});
+```
+
+省略 `contentType` 时 Void 会根据文件名推断。显式给出的值必须是合法的媒体类型。`contentId` 就是 HTML 里 `cid:<id>` 引用的图片名；使用 `logo` 或 `logo@acme.dev` 这类 ID。编码后的整封邮件限制 5 MiB，自定义头部限制 16 KiB。附件字段非法或邮件超限会返回 `MIME_ERROR`。
+
+## 结果与错误
+
+`sendEmail` 返回结果对象而不抛异常。成功的结果表示服务商已接受这次发送，并不能确认邮件已进入收件人的邮箱。
+
+`ok: true` 会带上各收件人的 ID。失败的结果要么有请求级的 `error`，要么有逐个收件人的 `deliveries`。平台返回的结果在可用时会带上 `operationId`。
+
+超时可能返回 `OUTCOME_UNKNOWN`；此时服务商仍可能已经接受了这封邮件。重试之前请先确认结果。
+
+对可能重试的发送使用幂等键：
+
+```ts
+const result = await sendEmail({
+  to: 'user@example.com',
+  subject: 'Invoice ready',
+  text: 'Your invoice is available in your account.',
+  idempotencyKey: 'invoice:42:ready',
+});
+
+if (result.ok) {
+  console.log('Accepted by the provider', result.operationId);
+} else {
+  console.log('Inspect the outcome before retrying', result.operationId, result);
+}
+```
+
+在 30 天内，用相同负载重复同一个键会返回已记录的结果，不会再向服务商提交一次。用不同负载复用同一个键会返回 `IDEMPOTENCY_CONFLICT`。响应丢失或服务商请求被中断可能返回 `OUTCOME_UNKNOWN`；请查看 `void email logs`，或用同一个键重发。换一个新键就是一次新的发送，可能造成重复投递。原生 Cloudflare 绑定发送不支持平台幂等键。
+
+| 错误码                   | 含义                                                           |
+| ------------------------ | -------------------------------------------------------------- |
+| `BINDING_MISSING`        | 没有配置邮件通道。                                             |
+| `INVALID_FROM`           | 发件人非法，或不属于该项目的授权范围。                         |
+| `INVALID_TO`             | 收件人列表非法，或超过 50 个收件人。                           |
+| `UNVERIFIED_DESTINATION` | 在当前策略下该收件人还需要验证。                               |
+| `MIME_ERROR`             | 邮件内容非法，或超出大小限制。                                 |
+| `QUOTA_EXCEEDED`         | 已用满平台或服务商配额。                                       |
+| `IDEMPOTENCY_CONFLICT`   | 该键已被用于另一个负载。                                       |
+| `OUTCOME_UNKNOWN`        | 发送可能已到达服务商；不要盲目重发。                           |
+| `UPSTREAM_ERROR`         | 服务商或平台拒绝了请求。                                       |
+
+平台默认额度是每个 UTC 月 200 次收件人投递尝试、滚动一分钟内 10 次。失败或不确定的尝试也可能计入这些限制。用 `void email usage` 查看你当前的额度。
+
+`void email usage` 展示当月的收件人投递次数、入站收取次数与剩余额度。`void email logs --limit 50` 展示最近最多 100 条、保留 30 天的元数据：操作、收件人、方向、状态、服务商引用与错误码。它不存储主题、正文或附件。收到一封邮件和发出一封回复是两个独立的事件。
+
+## 本地开发
+
+本地开发期间，发送不会走向 Cloudflare，而是被捕获进一个内存中的收件箱。开发服务器启动时会打印收件箱地址：
+
+```text
+[void] Email inbox: http://localhost:5173/__void/inbox?token=<printed-token>
+```
+
+打开一封邮件可以预览它的 HTML、查看附件，或把它下载为 `.eml` 文件。
+
+所有收件箱路由都需要一个本地访问令牌。Void 会把令牌放进打印出的收件箱 URL 和页面里的链接。命令行请求请按下面的示例通过 `x-void-dev-trigger` 头部带上它；不带令牌的请求返回 `401`。令牌存放在 `.void/dev-trigger-token`。请像对待凭据一样对待收件箱 URL，尤其当你把开发服务器暴露到网络上时。
+
+```bash
+# 把一封邮件下载为 .eml
+curl http://localhost:5173/__void/inbox/<id>/raw \
+  -H "x-void-dev-trigger: <printed-token>" -o message.eml
+
+# 清空收件箱
+curl -X DELETE http://localhost:5173/__void/inbox \
+  -H "x-void-dev-trigger: <printed-token>"
+```
+
+收件箱在最近 100 封邮件的范围内跨 HMR 保留内容，完全重启服务器时会被清空。
+
+开发收件箱在原生 Void 应用、TanStack Start 与 React Router 中可用；在 SvelteKit、Nuxt、Analog 与 Astro 中不可用，这些应用的发送会返回 `BINDING_MISSING`。在测试中捕获发送请使用 `void/email/testing` 的 `createEmailTestHarness`。如果已配置的收件箱无法访问，`sendEmail` 会返回 `UPSTREAM_ERROR` 并且不发送。
+
+已废弃的 `sendInDev` 选项请移除，以使用本地收件箱。要测试真实投递，请把应用部署出去。
+
+## 测试
+
+用测试装置断言外发邮件，无需 mock 绑定：
+
+```ts
+import { describe, it, expect } from 'vite-plus/test';
+import { sendEmail } from 'void/email';
+import { createEmailTestHarness } from 'void/email/testing';
+
+describe('signup flow', () => {
+  it('sends a welcome email', async () => {
+    const inbox = createEmailTestHarness();
+
+    await sendEmail({
+      from: 'acme+noreply@mail.example.com', // 使用你的项目发件人
+      to: 'user@example.com',
+      subject: 'Welcome',
+      text: 'Hi!',
+    });
+
+    expect(inbox.messages).toHaveLength(1);
+    expect(inbox.messages[0].subject).toBe('Welcome');
+    inbox.dispose();
+  });
+});
+```
+
+该装置会拦截每一次 `sendEmail` 调用，直到调用 `dispose()` 为止。`clear()` 只清空已捕获的列表，不释放拦截。[测试](/docs/testing) 说明了如何运行测试，以及如何测试使用了其他绑定的代码。
+
+要处理进来的邮件，请参见[接收邮件](/docs/email/receiving)。

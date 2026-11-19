@@ -1,0 +1,104 @@
+---
+title: 域名与资源
+description: 为已安装的平台添加应用域名，包括它的 DNS、路由与 HTTPS 证书。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+## 添加域名
+
+域名就绪后运行：
+
+```sh
+void platform domain set example.app --plan
+void platform domain set example.app
+```
+
+该命令会选定你已安装的平台（或给出选择列表），找到或创建它的 zone，配置 DNS 与路由，并在发布新的应用 URL 之前校验 HTTPS。创建 DNS 或 zone 时所需的 management token，按[安装与配置登录](/docs/platform/installation/setup)中的说明设置。请给现有的运行时令牌在新的 zone 上授予 **Cache Purge: Purge** 权限；Void 会通过运行中的平台校验这项权限，不需要你再次粘贴令牌。
+
+如果 nameserver、证书或项目的 Zero Trust 保护尚未完成，请按打印出的指引操作并重跑同一条命令。Void 会保留每个项目原有的公开或受保护设置，然后才开放新的 URL。你的 workers.dev 应用 URL 在设置期间和之后继续可用。项目、部署、secret 与平台 API URL 都保持不变，因此开发者无需重新连接，已配置的登录回调地址也不会变化。DNS 与配置变更可能需要一些时间才能生效。
+
+用 `--installation <id>` 显式选择某个安装；当应用域名形如 `apps.example.com` 时用 `--zone example.com`；要在专用 zone 上做 catch-all 路由时用 `--dedicated-zone`。嵌套域名仍然需要下面描述的通配证书。这条命令添加的是第一个域名；目前不支持替换已有的应用域名。它使用已安装的运行时，不需要 `--runtime`，也不需要重新部署应用。
+
+请选择一个不会让既有 Worker Custom Domains 失去可达性的应用域名。已有的、覆盖全部请求的更精确路由可以保住那些主机名。如果 Void 报出冲突，请换一个应用域名；对于全新安装，你可以先用 `void platform install --workers-dev`，之后再添加合适的域名。
+
+浏览器登录会话是每个 origin 独立的。使用各自 OAuth 提供方的应用可能需要注册新的回调 URL。除非应用覆盖了相关配置，Void 内置的认证会自动使用请求所在的 origin。
+
+同一个应用域名下的应用所设置的 cookie，能被该域名下的其他应用收到。对于 `apps.example.com` 这样的嵌套域名，应用还可以为 `example.com` 及其其他子域名设置 cookie。使用 `workers.dev` 测试 URL 的应用所设置的 cookie，会被你账户 `workers.dev` 子域名下的每个 Worker 收到。如果你的团队之外的人也能部署，请使用一个只服务 Void 应用的域名。服务数千名独立开发者的平台，也可以申请把自己的应用域名加入 [Public Suffix List](https://github.com/publicsuffix/list/wiki/Guidelines)。
+
+### 测试模式会有什么不同？
+
+在测试模式下，每个应用得到一个 `workers.dev` URL。这些 URL 在你添加域名之后依然可用；此后新建的应用才会使用域名。
+
+测试 URL 支持 WebSocket、SSE 与共享 ISR 存储，但会跳过边缘响应缓存这额外一层。卸载之后，它们的转发 Worker 会保留下来等你手动清理。禁用平台与挂起项目同样会阻断这些 URL 的流量。
+
+## 其他域名选项
+
+<Callout type="info" title="自定义 API 主机名">
+
+在安装时传入 `--control-plane-domain platform.example.net`。该主机名必须属于所选账户与管理令牌能够管理的某个 zone。不传则 API 继续留在 `workers.dev` 上。
+
+</Callout>
+
+### 使用嵌套的应用域名
+
+<Callout type="info" title="在已有企业 zone 内使用 apps.example.com">
+
+位于 `my-app.apps.example.com` 的应用需要一张 `*.apps.example.com` 的证书。`example.com` 的 Universal SSL 只覆盖一级主机名。请在安装前用 [Advanced Certificate Manager](https://developers.cloudflare.com/ssl/edge-certificates/advanced-certificate-manager/)（一项付费附加服务）配置一张可用的通配证书，或直接使用已有的自定义通配证书：
+
+```sh
+void platform install --application-domain apps.example.com --zone example.com --plan
+```
+
+为了做证书检查，管理令牌需要在该 zone 上具备 **SSL and Certificates: Read**（或 Edit）。Void 不会自动申请证书，也不会自动开通付费产品。请不要加 `--dedicated-zone`：那个开关只用于应用域名就是整个 zone 的安装，它会为其他未匹配流量添加 catch-all 路由。
+
+</Callout>
+
+## 项目自定义域名
+
+项目可以通过 Cloudflare for SaaS 的 custom hostname 使用自己的域名，例如 `www.example.com`。这需要一个专用的应用 zone。请在安装时开启，之后也可以用一次升级开启：
+
+```sh
+void platform install --application-domain example.app --zone example.app --dedicated-zone --custom-domains
+void platform upgrade <installation-id> --custom-domains
+```
+
+运行时令牌需要在应用 zone 上具备 **SSL and Certificates: Edit**。Void 会把它包含在运行时令牌的创建链接里，并在部署前检查；在自定义域名开启之前创建的令牌需要补上这一项。在添加第一个域名之前，请先在该 zone 上完成一次 Cloudflare for SaaS 的设置：
+
+1. 为 `cname.<application domain>` 创建一条 proxied DNS 记录，例如一条指向 `100::` 的 `AAAA` 记录。
+2. 打开 **SSL/TLS > Custom Hostnames**，启用 Cloudflare for SaaS，并把 `cname.<application domain>` 设为 fallback origin。
+
+之后项目所有者运行 `void domain add <hostname>`。Void 会打印 CNAME 目标 `cname.<application domain>` 以及用于证明所有权的 TXT 记录。等这些记录生效、证书签发之后，专用 zone 的 catch-all 路由就会把该主机名的请求送到对应项目。
+
+## 可选的 Dashboard
+
+API 的 `/admin/` 页面已包含在核心安装里。你可以单独部署可选的用户 dashboard，并在安装时用 `--dashboard-url https://dash.example.com` 配置它的 HTTPS origin。
+
+对于已有安装，先预览再应用该配置：
+
+```sh
+void platform repair <installation-id> --dashboard-url https://dash.example.com --plan
+void platform repair <installation-id> --dashboard-url https://dash.example.com --yes
+```
+
+该 origin 中不得包含凭据、路径、查询串或片段。Void 会保存它用于登录回调，并在升级与修复之间保留。这条命令不会创建 dashboard Worker，也不会创建 DNS 记录。请按源码应用的[独立 dashboard 准备说明](https://github.com/voidzero-dev/void/tree/main/platform/packages/dashboard#standalone-deployment)部署你自己的副本：使用一个未被占用的 Worker 名、你的 dashboard 主机名，以及已安装的 API Worker 的 service binding。把它的 `API_URL` 设为公开 API origin，`DASHBOARD_URL` 设为 dashboard origin，`SITE_DOMAIN` 设为本次安装的应用域名。省略该选项则保持已保存的 origin 不变。Dashboard 提供登录、关联的登录方式与登出；用户、项目与团队管理请用 CLI。
+
+如果平台受 Access 保护，它的应用还必须覆盖这个 dashboard origin。请在配置保护时就设好该 origin。要在一个已受保护的平台上修改它，需要有意识地通过认证配置移除保护、应用新的 origin，再重新启用保护。如果注册依赖 Access 这道门，请先选一条独立的准入规则。若配置的这个 origin 落在生效覆盖范围之外，维护会直接停止。
+
+## Cloudflare 资源占用
+
+新的平台资源在 Cloudflare 允许的场合使用确定性的 `void-<installation-name>-<role>` 命名，例如 `void-team-api`。请在账户里选一个未被使用的安装名；遇到无人占用的名字冲突时 Void 会停下来，而不是替换那个资源。已有的安装保留它们记录在案的名字，包括带后缀的旧式名字。
+
+| 资源                                      |                              数量 | 用途                                                                                       |
+| ----------------------------------------- | ------------------------------------: | ------------------------------------------------------------------------------------------ |
+| Worker                                    | 5 个，另加每个使用 workers.dev 的应用各 1 个 | API/控制面、proxy、tail 摄取、dispatch、email gateway，以及测试 origin 的转发器 |
+| KV namespace                              |                                   3 | 路由、ISR 缓存与静态资源存储                                                               |
+| R2 bucket                                 |                                   1 | 静态资源与部署产物                                                                         |
+| 队列                                      |                                   3 | 用量事件、cron 触发与部署                                                                  |
+| Workers for Platforms dispatch namespace  |                                   1 | 用户的应用 Worker                                                                          |
+| Hyperdrive 配置                           |                                   1 | 外部的平台 PostgreSQL                                                                      |
+| AI Gateway                                |                                   1 | 按安装隔离的 AI 路由与计量                                                                 |
+| Proxied 通配 DNS 记录                     |                              0 或 1 | 仅在配置了应用域名时创建                                                                   |
+| Zone                                      |                              0 或 1 | 仅在请求的应用 zone 不存在时创建                                                           |
+
+API Worker 使用四个 Durable Object 类，分别负责用量、cron 调度、错误监控与并发。Worker 绑定会在 Analytics Engine 中创建请求与日志 dataset，而 Analytics Engine 必须[为该账户启用](/docs/platform/installation/prerequisites)。核心安装不会创建 Container application、GitHub App、dashboard Worker 或构建 Worker。

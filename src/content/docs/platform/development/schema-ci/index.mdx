@@ -1,0 +1,32 @@
+---
+title: Schema 与 CI
+description: 修改平台数据库 schema、生成迁移，并了解 CI 如何校验 schema。
+---
+
+## 修改平台 Schema
+
+Schema 位于 `platform/packages/api/src/schema.ts`。改动它之后生成一次迁移：
+
+```sh
+vp run --filter @voidcloud/api db:generate
+```
+
+在提交生成的 SQL 与迁移 journal 之前先审阅它们。已发布的迁移只追加、不修改。升级会在旧 Worker 可能仍在处理请求时应用新迁移，因此 schema 改动必须与那份代码保持兼容。
+
+`platform/packages/api/drizzle/compatibility.json` 记录了哪些较早的运行时已经针对新 schema 验证过。只有在测试过某种兼容性之后，才添加对应的边。运行时构建会检查迁移文件与记录的 schema 历史是否一致。
+
+## 运行时产物契约
+
+`@void/platform` 在 `./installer` 导出下包含安装清单、资源命名、发现契约、Worker 配置与可部署的 bundle。平台源码位于 `platform/packages/`。
+
+运行时产物包含迁移 SQL、它的 journal，以及一份回滚兼容性清单。Drizzle 的编写期快照仍留在源码树中。
+
+## Fork 中的 CI
+
+无需凭据的测试 workflow 在 fork 中使用 GitHub 托管 runner。它们构建并测试整个工作区，不需要 Void Cloud 账户、令牌或部署权限。
+
+如果你的 fork 有一个已发布的平台版本，请把仓库变量 `VOID_PLATFORM_PRODUCTION_REF` 设为它那个不可变的 40 位 commit SHA。这样平台相关的 pull request 就会创建该版本的数据库，写入有代表性的用户、项目与加密 secret 记录，再应用提议的迁移。这项检查会校验既有数据，并让上一个运行时对着升级后的 schema 跑起来。可变的分支名或 tag 名会被拒绝。
+
+没有显式 SHA 时，必需的兼容性检查会使用最近一次成功部署到 `Prod`（或 `VOID_PLATFORM_PRODUCTION_ENV`）的 GitHub 部署。它们需要读取部署历史的权限，若找不到已完成的部署就会停止。推进生产分支不会改变被选中的基线。调用平台 CI 的 fork workflow 必须在 `contents: read` 之外同时授予 `deployments: read`。
+
+上游仓库中还包含部署 Void Cloud 与发布官方 npm 包的 workflow。fork 应当围绕构建出的 CLI 与 `platform upgrade --runtime` 配置自己的发布 workflow，[源码构建 CI 示例](/docs/platform/development/runtime)列出了所需的输入。生产凭据请保存在受保护环境中，并限制在合适的发布 ref 上可用。

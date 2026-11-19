@@ -1,0 +1,137 @@
+---
+title: 邮件
+description: 配置平台邮件，决定邮件可以发给谁，并管理项目的发信域名。
+---
+
+## 管理邮件
+
+这些命令适用于启用了邮件功能的平台。每个项目都可以在平台的共享邮件域名上，用 `<slug>+tag@<邮件域名>` 这样的地址发信。部署带 `email/` 处理器的应用后，只要收件人规则就绪，这个地址就能收信；应用本身如何处理邮件，见[邮件指南](/docs/email)。
+
+共享的收件邮件为每个收信项目使用一条精确的路由规则，并在这个 zone 上开启 Cloudflare 的 plus addressing。创建项目、或部署只发信的应用，不会占用任何收件规则。已有的规则与顶级域的 catch-all 会保持不变。Cloudflare 通常[每个域名允许 200 条路由规则](https://developers.cloudflare.com/email-service/platform/limits/)；共享域名接近上限时，请删除无用的规则或申请更高限额。针对项目基础地址或 plus 地址的无关规则，会阻塞它的初始化，直到该冲突被移除。
+
+项目所有者可以用 [`void email alias <name>`](/docs/reference/cli/email) 设定一个固定的、更短的地址。同时在 slug 和别名上收信会占用两条路由规则。添加别名之前，请先解决冲突的规则并确认域名的规则上限。
+
+如果创建收件人的过程被中断，可以查看它保留下来的意图：
+
+```sh
+void platform email shared-recipients --project my-app
+void platform email shared-recipient-resolve <recipient-id> --ended --outcome not-applied --reason "Provider audit confirms the request did not create a rule" --plan
+```
+
+等到命令报告的恢复时间，确认最初那次执行已经结束，并检查 plan 中显示的那个确切的、归平台所有的提供方资源。该资源确实存在时用 `applied`；只有在提供方审计证明确实没有创建时才用 `not-applied`。仅仅“不存在”不足以证明结果。检查之后，用 `--yes` 重跑同一条命令。恢复过程会把这次决定记录到平台事件里，本身不创建也不删除任何规则。之后正常的调和流程会验证投递；正在删除的项目保持关闭状态，它的删除可以重试。恢复要求详见 [operator 邮件命令](/docs/reference/cli/platform-email)。
+
+### 平台发出的邮件
+
+平台邀请、欢迎邮件与部署提醒都使用 `noreply@<邮件域名>`，并带上平台的显示名称。Void 会自动配置好这个发件地址。
+
+发往未验证地址的邮件，需要完成 Cloudflare Email Sending 的 onboarding 并使用 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans)。
+
+### 决定邮件可以发给谁
+
+默认情况下，共享发件地址发出的邮件只能抵达各项目已验证的收件人。如果团队的应用主要给同事发信，可以为整个安装一次性放宽：
+
+```sh
+void platform email policy
+void platform email policy-set domains --domains example.com,corp.example.net
+void platform email policy-set any
+void platform email policy-set verified
+```
+
+在管理后台的 **Email** 页面或用上面的命令选择一种策略：
+
+- `verified`：只有各项目已验证的收件人。
+- `domains`：已验证的收件人，再加上所列域名下的任意地址。
+- `any`：任意收件人。
+
+未验证的收件人仍然需要 Cloudflare Email Sending 的 onboarding 与 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans)，否则这类发送会返回 `UNVERIFIED_DESTINATION`。从项目自定义域名发出的邮件，以及发往平台自身邮件域名的邮件，始终要求验证收件人。
+
+策略变更只对新的发送生效；已放行的尝试可能仍会完成。
+
+### 项目限额
+
+默认情况下，每个项目在每个 UTC 自然月可提交 200 个收件人，并且在滚动 60 秒窗口内最多 10 个。一次尝试只要开始就计入用量，失败或结果不确定的也一样。按项目 ID 或 slug 调高或调低限额：
+
+```sh
+void platform email limit hr-portal --monthly 2000 --burst 30
+```
+
+管理后台中该项目的页面会显示当前取值，并可清除覆盖。
+
+### 恢复被中断的发送
+
+如果发件方在开始调用提供方之后停止，它那笔未解决的尝试会阻塞项目或发信域名的删除。查看尝试的 ID 与开始时间：
+
+```sh
+void platform email attempts --project hr-portal
+```
+
+先通过 Worker 日志或事故记录确认最初那次执行已经结束。当该尝试已存在至少 24 小时后，用一条不含收件人地址和邮件内容的审计理由来结案：
+
+```sh
+void platform email attempt-resolve <attempt-id> --ended --reason "Original Worker execution ended; provider outcome could not be verified" --plan
+void platform email attempt-resolve <attempt-id> --ended --reason "Original Worker execution ended; provider outcome could not be verified"
+```
+
+这会把该次发送记为 `outcome_unknown`，并释放它的清理栅栏。这次尝试仍然计入用量，并且永不重试。如果它 30 天的投递记录已过期，只移除那部分不含收件人信息的栅栏。在原始执行可能仍然活跃时，不要结案。
+
+用下面的命令查看项目保留的凭据与收件人结果：
+
+```sh
+void platform email logs hr-portal --page 1 --limit 50 --json
+```
+
+日志包含操作 ID、记录的结果、提供方引用与错误码。项目删除之后，请使用它的 project ID 查询，直到 30 天的元数据保留期结束。邮件正文、主题、附件与凭据不会被记录。
+
+### 为项目注册邮件域名
+
+你的用户可能没有 Cloudflare 账户。告诉平台“邮件域名由管理员注册”，这样 `void email domain add` 就不会打开令牌创建页面，而是打印出该来找你要的那条命令：
+
+```sh
+void platform email settings-set --domains admin
+```
+
+然后为项目注册域名。zone 必须位于平台的 Cloudflare 账户里；配置由平台自己的凭据完成，不会按域名存储任何 Cloudflare 凭据：
+
+```sh
+void platform email domain-add example.com --project hr-portal
+void platform email domain-status example.com
+void platform email domain-rotate-secret example.com
+void platform email domains
+```
+
+请使用所选 Cloudflare zone 的顶级域。平台托管的自定义收件邮件依赖该域的 catch-all，它不覆盖子域名；因此要么选一个没有其它邮件服务商的顶级域，要么使用平台的共享邮件地址。`domain-status` 会分开展示收件、发件与托管就绪状态。完成要求的 DNS 或 Cloudflare 后台步骤后，用 `domain-sync` 调和。需要显式更换 zone ingress 凭据时，用 `domain-rotate-secret`。Email Sending 的 onboarding 需要 Workers Paid；升级之后用 `domain-sync` 重试它。对于位于另一个 Cloudflare 账户的 zone，把该账户的 API 令牌从标准输入传入：
+
+```sh
+void platform email domain-add other.example --project hr-portal --token-stdin --yes < token.txt
+```
+
+项目所有者在 `void email domain list` 与 `status` 中能看到由管理员注册的域名；对于他们自己无法执行的步骤，`status` 会指名对应的 `void platform email` 命令，而 `sync` 与 `remove` 会引导他们使用 `domain-sync` 与 `domain-remove`。在你切换到 `admin` 之前由所有者注册的域名，仍然归他续期、同步与删除。要让这套流程正常工作，runtime 令牌需要具备[邮件相关权限](/docs/platform/installation/credentials)。
+
+权限被拒会让配置停在阻塞状态。修正权限后运行 `domain-sync`，即可继续同一个配置操作；重复执行 `domain-rotate-secret` 可继续被阻塞的轮换，而不会替换它已暂存的密钥。如果项目删除后留下被阻塞的域名清理，修正权限并运行 `domain-remove <domain>` 完成保留下来的清理。若它的令牌已过期或被撤销，提供一个同账户、同 zone 范围的替代令牌：
+
+```sh
+void platform email domain-remove other.example --token-stdin --yes < token.txt
+```
+
+这条恢复只在一个项目的删除已经开始、且没有其它项目使用该连接时可用。对于仍在运行的项目，请通过 `domain-add` 续期它的令牌。超时的 Cloudflare 变更操作会保持停止，因为重放可能重复写入提供方。在确认原始执行结束之后，等待 24 小时，检查 preview 指明的确切路由、Worker、密钥、catch-all 或 Sending 资源，再使用它的恢复栅栏：
+
+```sh
+void platform email operation-resolve <operation-id> --ended --outcome <applied|not-applied> --reason "Provider state verified" --plan
+void platform email operation-resolve <operation-id> --ended --outcome <applied|not-applied> --reason "Provider state verified"
+```
+
+执行恢复时，请使用创建这份持久化意图时同一个平台版本。`applied` 会继续而不重放写入；`not-applied` 允许重试那一个确切的步骤。密钥轮换会保留它暂存的那个生成结果，删除则从未解决的清理步骤继续。仅仅时间过去得多，永远不构成重试的依据。
+
+### 从已在收信的域名发信
+
+如果一个顶级域已经在使用别的服务商收信，例如 Microsoft 365 或 Google Workspace，可以只把它注册为发信域名：
+
+```sh
+void platform email domain-add brand.example --project hr-portal --outbound-only
+```
+
+之后该项目就能用这个顶级域下的任意地址发信，例如 `support@brand.example`。来信、MX 记录与顶级域的 SPF 记录仍归现有服务商。
+
+这需要 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/plans) 与 Cloudflare Email Sending 的 onboarding。Email Sending 会在 `cf-bounce.<domain>` 与 `_dmarc.<domain>` 添加记录。解决报告的 DNS 冲突后运行 `domain-sync`。
+
+只有管理员能注册仅发信的域名。请选一个与平台共享邮件 zone 不同的 zone 顶级域。用 `domain-remove` 可停止经由平台发信。要在“仅发信”与“平台托管收件邮件”之间切换，需要先移除该域名再重新添加。

@@ -1,0 +1,98 @@
+---
+title: 运维
+description: 用管理员会话预览平台改动、跟踪日志并检查平台健康状态。
+---
+
+## 预览改动
+
+会改动平台的命令在请求确认之前，先展示受影响的对象。只想检查而不实际应用时，加上 `--plan`：
+
+```sh
+void platform user suspend <user-id> --reason "Investigating unexpected traffic" --plan
+```
+
+预览会显示哪个账户将被停用，以及对它项目的影响。不带 `--plan` 重跑同一条命令会进入交互式确认；改动确实要生效时用 `--yes`：
+
+```sh
+void platform user suspend <user-id> --reason "Investigating unexpected traffic" --yes
+```
+
+脚本必须用 `--yes` 来应用这类改动。`void platform auth` 的会话命令直接执行，不使用 `--plan` 或 `--yes`；`void platform config auth` 下的改动则要走预览与确认。改动之后，`void platform system events` 会显示管理员、受影响的对象与记录的结果。
+
+当账户拥有大量资源时，改动可能耗时更久。会改动平台的请求默认允许五分钟；用 `--timeout` 可以按秒设定不同的上限：
+
+```sh
+void platform user delete <user-id> --timeout 600 --plan
+```
+
+如果请求超时或连接中断，部分工作可能已经完成。重试之前，请先检查受影响的对象与 `system events`。Void 在能给出时会报告部分完成的结果，但不会自动重复执行改动。
+
+## 跟踪日志
+
+要排查某个部署，先找到它的 ID，再跟踪它的运行时日志：
+
+```sh
+void platform deployment list --project <project-id>
+void platform deployment logs <deployment-id> --since 10m --follow
+```
+
+运行时日志包含应用消息、异常与 HTTP 状态码。不带 `--follow` 时，命令读取一页历史日志。`--since` 可以指定时长、ISO 日期或毫秒时间戳。
+
+日志可能在请求结束之后才可读取。跟踪模式会回看五分钟的区间，以补上延迟写入的记录又不会重复输出。延迟超过这个区间的记录，可能需要之后再做一次历史查询。
+
+构建日志使用构建的 ID：
+
+```sh
+void platform build logs <build-id> --follow
+```
+
+跟踪会等到最后的日志读完才停止，包括在构建状态变化之后写入的诊断信息。对于 GitHub Actions 构建，命令会给出其日志的 URL。
+
+## 检查平台
+
+### 健康检查
+
+用概览查看近期活动，或运行一次健康检查来测试平台的服务与数据库：
+
+```sh
+void platform system overview
+void platform system health
+```
+
+健康检查使用所选平台上已配置的服务。结果不健康时命令以非零状态退出，因此同一条命令可以直接用在脚本里。
+
+后台的 **System Status** 页面每 30 秒刷新一次健康检查，并把错误显示在受影响的服务旁边。
+
+用 `void platform upgrade`、`repair`、`disable`、`enable` 来维护你的平台，见[平台维护](/docs/platform/installation/maintenance)。
+
+升级或回滚期间，管理后台会在 `/admin/status` 显示进度，参见[跟踪升级与回滚进度](/docs/platform/installation/maintenance)。
+
+备份与恢复见[灾难恢复准备](/docs/platform/installation/maintenance)。
+
+## 编写脚本
+
+加上 `--json`，让其他程序读取命令结果：
+
+```sh
+void platform user list --page 1 --limit 50 --json
+void platform system health --json
+```
+
+结果输出到标准输出，命令错误以 JSON 输出到标准错误并以非零状态退出。带 `--follow` 时，每条日志响应是一行独立的 JSON。
+
+operator 令牌一小时过期。在 CI 中，请在每个 job 开始时，用属于活跃管理员的有效完整 API 登录会话换取一枚新的 operator 令牌。显式选择平台，从密钥管理器把完整会话作为 `VOID_TOKEN` 注入，并直接把换取的输出捕获进受保护的 job 环境：
+
+```sh
+export VOID_API_URL=https://platform.example.com
+VOID_OPERATOR_TOKEN="$(
+  printf '%s' "$VOID_TOKEN" | void platform auth token --token-stdin
+)" || exit 1
+export VOID_OPERATOR_TOKEN
+unset VOID_TOKEN
+void platform system health --json
+unset VOID_OPERATOR_TOKEN
+```
+
+换取令牌时请关闭 shell trace，两个令牌都不要写进日志或明文文件。完整的 API 登录会话 30 天后过期，也可能更早被撤销；请通过正常的认证登录流程续期，并更新受保护的 CI secret。运行超过一小时的 job，必须在其完整 API 会话仍然有效时重复换取。过期的 operator 令牌无法自我刷新，Void 也不为管理员自动化签发永久服务令牌。
+
+`auth login --token-stdin` 执行同样的提权，并把换取到的一小时 operator 令牌存入系统钥匙串供交互使用。完整命令语法见 [operator 认证](/docs/reference/cli/platform)。

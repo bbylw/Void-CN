@@ -1,0 +1,201 @@
+---
+title: 项目零信任
+description: 在项目主机名（包括自定义域名）上要求 Cloudflare Access 登录，让访客在抵达应用之前先完成身份验证。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+项目零信任会在你平台上各项目的主机名前面加上 Cloudflare Access，自定义域名同样覆盖。访客在抵达受保护的项目之前，必须先用你选定的身份提供方登录。每个项目仍然可以单独设为公开。
+
+这与平台 API 自身的 Access 登录与访问防护是两回事。直接部署到 Cloudflare 的项目不受影响。
+
+应用访问策略可以在 `void platform install` 时选择，也可以在之后按本页配置。安装流程会复用平台已有的策略，或协助你选定单独的公司规则，并在放开流量之前完成全部配置。
+
+<Callout type="info" title="Default-Deny 账户">
+  如果在启用了 Default-Deny 的账户中选择公开应用，Void 改为管理范围受限的公开规则。新建的项目与自定义域名会自动保持公开。只要 Default-Deny 开启，就必须保留这些规则；删除它们可能阻断流量。
+
+  纯公开的安装不需要任何身份提供方或公司策略，直到你选择保护应用为止。要在后台续期它们的令牌，把策略字段留空即可。
+</Callout>
+
+## 前置要求
+
+- 托管平台的那个 Cloudflare 账户里要有一个 Cloudflare Zero Trust 组织，并配好你打算使用的身份提供方与可复用的 Access 策略。至少选择一个按身份匹配人员的 Allow 策略。Void 会拒绝 Bypass 与 Service Auth 策略，以及允许 Everyone 或任意服务令牌的规则。
+- 该账户的一个 Cloudflare API 令牌，具备 **Access: Apps and Policies Write** 与 **Access: Organizations, Identity Providers, and Groups Read**。Void 把它与平台 runtime 令牌分开保存、加密存储，并且不再显示。
+- 账户中有空闲的 Access 应用额度。Cloudflare 的默认限额是每个账户 500 个。请先统计你在 Void 之外已经管理的应用数量，再加上 Void 需要的数量，具体见 [Void 创建的 Access 应用](#void-创建的-access-应用)。
+- 平台 API、代理与邮件网关的主机名必须位于项目应用域名之外。如果项目防护会覆盖到其中任何一个，配置会被拒绝。项目应用域名下的其它主机名同样会要求登录，只有 `void-platform-health.<你的域名>` 的 `/health` 路径例外：Void 为自身的健康检查保留它开放，并且绝不会从项目中提供这个名称。新项目无法使用这个名字；已经在使用它的项目，其余路径仍像其它项目一样，该保护的受保护、该公开的公开。
+
+## 启用 Zero Trust
+
+在管理后台打开 **Zero Trust**，或使用 operator CLI：
+
+```sh
+printf '%s' "$ACCESS_API_TOKEN" | void platform zero-trust configure \
+  --identity-providers <id[,id...]> \
+  --policies <id[,id...]> \
+  --existing-projects public \
+  --protect-new-projects \
+  --token-stdin \
+  --yes
+```
+
+- `--existing-projects protected|public` 决定已存在的项目如何处理。启用零信任时这项参数是必填的。
+- `--protect-new-projects` 保护此后创建的项目。省略它，新项目就是公开的。
+- 用 `--plan` 代替 `--yes`，可以检查而不应用改动。
+
+之后要更换身份提供方、策略、令牌或新项目的默认值，运行同一条命令但不带 `--existing-projects`。已有项目保持各自的防护状态；要改单个项目，请使用下面的项目级覆盖。
+
+## 查看状态
+
+```sh
+void platform zero-trust status
+void platform zero-trust status --check
+```
+
+`status` 显示已保存的设置、当前正在执行的操作，以及有多少项目处于受保护、公开或等待状态。`--check` 还会把设置与 Cloudflare Access 的实际状态做比对。在管理后台里对应的按钮是 **Check with Cloudflare**。
+
+## 项目级覆盖
+
+项目所有者与项目管理员都可以保护某个项目或把它设为公开，只读成员可以查看它的状态。
+
+```sh
+void project zero-trust status
+void project zero-trust protect
+void project zero-trust public
+void project zero-trust reconcile
+```
+
+`status` 还会告诉你当前是否能修改防护。把项目设为公开不会改变新项目的默认值。
+
+安装管理员可以在管理后台的项目页面上做同样的事，或用 `void platform zero-trust project-status|project-protect|project-public|project-reconcile <project-id>`。
+
+部署与回滚会等待项目的防护变更完成。如果被拒绝，运行 `void project zero-trust status` 查看原因；由所有者或项目管理员先运行 `void project zero-trust reconcile` 再重试。一个受保护的项目最多可以有 100 个自定义域名。
+
+## 停用 Zero Trust
+
+```sh
+void platform zero-trust disable
+```
+
+这会移除 Void 创建的 Access 应用，并把所有项目设为公开。在规模较大的安装上，它分步执行；请重复运行该命令，或查看 `void platform zero-trust status`，直到零信任显示为已停用且没有操作在运行。
+
+在[卸载平台](/docs/platform/installation/uninstall)之前，请先停用零信任并等待它的应用被移除。如果某个项目的删除中途停止，请针对该项目重试 `void project delete`。
+
+## 防护如何生效
+
+Cloudflare Access 负责登录并应用你的策略；Void 在提供受保护项目之前还会再校验一次令牌。公开的项目允许访客无需登录直接进入。
+
+### 访客看到什么
+
+受保护的项目会要求访客用你选定的身份提供方之一登录。如果你恰好只选了一个，访客会直接前往它；否则访客需要在所选提供方中挑一个。一次登录有效 12 小时，之后 Access 会再次要求登录。
+
+防护会跟随项目覆盖它响应请求的每一个主机名：
+
+| 主机名                                      | 受保护的项目   | 公开的项目     |
+| ------------------------------------------- | -------------- | -------------- |
+| `<slug>.<你的域名>`                         | 需要登录       | 任何人可访问   |
+| 项目的 `workers.dev` 测试 URL               | 需要登录       | 任何人可访问   |
+| 自定义域名，例如 `app.example.com`          | 需要登录       | 任何人可访问   |
+
+Void 只覆盖本安装自身的 `workers.dev` 测试 URL，账户里的其它 Worker 不受影响。在没有配置域名的安装上，`workers.dev` 测试 URL 是项目唯一的 URL，共享的项目应用也只覆盖这些 URL。
+
+#### 403 页面
+
+没有有效令牌的请求会收到 `403 Cloudflare Access authentication required`。页面请求返回 HTML 错误，API 与静态资源请求返回纯文本。这些响应永不被缓存。
+
+正常完成登录页流程的访客不会看到这个页面。以下情况可能会看到它：
+
+- 项目正在受保护与公开之间切换的短暂时间内；
+- 某项零信任变更尚未在项目上应用完成时；
+- 有人在 Cloudflare 后台删除了 Void 管理的 Access 应用，或改动了它的主机名，见[在后台编辑应用](#在后台编辑应用)。
+
+#### 所有路径都被覆盖
+
+防护作用于整个主机名，没有路径例外。`/api/*` 路由、静态文件、带 hash 的资源、`robots.txt`、`favicon.ico`、server-sent 事件与 WebSocket 都要求访客已登录。
+
+#### Webhook 与其它非浏览器客户端
+
+项目防护要求的是「人的身份」。Webhook、CI 任务、可用性拨测与未认证的 `curl` 调用只会拿到登录页或一个 403。
+
+如果某个项目必须接受这类请求：
+
+- 用 `void project zero-trust public` 把项目设为公开，并在你自己的代码里校验调用方；或者
+- 把机器调用的端点迁到另一个独立项目，只把那个项目设为公开。
+
+### Void 创建的 Access 应用
+
+Void 会在你的 Zero Trust 组织里创建并持有这些 self-hosted 应用：
+
+| 应用                     | 覆盖范围                                                                | 策略                                                                     | 存在条件                                                             |
+| ------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| 共享项目应用             | `*.<你的域名>` 与本安装的 `workers.dev` 测试 URL                        | 你选定的策略与身份提供方                                                 | 在「受保护应用」的配置下，有且仅有一个                               |
+| 公开应用的管理权限校验   | 一个保留的、不使用的 dispatch check 路径                                | Deny Everyone；在不开放主机名的前提下校验管理权限                        | 在纯公开模式下替代共享通配符，有且仅有一个                           |
+| 公开例外                 | 某个公开项目的 `<slug>.<你的域名>` 与 `workers.dev` 测试 URL            | 名为 `Void project is public` 的、对 Everyone 的 Bypass 策略             | 每个公开项目一个                                                       |
+| 自定义域名应用           | 某个项目全部由平台管理的自定义域名                                      | 受保护项目用公司策略；公开项目用 Bypass                                  | 每个拥有托管自定义域名的项目一个                                     |
+| 健康检查例外             | `void-platform-health.<你的域名>/health`                                | 名为 `Void platform health check` 的、对 Everyone 的 Bypass 策略         | 在配置了域名并启用零信任的安装上，有且仅有一个                       |
+
+通过安装流程配置的安装还会管理公开自定义域名的规则。它们的自定义域名应用会在项目于公开与受保护之间切换时更换策略。
+
+如果安装流程已经配置了同样的健康检查例外，零信任会直接复用它。停用项目零信任时，那条已有的例外会保留下来，让平台健康检查继续工作。
+
+Void 需要的应用数量是：
+
+```text
+1 + 健康检查应用 + 公开项目 + 拥有托管自定义域名的项目
+```
+
+第一个应用要么是共享的公司策略应用，要么是公开应用的管理权限校验。健康检查例外按一个计算，即使它与安装流程共用。举例：40 个项目加一个健康检查例外、10 个公开项目、5 个拥有托管自定义域名的项目，需要 1 + 1 + 10 + 5 = 17 个应用。当账户的 Access 应用超过 500 个时，Void 会报错停止。
+
+#### 辨认 Void 的应用
+
+运行 `void platform zero-trust status` 查看共享应用与健康检查应用，或用 `void platform zero-trust project-status <project-id>` 查看某个项目的应用。这些命令会给出它们的准确名称与 ID。
+
+### 在后台编辑应用
+
+请通过 `void platform zero-trust configure` 与项目相关命令来管理 Void 的应用。直接在 Cloudflare 里编辑或删除它们，可能让访问一直受阻，直到你执行 reconcile。后台里的手动修改，可能在 Void 下次更新该应用时被覆盖。
+
+你可以编辑所选可复用策略的规则，改动会影响所有使用该策略的项目。请保留一条基于身份的 Allow 策略，不含 Everyone 或服务令牌，然后用下面的命令检查：
+
+```sh
+void platform zero-trust status --check
+```
+
+- `drifted: true`：运行 `void platform zero-trust reconcile`。
+- `present: false`：检查令牌、应用、身份提供方与策略，然后 reconcile。
+
+这条命令检查的是共享应用与健康检查应用。对于公开例外或自定义域名应用，请使用项目的 reconcile 命令。
+
+#### 修复命令
+
+| 命令                                                      | 作用范围                              | 可执行者                       |
+| --------------------------------------------------------- | ------------------------------------- | ------------------------------ |
+| `void platform zero-trust reconcile`                      | 平台与全部项目                        | 安装管理员                     |
+| `void platform zero-trust project-reconcile <project-id>` | 单个项目                              | 安装管理员                     |
+| `void project zero-trust reconcile`                       | 已链接的项目，或 `--project <slug>`   | 项目所有者与项目管理员         |
+
+项目调和要求平台状态为 `ready`，否则请先调和平台。
+
+如果某个应用被重命名，请先把它恢复成记录中的名称再调和。重复的副本需要你自行清理。删除共享应用会临时阻断所有受保护的项目；删除健康检查例外，可能直到它被恢复之前都会阻断升级与修复。
+
+### 变更期间会发生什么
+
+防护变更可能短暂返回 403。如果某一步失败，受保护的项目会保持受保护，或在变更完成之前拒绝访客。
+
+保护项目或设为公开通常在命令返回前就完成了。如果它仍在运行或报错，请检查 `void project zero-trust status`，修好报告的原因，再运行 `void project zero-trust reconcile`。
+
+平台级的变更分步执行。初次配置期间，自定义域名会保持公开，直到 Void 处理到它们所属的项目。停用期间，各主机名变为公开的时间可能不同。用 `void platform zero-trust status` 跟踪进度。
+
+新的自定义域名只有在它所属项目的防护就绪后才会可达。
+
+### 缓存
+
+携带 Access 令牌的请求会绕过 [ISR](/docs/edge/revalidation)与[静态资源边缘缓存](/docs/edge/static-assets)。受保护的页面每次请求都会渲染，这可能增加延迟与请求用量。公开的项目沿用共享缓存。
+
+## 故障恢复
+
+- **状态长期停留在 `configuring` 或 `disabling`。** 大规模变更分步执行。例行维护会在几分钟内继续推进它们，也可以手动运行 `void platform zero-trust reconcile`。
+- **状态显示错误。** 先修好它给出的原因，例如令牌权限或应用数量上限，再运行 `void platform zero-trust reconcile`。否则 Void 每小时重试一次。
+- **只有某个项目显示错误。** 变更的其余部分仍会完成。Void 每小时重试该项目，也可以由所有者或项目管理员运行 `void project zero-trust reconcile`。在此之前，原本已受保护的项目保持受保护，正在新设保护的项目绝不会比之前更开放。
+- **添加域名因为某个项目而一直挂起。** Void 只有在所有项目都能接受新域名后才会发布它。平台状态里会显示一个错误，指明那些无法更新的项目。用 `void platform zero-trust project-status <project-id>` 逐个检查，修好原因后运行 `void platform zero-trust reconcile` 或重跑域名命令。Void 同样每小时重试。期间你的 `workers.dev` URL 仍可正常工作。
+- **新项目未能完成配置。** 创建项目本身仍会成功，只是附带一条警告。Void 每小时重试，也可以运行 `void project zero-trust reconcile`。
+- **保存的 API 令牌过期或被撤销。** 用 `void platform zero-trust configure --token-stdin` 传入替换令牌，并带上相同的身份提供方、策略与 `--protect-new-projects` 选择，省略 `--existing-projects`。Void 会接着完成未做完的变更，包括一次未完成的停用。请先完成它，再改动其它设置。
+- **选定的身份提供方或策略被删除。** 运行 `void platform zero-trust disable` 终止未完成的配置并移除它创建的应用，这会把项目变为公开。之后用新的选择重新配置零信任。

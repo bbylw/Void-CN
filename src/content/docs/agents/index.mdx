@@ -5,6 +5,18 @@ description: void init 会在新项目中添加一份精简的 AGENTS.md，并�
 
 import Callout from '@/components/docs/Callout.astro';
 
+`void init` 在项目初始化过程中就会把编程智能体一并配置好：
+
+```sh
+npx void init
+```
+
+新项目会得到一份精简的 `AGENTS.md`，说明 Void 是什么、文档到哪里读。
+
+在已有项目中，Void 在创建、追加或更新 `AGENTS.md` 之前都会先征求你的同意，并保留 Void 段落之外你自己的指令；选择拒绝时文件保持原样。CI 与非交互式运行不会改动已有项目的指令文件。
+
+完整的 Markdown 文档随包发布在 `node_modules/void/docs/`，入口是 `guide/quickstart.md`（上手）与 `reference/cli.md`（命令）。即使没有链接技能，智能体也可以直接读取这些文件。
+
 ## AGENTS.md
 
 在**新建**项目中，初始化流程会写入一份精简的 `AGENTS.md`，其中包含 Void 的关键约定：
@@ -14,11 +26,18 @@ import Callout from '@/components/docs/Callout.astro';
 - 资源约定：导入即启用，不要手写 `wrangler.jsonc`
 - 命令约定：`void db generate`、`void deploy`、`void env check`
 
-在**已有**项目中，Void 不会直接覆盖你的指令文件，它会先征求你的同意，再进行合并或替换。
+在**已有**项目中，Void 不会直接覆盖你的指令文件，它会先征求你的同意，再进行合并或替换；`AGENTS.md` 里 Void 段落以外的内容会被保留。
 
 ## 打包的技能
 
-Void 为检测到的编程智能体链接打包好的技能包，让智能体可以直接查询 Void 的 API、CLI 与最佳实践，而不依赖它事先记住这些内容。
+技能（skill）把智能体指向完成当前任务所需的命令与文档。它们链接到已安装的 `void` 包，因此指引始终与你应用实际使用的版本一致。
+
+Void 提供两个技能：
+
+- **`void`：** 应用开发用到的命令与文档。
+- **`migrate-vite-cloudflare-to-void`：** 把现有 `@cloudflare/vite-plugin` 应用迁移到 Void 的技能。
+
+当 `void init` 检测到受支持智能体的配置时，会自动链接这些技能。例如 Claude Code 使用 `.claude/skills/`，Codex 使用 `.agents/skills/`。技能读取应用已安装的文档，所以指引与该项目的 Void 版本相符；全局安装的技能在没有本地安装时，会使用自己所在 `void` 包里的文档。如果一个智能体都没检测到，指令文件仍然会直接指向随包发布的文档。
 
 <Callout type="tip">
   如果你使用的智能体不在自动检测范围内，可以手动指向随 `void` 包一起提供的 Markdown 指南与参考，位于
@@ -30,8 +49,8 @@ Void 为检测到的编程智能体链接打包好的技能包，让智能体可
 `void` 包自带完整的 Markdown 指南与参考：
 
 ```text title="node_modules/void/docs/"
-├── guide/      指南
-└── reference/  参考
+├── guide/      指南（从 quickstart.md 开始）
+└── reference/  参考（命令见 cli.md）
 ```
 
 这让你可以在没有网络访问的环境中，也能让智能体查到准确的 API 与 CLI 用法。

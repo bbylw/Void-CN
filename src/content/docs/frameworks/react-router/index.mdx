@@ -1,0 +1,81 @@
+---
+title: React Router v7
+description: 在 React Router 的 Vite 插件旁边加上 voidPlugin()，即可获得数据库、存储与部署能力，无需额外的 Cloudflare 适配器。
+---
+
+在 [React Router v7](https://reactrouter.com/) 的 Vite 插件旁边加上 `voidPlugin()`，就能使用 Void 的数据库、存储与部署能力，不需要再配置单独的 Cloudflare 适配器。
+
+## 接入步骤
+
+### 1. 创建新项目
+
+```bash
+npm create react-router@latest my-app
+cd my-app
+```
+
+### 2. 安装依赖
+
+```bash
+npm install -D void
+```
+
+### 3. 配置 `vite.config.ts`
+
+```ts
+import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  plugins: [
+    voidPlugin(), // 必须放在框架插件之前
+    reactRouter(),
+  ],
+});
+```
+
+### 4. 部署
+
+```bash
+void auth login
+void deploy
+```
+
+## 使用 Void 能力
+
+多数 [Void 平台能力](/docs/app-types)都可以在 React Router 中使用。把它们用在 loader 与 action 里。
+
+Void 托管的认证暂不支持框架模式，目前请直接使用 Better Auth 官方的 React Router 集成。
+
+### 数据库
+
+```tsx
+import { users } from '@schema';
+import { db } from 'void/db';
+import type { Route } from './+types/users';
+
+export async function loader({}: Route.LoaderArgs) {
+  return { users: await db.select().from(users) };
+}
+```
+
+### 其他资源
+
+在服务端代码中使用 [KV](/docs/kv)、[对象存储](/docs/storage) 与 [AI](/docs/ai)，导入方式和 Void 应用完全相同。在 `crons/` 中添加 [cron 任务](/docs/jobs)，在 `queues/` 中添加[队列消费者](/docs/queues)。
+
+### 环境变量
+
+在 `env.ts` 中声明变量，用 `import { env } from "void/env"` 读取。本地取值、生产密钥以及公开的 `VITE_*` 值参见[环境变量](/docs/env-vars)。
+
+服务端密钥要读自 `.server.ts` 伴生模块，再在 loader 或 action 中导入它。如果某个路由文件里同时含有浏览器组件，Void 会拒绝其中的服务端密钥读取。
+
+## 直接访问绑定
+
+你也可以通过 `cloudflare:workers` 模块访问 Cloudflare 绑定：
+
+```tsx
+import { env } from 'cloudflare:workers';
+
+const { results } = await env.DB.prepare('SELECT * FROM users').all();
+```

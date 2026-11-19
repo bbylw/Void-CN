@@ -1,0 +1,69 @@
+---
+title: 连接与认证
+description: 把 CLI 连接到 Cloudflare 或某个 Void 平台，并登录承接部署的那个账户。
+---
+
+```sh
+void connect
+void connect platform.example.com
+void connect --platform cloudflare
+void connect --platform void
+```
+
+把项目连接到它的部署目标。不带参数时，可以交互式选择 Cloudflare 或某个 Void 平台；给出 URL 就直接选定该 Void 平台；`--platform void` 会列出已保存的平台并提供手动输入 URL 的选项。
+
+也可以只写主机名：`void connect platform.example.com` 通过 HTTPS 连接。回环地址（`localhost`、`127.0.0.1` 和 `[::1]`）默认使用 HTTP，因此本地平台要用 `void connect localhost:8787`。交互式提示里同样如此。想覆盖默认协议就显式写出 scheme，例如 `void connect https://localhost:8787`。
+
+连 Cloudflare 时，Void 会在需要时通过浏览器登录，选一个可访问的账户，并把 `cloudflare.account_id` 写进 `void.config.ts`，或把解析出的状态写进 `void.lock.json`。它与 `void init` 共用同一套配置。已有的账户选择会被保留；若账户设置存在冲突或无法访问，必须先解决才能继续。
+
+连 Void 平台时，Void 会检查连通性，并在需要时通过浏览器让你登录。凭据按平台 origin 分别存入系统钥匙串。
+
+部署偏好保存在 `.void/project.json`。改连另一个 Void 平台会保留已有的项目关联；如果该关联或某个环境变量覆盖仍然指向别的目标，CLI 会说明原因。要用 `void project link` 显式选择项目。选择 Cloudflare 时也会保留已有的 Void 项目元数据，方便之后切回。
+
+在非交互式 shell 中，必须给出 URL 或明确的目标。Cloudflare 需要可用凭据和无歧义的账户（必要时设置 `CLOUDFLARE_ACCOUNT_ID`）。连接 Void 平台时，要么提供 `VOID_TOKEN` 并配上匹配的 `VOID_API_URL`，要么复用一个有效的、按 origin 隔离的钥匙串会话。`void connect <url> --no-login` 可以在不登录的情况下保存已验证的连接，该选项只对 Void 平台可用。
+
+## 认证
+
+`void auth login`、`void auth status` 与 `void auth logout` 使用 `void init` 或 `void connect` 为当前项目保存的目标。若没有保存目标，交互式命令会让你选择 Cloudflare 或已连接的 Void 平台。在非交互式 shell 中，请传 `--platform cloudflare|void`，或改用明确的 `void cloudflare` 与 `void account` 命令。为认证选择目标不会改变项目的部署目标。
+
+## Void 平台账户
+
+### `void account login`
+
+通过该平台当前启用的某种登录方式在浏览器中登录。token 存入操作系统钥匙串，并按平台 origin 隔离。当没有可用钥匙串时，登录会直接失败，而不是把 token 写成明文文件；无界面环境请使用密钥管理服务提供的 `VOID_TOKEN`。
+
+登录前先用 `void connect <url>` 连到平台。如果旧的项目关联里没有平台 URL，请重新连接并运行 `void project link` 再次选择项目。
+
+设置 `VOID_TOKEN` 时请同时设置 `VOID_API_URL`，用以指明签发它的平台。基于环境变量的认证两者都必需，且该 URL 必须已经连接过。在全新的 CI 环境里，部署前先运行 `void connect "$VOID_API_URL" --no-login`。若想改用平台已保存的登录，请取消设置 `VOID_TOKEN`。
+
+如果你已经在 `void connect` 或交互式 `void init` 流程中完成认证，这一步是可选的。
+
+### `void account link [connection-id]`
+
+把另一种启用的登录方式关联到你当前的账户。如果会话不够新鲜需要重新登录，完成额外提供方的浏览器登录，并确认页面上显示的身份。不带 connection ID 时交互式选择一种启用的方式。可选的 dashboard 在 **Account** 中提供同样的流程。
+
+### `void account logout`
+
+移除已保存的凭据。
+
+### `void account whoami`
+
+打印当前的登录身份。
+
+### `void account token`
+
+把人工登录用的 auth token 复制到系统剪贴板。它用于交互式排障，并且仍然遵循登录方式的吊销规则。不要把它和 Cloudflare Access 的 service token 混用在 CI 里；机器侧的 Access 凭据无法把人工 Void token 变成自动化身份。请改用 `void project token create` 创建项目范围的凭据。
+
+## Cloudflare 认证
+
+用 Void 提供的 Cloudflare 命令登录并管理凭据，无需另外安装 Cloudflare CLI。浏览器凭据经过加密，由系统钥匙串保护。
+
+- `void cloudflare login` — 通过浏览器登录，或切换 Cloudflare 用户。
+- `void cloudflare status` — 显示你的身份、凭据来源、可访问的账户与部署所用账户。
+- `void cloudflare logout` — 移除本地浏览器会话。
+
+交互式的 `void connect --platform cloudflare`、`void init` 与 `void deploy --platform cloudflare` 会在必要时机调用同一套登录流程。非交互式 CI 必须设置 `CLOUDFLARE_API_TOKEN`。
+
+登录改变的是浏览器会话，而不是项目配置里的 `account_id`。切换用户后请查看 `void cloudflare status`；如果新用户无法访问被固定的账户，请先单独解决项目目标再部署。
+
+环境中的 API token 或全局 API key 键对优先于浏览器凭据。显式浏览器登录会打印这些覆盖项的名称并停止；请先在该 shell 中移除它们再登录。`status` 会报告当前生效的凭据来源，`logout` 会在环境凭据仍然生效时给出警告。显式浏览器登录需要交互式终端；部署时的自动检查仍会复用有效会话。

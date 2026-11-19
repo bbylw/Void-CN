@@ -1,0 +1,65 @@
+---
+title: 部署产物 API
+description: 无需平台凭据，即可把已构建的应用、SPA 或静态站点准备好用于托管平台部署。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+在 Node.js 中使用 `void/deploy`，把已构建的 Void 应用、SPA 或静态站点准备好用于托管平台部署，且无需持有平台凭据。
+
+在应用的隔离环境中以托管模式构建：
+
+```sh
+VOID_DEPLOY_BUILD=1 VOID_DEPLOY_PROJECT_ID=artifact npm run build
+```
+
+这些取值会选出与平台兼容的构建产物。目标项目在发布审批阶段确定。
+
+```ts
+import { prepareDeployArtifact } from 'void/deploy';
+
+const { artifact, assets } = await prepareDeployArtifact('/path/to/app');
+```
+
+`artifact` 包含部署清单、资源元数据以及所有 Worker 模块。`assets` 把资源的 URL 路径映射到 base64 字节。SPA 与静态站点使用与 `void deploy` 相同的输出目录和路由配置。在申请[发布审批](/docs/platform/administration/connected-apps)期间，请保持准备好的结果原样不变。
+
+该 API 适用于已构建的 Cloudflare Worker 应用、SPA 与静态站点。对于 Node 目标、Pages 的 `output: 'static'`、远程数据、部署时预渲染、Sandbox 或 Live 资源，请使用 `void deploy`。
+
+请在与应用构建相同的隔离环境中执行准备工作。应用配置与构建插件会执行项目代码；平台凭据只保留在发布服务器上。
+
+## Cloudflare Build Output
+
+<Callout type="warn" title="实验特性">
+  `prepareCfBuildOutput` 跟随 Cloudflare 草案阶段的 Build Output 格式。它的选项以及准备出的目录结构可能
+  在 Void 的各个版本之间发生变化。
+</Callout>
+
+用 `prepareCfBuildOutput` 把已有的 Worker 构建产物准备好用于在 Cloudflare 发布：
+
+```ts
+import { prepareCfBuildOutput } from 'void/deploy';
+
+const prepared = await prepareCfBuildOutput('/path/to/app/dist/server', {
+  projectRoot: '/path/to/app',
+  mode: 'staging',
+});
+if (!prepared) {
+  throw new Error('The Worker build could not be prepared.');
+}
+
+try {
+  // 检查 prepared.directory，或把它交给你的 Cloudflare 发布流程。
+} finally {
+  await prepared.dispose();
+}
+```
+
+传入包含生成的 `wrangler.json` 的 Worker 输出目录，例如 `dist/ssr` 或 `dist/server`。对于原生的 Cloudflare Build Output，传入包含 `.cloudflare/output/v1` 的项目根目录。用旧版本 Void 生成的构建产物，需要先重新构建，再用更新后的工具链准备。结果是一份供你发布流程使用的临时副本。对于由本地 Dockerfile 构建的容器，请在构建镜像时使用的那个 Docker 环境中发布。
+
+| 选项            | 说明                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `accountId`     | 构建必须针对的 Cloudflare 账号。若构建属于另一个账号，返回 `null`。省略时保留构建自带的账号，或不设置账号。                                |
+| `mode`        | Vite 构建模式。原生输出会保留它构建时使用的模式，传入不同的值会返回 `null`。对其他输出，默认值为 `production`。                             |
+| `projectRoot` | 包含 `package.json` 及其已安装依赖的应用目录。默认为输入的目录。                                                                            |
+
+结果提供 `directory`、指向输入资源的可选 `assetsDirectory`，以及异步的 `dispose()` 方法。发布完成后调用 dispose 释放结果。不受支持的配置返回 `null`；构建文件缺失或无效会抛出错误。

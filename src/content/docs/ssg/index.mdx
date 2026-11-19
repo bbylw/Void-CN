@@ -1,0 +1,101 @@
+---
+title: 静态站点生成（SSG）
+description: 在 void.config.ts 中设置 static 输出模式，在构建期预渲染所有页面。
+---
+
+在 `void.config.ts` 中设置 `output: "static"`，即可在构建期预渲染所有页面：
+
+```json
+{
+  "output": "static"
+}
+```
+
+当 `output` 为 `"static"` 时：
+
+- 页面默认为 `prerender = true`，并作为 HTML 文件写入 `dist/client/`。
+- 想退出预渲染，在页面的 `.server.ts` 中写 `export const prerender = false`，该页面会在请求时进行服务端渲染。
+- 没有 `getPrerenderPaths()` 的动态页面不会被隐式预渲染（构建期无法知道这些路径）。
+- 构建产物是自包含的，既可以直连部署到 Cloudflare，也可以自托管或用 `void deploy` 部署。
+
+## 尾部斜杠与目录索引
+
+对于 GitHub Pages 这类宿主，可以开启带尾部斜杠的 Pages URL 和目录式 HTML 输出：
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  output: 'static',
+  routing: { trailingSlash: true },
+});
+```
+
+Void 会把 `/posts/` 写到 `posts/index.html`，把 `/posts/hello/` 写到 `posts/hello/index.html`。链接里也请使用尾部斜杠；生成的路由类型会遵循这个设置。在开发环境以及由 Void 服务时，不带斜杠的 URL 会重定向到带斜杠的形式，API 的 URL 保持不变。
+
+默认值是 `false`，此时写出 `posts.html`。两种模式下错误页都仍然是 `404.html`。
+
+在 Cloudflare 上，请使用默认的 HTML 处理或 `force-trailing-slash`，不要用 `drop-trailing-slash`。第三方框架使用它们自己的 URL 设置。
+
+## 页面级覆盖
+
+单个页面可以退出预渲染：
+
+```ts title="pages/dashboard.server.ts"
+export const prerender = false;
+```
+
+对于动态页面，请从 `getPrerenderPaths()` 返回要渲染的路径。给返回类型标注 [`PageParams`](/docs/reference/api/types) 就能检查参数名：
+
+```ts title="pages/blog/[slug].server.ts"
+import type { PageParams } from 'void/routes';
+
+export async function getPrerenderPaths(): Promise<PageParams<'/blog/[slug]'>[]> {
+  return [{ slug: 'hello-world' }, { slug: 'getting-started' }];
+}
+```
+
+每个必填参数都以字符串或数字返回，Void 会对取值做 URL 编码。如果值里含 `/`，请使用 `pages/docs/[...slug]` 这样的 catch-all 页面，例如 `{ slug: 'guides/intro' }`。
+
+必须写上上面的类型标注，TypeScript 才会检查键名。非法条目会中断构建，并带上服务端文件名与下标。
+
+## 404 页面
+
+只要至少预渲染了一个页面，静态构建就会在 `dist/client/` 中包含一个默认的 `404.html`。想自带错误页，可以添加 `public/404.html`，或把某个页面预渲染到 `/404`。
+
+完全静态的 Void 部署默认会用 HTTP 404 状态码为缺失的 URL 服务这个页面，你可以用 [`routing.notFound`](/docs/config) 覆盖这一行为。混合部署则在 Worker 中处理缺失的 URL。
+
+如果你自己托管 `dist/client/`，请在宿主上配置好：缺失页面用 404 状态码服务 `404.html`。
+
+## 与边缘预渲染的对比
+
+| `output` 取值        | 默认 prerender    | 页面级覆盖                       | 预渲染时机                 |
+| -------------------- | ----------------- | -------------------------------- | -------------------------- |
+| `"server"`（默认）   | `false`           | `export const prerender = true`  | 部署时（平台 ISR）         |
+| `"static"`           | `true`            | `export const prerender = false` | 构建期或部署后的 post-build |
+
+在默认的 `output: "server"` 下，请使用 `export const prerender = true` 做部署时的[边缘预渲染](/docs/edge/prerendering)。
+
+## 部署行为
+
+`void deploy` 会自动选择部署方式：
+
+- **完全静态：** 每个页面都被预渲染，且没有 API 路由、中间件、定时任务或队列。Void 会把构建产物作为静态站点部署。
+- **混合：** 有些页面需要服务端渲染，例如没有 `getPrerenderPaths()` 的动态页面，或设置了 `prerender = false` 的页面。Void 会为这些路由部署一个 Worker，并把预渲染好的页面作为静态资源提供服务。
+
+在直连 Cloudflare 的部署上，静态文件可以绕过 Worker：
+
+- 完全静态的应用直接服务文件。[边缘规则](/docs/edge/headers)（包括 `public/` 里的 `_headers` 或 `_redirects`）会在每个请求上需要一个很小的 Worker。
+- 混合应用在没有 `.server.ts` 配套文件时直接服务预渲染页面。API 路由、动态页面以及有服务端配套文件的页面都在 Worker 中运行。
+
+只要应用存在中间件、认证、live 更新、边缘规则、自定义的 Vite `base`、非 `"none"` 的 `routing.notFound` 值，或在 `pages/` 根目录上有动态页面（例如 `pages/[slug].vue`），每个页面都会使用 Worker。在这些设置下，预渲染过的请求同样会经过 Worker。
+
+## 与 `inference.appType: "static"` 的关系
+
+`inference.appType` 字段描述的是应用类型（SPA、static、void），而 `output` 控制的是渲染策略：
+
+|              | `inference.appType: "static"`                   | `output: "static"`                            |
+| ------------ | ----------------------------------------------- | --------------------------------------------- |
+| **是什么**   | 部署一个已经构建好的静态站点（不使用 Void 插件） | 在构建期预渲染一个 Void 应用                  |
+| **Worker**   | 没有（只有静态资源）                            | 只在服务端代码与边缘规则时需要                |
+| **适用场景** | VitePress、纯 HTML、外部 SSG 工具               | 内容基本或完全静态的 Void 应用                |

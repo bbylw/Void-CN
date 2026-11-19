@@ -1,0 +1,200 @@
+---
+title: 身份认证 API
+description: 来自 void/auth 的会话、用户与认证客户端，以及 void/client 中浏览器侧的辅助方法。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+从 `"void/auth"` 导入。浏览器侧的辅助方法从 `"void/client"` 导入。
+
+## `defineAuth(config)`
+
+在根目录的 `auth.ts` 文件中自定义 Better Auth。展开 `defaults` 以保留 Void 的默认配置：
+
+```ts
+import { defineAuth } from 'void/auth';
+
+export default defineAuth(({ defaults }) => ({
+  ...defaults,
+  trustedOrigins: ['https://example.com'],
+}));
+```
+
+**签名：**
+
+```ts
+function defineAuth(config: VoidAuthConfig): VoidAuthConfig;
+```
+
+## `getUser()`
+
+返回当前已认证的用户；没有用户时返回 `null`。
+
+```ts
+import { getUser } from 'void/auth';
+
+const user = getUser();
+```
+
+**签名：**
+
+```ts
+function getUser(): AuthUser | null;
+```
+
+## `getSession()`
+
+返回当前用户与会话；未登录时返回 `null`。
+
+```ts
+import { getSession } from 'void/auth';
+
+const state = getSession();
+```
+
+**签名：**
+
+```ts
+function getSession(): AuthState | null;
+```
+
+## `getAuth(c)`
+
+返回当前请求对应的 Better Auth 实例，其中包含由 `auth.ts` 推断出的插件 API。可以用它配合 Better Auth 的插件辅助方法，或把请求转发给 `auth.handler`。
+
+```ts
+import { defineHandler } from 'void';
+import { getAuth } from 'void/auth';
+
+export const GET = defineHandler((c) => getAuth(c).handler(c.req.raw));
+```
+
+调用这个辅助方法之前要先启用[身份认证](/docs/auth)；没有可用实例时它会抛出异常。匿名请求同样可以使用它。需要强制登录时，另外调用 `requireAuth(c)`。
+
+Void 会把 `getAuth(c).api` 调用设置的 cookie 附带在响应里。例如 `signInEmail` 与 `signUpEmail` 会让当前浏览器完成登录。要让这些 cookie 被发送，跨域的 `POST` 必须来自已配置的 `trustedOrigins` 条目。会话更新与账号创建见[调用 Better Auth API](/docs/auth)。
+
+**签名：**
+
+```ts
+function getAuth(c: CloudContext): AuthInstance;
+```
+
+## `requireAuth(c, options?)`
+
+返回已登录的用户；不存在会话时抛出 `401` 的 `HTTPException`：
+
+```ts
+import { defineHandler } from 'void';
+import { requireAuth } from 'void/auth';
+
+export const GET = defineHandler((c) => {
+  const user = requireAuth(c);
+  return { email: user.email };
+});
+```
+
+在页面 loader 或中间件里，这个异常会交给最近的可用 [`_error` 组件](/docs/pages-routing/errors)处理。如果希望把访客引导到登录页，传入 `throwRedirect`：
+
+```ts
+import { defineHandler } from 'void';
+import { requireAuth } from 'void/auth';
+
+export const loader = defineHandler((c) => {
+  const user = requireAuth(c, { throwRedirect: '/login' });
+  return { email: user.email };
+});
+```
+
+`throwRedirect` 可用于 loader、action 与中间件。对于未登录的请求，它会以重定向终止执行：GET/HEAD 请求返回 `302`，其他方法返回 `303`。Pages 的客户端导航会跟随重定向且不重新加载文档。登录之后不会重复执行被拒绝的 action。
+
+请选用你应用中可信的目标地址；由用户提供的 URL 必须先校验再传入。
+
+**签名：**
+
+```ts
+function requireAuth(c: CloudContext, options?: { throwRedirect?: string }): AuthUser;
+```
+
+## `AuthUser`
+
+由 Void 重新导出的 Better Auth 用户结构。它还包含 Better Auth 插件以及 `auth.ts` 中 `user.additionalFields` 添加的字段，例如 `admin()` 带来的 `role` 或自定义的 `plan` 字段。这要求你的 tsconfig 使用生成的 Void 类型，见[类型安全的安装步骤](/docs/type-safety)。
+
+```ts
+interface AuthUser {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  name: string;
+  image?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+## `AuthSession`
+
+由 Void 重新导出的 Better Auth 会话结构。它还包含 `auth.ts` 中 Better Auth 插件添加的会话字段，例如 `admin()` 带来的 `impersonatedBy`。
+
+```ts
+interface AuthSession {
+  id: string;
+  token: string;
+  userId: string;
+  expiresAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+```
+
+<Callout type="tip" title="auth.ts 中的类型">
+  在 `auth.ts` 及其导入的文件中，让 Better Auth 推断钩子类型，或使用它提供的 `User` 与 `Session` 类型。
+  在那里使用 Void 推断出的 auth 类型或 auth 辅助方法的返回值会形成循环引用。`sendResetPassword`
+  这类回调收到的是 Better Auth 基础的 `User` 类型。
+</Callout>
+
+## `AuthState`
+
+已认证请求的组合状态：
+
+```ts
+interface AuthState {
+  user: AuthUser;
+  session: AuthSession;
+}
+```
+
+## `auth`
+
+从 `"void/client"` 导入。这是一个开箱即用的 Better Auth 客户端实例，预先配置了 `basePath: "/api/auth"`。
+
+```ts
+import { auth } from 'void/client';
+
+await auth.signIn.email({ email, password });
+await auth.signOut();
+```
+
+具体的客户端方法由 Better Auth 提供。在 pages 应用中，只要对应的框架专属 Better Auth 客户端包可用，Void 会自动选择它。
+
+对于只使用 Void 的 API/文件路由、没有开启 Void Pages 模式的普通 SPA 应用，需要显式导入框架专属的客户端：
+
+```ts
+import { auth } from 'void/client/react';
+// 或：'void/client/vue'
+// 或：'void/client/svelte'
+// 或：'void/client/solid'
+```
+
+这些子路径保留与 `void/client` 相同的 `fetch`、`fetchStream` 与 auth 导出，但会把 `auth` 与 `createAuthClient` 绑定到 Better Auth 的对应框架包。
+
+## `createAuthClient`
+
+从 `"void/client"` 导入。这是 Better Auth `createAuthClient` 的重新导出，用于进阶用法。
+
+```ts
+import { createAuthClient } from 'void/client';
+
+const auth = createAuthClient({ basePath: '/api/auth' });
+```

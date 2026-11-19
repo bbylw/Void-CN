@@ -1,0 +1,171 @@
+---
+title: 服务器发送事件（SSE）
+description: 从路由处理器向浏览器流式发送事件。Void 负责拼装消息、发送保活并关闭流。
+---
+
+用 `void/sse` 可以从路由处理器向浏览器流式发送事件。Void 负责格式化消息、发送 keepalive，并在请求结束时关闭流。
+
+SSE 适合单个请求产出的 AI token、进度更新或日志。如果其他请求也要向已连接的客户端发布消息，请看 [Live 事件流](/docs/live)。若客户端需要回放事件，请自行存储它们。
+
+## 服务端流
+
+在路由处理器中返回 `eventStream()`：
+
+```ts title="routes/api/events.ts"
+import { defineHandler } from 'void';
+import { eventStream } from 'void/sse';
+
+export const GET = defineHandler((c) => {
+  return eventStream(
+    async (stream) => {
+      await stream.comment('connected');
+      await stream.send({
+        event: 'ready',
+        data: { now: Date.now() },
+      });
+
+      const timer = setInterval(() => {
+        void stream.send({ event: 'tick', data: { now: Date.now() } }).catch(() => stream.close());
+      }, 1000);
+
+      await stream.closed;
+      clearInterval(timer);
+    },
+    {
+      signal: c.req.raw.signal,
+    },
+  );
+});
+```
+
+`eventStream()` 会立刻返回一个 `Response`，带上这些默认头部：
+
+```text
+Content-Type: text/event-stream; charset=utf-8
+Cache-Control: no-cache, no-transform
+X-Accel-Buffering: no
+```
+
+`start` 回调一返回，流就关闭了。长期存在的流应当在返回之前等待 `stream.closed`、某个生产者 Promise，或应用侧的取消信号。
+
+## 发送事件
+
+用 `send()` 发送 SSE 消息，用 `comment()` 发送注释：
+
+```ts
+await stream.send({
+  id: 'evt_1',
+  event: 'post.update',
+  retry: 1000,
+  data: { id: 'post_123', likes: 10 },
+});
+
+await stream.comment('still connected');
+```
+
+`data` 接受字符串或可 JSON 序列化的值。SSE 只能传文本。
+
+向已关闭的流写入会抛出 `SseStreamClosedError`。
+
+对于已经序列化好的载荷，请用 `formatSseText()` 格式化：
+
+```ts
+import { formatSseText } from 'void/sse';
+
+const frame = formatSseText({
+  event: 'post.update',
+  data: JSON.stringify({ id: 'post_123', likes: 10 }),
+});
+```
+
+## 保活
+
+保活默认开启，每 15 秒一次：
+
+```ts
+return eventStream(start);
+```
+
+可以关闭它，或自定义间隔与注释文本：
+
+```ts
+return eventStream(start, { keepAlive: false });
+
+return eventStream(start, {
+  keepAlive: { intervalMs: 5000, comment: 'ping' },
+});
+```
+
+## Last Event ID
+
+当带 `id` 字段的事件之后浏览器重连，它会发送 `Last-Event-ID`。用 `getLastEventId()` 从你自己的存储里续传：
+
+```ts
+import { getLastEventId } from 'void/sse';
+
+export const GET = defineHandler((c) => {
+  const lastId = getLastEventId(c.req.raw);
+  return eventStream(async (stream) => {
+    await stream.send({ id: nextId(lastId), data: await loadNextItem(lastId) });
+  });
+});
+```
+
+## 客户端
+
+使用只在浏览器可用的 `void/sse/client` 子路径中的 `connectEventStream()`：
+
+```ts
+import { connectEventStream } from 'void/sse/client';
+
+const stream = connectEventStream<{
+  ready: { now: number };
+  tick: { now: number };
+}>('/api/events', {
+  withCredentials: true,
+});
+
+const offReady = stream.on('ready', (event) => {
+  console.log(event.data.now);
+});
+
+stream.on('tick', (event) => {
+  console.log(event.data.now);
+});
+
+offReady();
+stream.close();
+```
+
+客户端包装了原生 `EventSource`。它支持携带 cookie 凭据和带类型的事件处理器，但不支持请求体和自定义头部。需要自定义头部时，请改用 cookie 认证、签名 URL，或一个基于 fetch 的流式路由。
+
+开启 [`routing.typedRoutes`](/docs/config) 后，TypeScript 会把 URL 与你的路由做比对，例如 `/api/jobs/${id}`。外部的 `http://` 与 `https://` 地址同样可用。对于运行时才校验的 URL，请使用 `void/routes` 的 `as RouteUrl` 跳过类型检查。
+
+解析 JSON 是默认行为。非 JSON 载荷请设置 `parse: 'text'`，或传入自定义解析器：
+
+```ts
+const logs = connectEventStream('/api/logs', { parse: 'text' });
+
+logs.on('line', (event) => {
+  console.log(event.data);
+});
+```
+
+## 认证
+
+SSE 路由就是普通的路由处理器，因此沿用你在 JSON 路由里用的那套认证检查：
+
+```ts
+import { requireAuth } from 'void/auth';
+
+export const GET = defineHandler(async (c) => {
+  const user = await requireAuth(c);
+
+  return eventStream(async (stream) => {
+    await stream.send({ event: 'ready', data: { userId: user.id } });
+    await stream.closed;
+  });
+});
+```
+
+需要共享主题与订阅时请使用 [Live 事件流](/docs/live)，需要双向通信时请使用 [WebSockets](/docs/websockets)。

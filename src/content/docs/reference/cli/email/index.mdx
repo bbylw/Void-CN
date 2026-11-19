@@ -1,0 +1,143 @@
+---
+title: 邮件命令
+description: 查看邮件用量，并选择项目允许发送给哪些收件人。
+---
+
+查看邮件用量、管理项目允许发送到的收件人。运行时 API 见[邮件](/docs/email)。
+
+邮件命令的项目解析与 deploy 一致（`--project`、`VOID_PROJECT`、已关联项目）。例外是 `void email setup` 与 `void email status --platform cloudflare`：它们通过你的 Cloudflare 登录（`void cloudflare login`）直接作用于你自己的 Cloudflare 账户，不需要 Void 项目。
+
+## `void email usage`
+
+```sh
+void email usage [--project <name>]
+```
+
+显示本月的收件人尝试次数与收件回执、月度尝试上限，以及剩余额度。预留的提交计入上限；已经开始的尝试即使投递失败或结果未知也照样计费。被暂停的项目会在输出中标出。
+
+## `void email logs`
+
+```sh
+void email logs [--limit <n>] [--project <name>]
+```
+
+显示保留 30 天的近期邮件操作元数据：时间戳、方向、操作 ID、收件人与状态。`--limit` 取值为 1–100。主题、正文与附件都不存储。提供方接收成功不等于已投入收件箱；重试之前请先查看结果未知的投递。
+
+## `void email destinations`
+
+```sh
+void email destinations [--project <name>]
+```
+
+列出项目的收件人地址及其状态（`verified`、`pending` 或 `failed`）。外发邮件只会投递到已验证的地址。
+
+## `void email allow`
+
+```sh
+void email allow <address> [--project <name>]
+```
+
+向项目的收件人列表添加一个收件人。Cloudflare 会给该地址发出一封含验证链接的邮件——由收件人点击完成，不需要 Void 或 Cloudflare 账户。之后运行 `void email destinations`：真正记录这次点击的是列表查询本身，在它记录之前，发往该地址的邮件会对这个收件人返回 `UNVERIFIED_DESTINATION`。如果链接没收到或已过期，在地址仍是 pending 时再次运行 `void email allow <address>`——CLI 会重发链接，或者告诉你如何获取新链接。
+
+项目创建时会自动把项目所有者的邮箱加入列表，因此它可以跳过这一步，但跳过不了验证：除非 Cloudflare 已因你之前的项目验证过它，否则请点击它寄来的链接并运行 `void email destinations`；在那之前，发给你自己的邮件会对该收件人返回 `UNVERIFIED_DESTINATION`。
+
+## `void email disallow`
+
+```sh
+void email disallow <address> [--project <name>]
+```
+
+从项目的收件人列表移除一个收件人。发往该地址的新请求会立刻被拒绝；此前已受理的尝试可能完成。整个过程不涉及部署。
+
+## `void email alias`
+
+```sh
+void email alias [--project <name>]
+void email alias <name> [--yes] [--project <name>]
+```
+
+不带名字时，显示项目在平台共享邮件域名上的地址，以及收件邮件是否能到达它。
+
+作为项目所有者，运行 `void email alias acme` 即可用 `acme@<mail domain>` 与 `acme+<tag>@<mail domain>` 收发邮件。请选一个可用、且符合项目 slug 规则的名字。五个字符或更短的名字需要允许短名称的套餐。
+
+alias 是永久的，在项目删除之前一直被占用。原来的 slug 地址仍然可用。CLI 会请求确认；在脚本与 CI 中使用 `--yes`。
+
+在对外分享 alias 之前，请用当前 Void 版本重新部署，这样处理器才能收到预期的 `message.to` 地址。当项目的 `email/` 处理器与收件人规则就绪后收件才会开始；可用 `void email alias` 检查。
+
+## `void email domain`
+
+```sh
+void email domain <add|status|list|sync|rotate-secret|remove> [<domain>] [--project <name>]
+```
+
+在你拥有的某个 Cloudflare zone 上，用自己的域名收发邮件，并注册到项目上。仅 Void 平台可用——在你自己的 Cloudflare 账户上，邮件域名来自 `email.from`（见 `void email setup`）。完整步骤见[在平台上使用你自己的域名](/docs/email/domains)。
+
+### `void email domain add`
+
+```sh
+void email domain add <domain> [--project <name>]
+```
+
+用一个范围受限的 Cloudflare API token 把该精确域名注册到项目。CLI 会打开一个 token 模板，接受掩码粘贴或刚复制的 token，并让你确认账户与 zone 的权限范围。凭据会被加密保存供该 zone 连接使用。自定义收件邮件要求是 Cloudflare zone apex，因为它的 catch-all 不覆盖子域名。外来的 MX 记录与 catch-all 会被保留；如果该 apex 已经在收邮件，请改用另一个 zone apex 或平台的共享邮件地址。每个自定义 apex 只能属于一个项目。配置会返回一个 operation ID，因此被中断的请求可以先查询结果而不必重跑整个操作。
+
+### `void email domain status`
+
+```sh
+void email domain status <domain> [--project <name>]
+```
+
+显示记录在案的收件、发信与管理就绪状态、观测时间与最近一次操作。用 `sync` 对齐配置并刷新就绪状态。
+
+### `void email domain list`
+
+```sh
+void email domain list [--project <name>]
+```
+
+列出项目注册的邮件域名及其就绪状态。
+
+### `void email domain sync`
+
+```sh
+void email domain sync <domain> [--project <name>]
+```
+
+重新对齐域名连接并刷新就绪状态。sync 不会轮换它的 secret。被阻塞或结果不确定的操作会以失败退出，并指出需要检查的 operation。
+
+### `void email domain rotate-secret`
+
+```sh
+void email domain rotate-secret <domain> [--project <name>]
+```
+
+轮换该域名与同一 zone 上其他域名共用的连接 secret。收件投递必须已就绪；如果配置尚未完成，请先运行 `void email domain sync <domain>`。重试之前请先确认结果不确定的那次操作。
+
+### `void email domain remove`
+
+```sh
+void email domain remove <domain> [--project <name>]
+```
+
+停用该域名分配并记录清理工作。被其他域名使用的 zone 资源仍然保留。未完成或不确定的清理会一直记录在案，直到可以安全地对齐。
+
+## `void email status`
+
+```sh
+void email status --platform cloudflare
+```
+
+检查 `email.from` 中配置的域名：权限、发信与邮件绑定；如果应用带有 `email/` 处理器，还会检查 routing 与处理器地址。当配置未完成或无法验证时以失败退出。只做发信的应用需要一个已完成开通的发信域名。带有收件处理器的应用在 Workers Free 上也可以就绪，但发信仅限已验证收件人；升级到 Workers Paid 后请运行 `void email setup --platform cloudflare`。
+
+`void email status` 只读取你自己的 Cloudflare 账户，因此必须带 `--platform cloudflare`。在 Void 平台上请改用 `void email usage` 与 `void email destinations`。
+
+## `void email setup`
+
+```sh
+void email setup --platform cloudflare
+```
+
+在 CI 部署之前先把邮件配好。需要 `void.config.ts` 中的 `email.from`、一个交互式终端，以及 Cloudflare 的邮件权限。
+
+Void 会展示计划中的变更并征求确认后再应用。没有 `email/` 处理器的应用只配置发信，routing 与 plus addressing 保持不变。提交 `void.lock.json`，然后在 CI 中运行 `void deploy --platform cloudflare --require-email`。
+
+在 Workers Free 上，带有 `email/` 处理器的应用保留收件邮件以及发往已验证收件人的能力。只做发信的应用需要 Email Sending，而这要求 Workers Paid。升级到 Workers Paid 后再次运行该命令以放开任意收件人。见[邮件配置](/docs/email/domains)。

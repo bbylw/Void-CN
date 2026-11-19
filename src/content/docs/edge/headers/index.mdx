@@ -1,0 +1,49 @@
+---
+title: 自定义响应头
+description: 在 void.config.ts 中定义自定义响应头，把 URL 模式匹配到具体的头部名与取值。
+---
+
+在 [`void.config.ts`](/docs/config) 中用 `routing.headers` 字段定义自定义响应头。键是 URL 模式，值是 `"Name: value"` 字符串组成的数组。
+
+```json
+{
+  "routing": {
+    "headers": {
+      "/assets/*": ["Cache-Control: public, max-age=31536000, immutable"],
+      "/*": ["X-Frame-Options: DENY", "X-Content-Type-Options: nosniff"],
+      "/*.html": ["Cache-Control: no-cache"]
+    }
+  }
+}
+```
+
+## 规则
+
+- **模式键**以 `/` 开头。`*` 匹配任意字符，包括 `/`。
+- **头部取值**使用 `Name: value` 格式，取值里可以包含冒号。
+- 所有命中的规则会被合并；多条规则设置同一个头部名时，**最后命中的那条生效**。
+- 用户定义的 `Cache-Control` 会覆盖内置默认值；没有任何规则命中时，默认值仍然生效。
+- 配合[认证](/docs/auth)使用时，在开发环境、直接部署到 Cloudflare 以及[其他运行时](/docs/deployment)上，带 cookie 或凭据的请求响应会保持 private，认证相关端点也不会进入缓存。在 [Void 平台](/docs/deployment)上，头部规则可以替换这些缓存设置，因此请把公开缓存规则避开登录后的页面和 `/api/auth/*`。
+- 规则同样作用于错误响应，包括 404。只对内容变化时 URL 也会变化的地址使用 immutable 缓存，否则文件缺失时会被永久缓存在一个固定 URL 上。
+
+## 作用范围
+
+头部规则适用于静态资源、SSR 页面和 API 响应，包括从缓存服务的哈希资源。
+
+对于哈希资源，你可以添加头部，但缓存与响应编码仍由平台掌控：这些文件上的 `Cache-Control`、`Content-Type`、`Content-Encoding`、`Content-Length`、`Content-Range`、`Accept-Ranges`、`Transfer-Encoding` 无法被规则替换。
+
+头部规则不适用于 ISR 缓存响应。
+
+### Cookie 头部
+
+在 [Void 平台](/docs/deployment)上，请在应用自己的响应里设置 cookie。头部规则会忽略 `Set-Cookie`，会从 `Clear-Site-Data` 中移除 `"cookies"`，并忽略包含 `"*"` 的 `Clear-Site-Data` 规则。你可以使用 `"cache"`、`"storage"` 这类指令。
+
+这些限制作用于你应用的所有主机名，包括自定义域名，目的是保护共享域名上其他应用的 cookie。你自己的 cookie 头部仍然可能影响到那些应用，所以请谨慎设置 cookie 的作用域，参见[域名与资源](/docs/platform/installation/domains)。
+
+在本地开发、`void deploy --platform cloudflare` 以及[其他运行时](/docs/deployment)上，头部规则会原样写入所有头部。
+
+## 框架的 `_headers` 文件
+
+在 Void 平台上，Void 会读取受支持框架产出的 `_headers` 文件。你的 `routing.headers` 规则在其之后执行，因此可以覆盖框架的默认值。
+
+对于直接部署到 Cloudflare 的框架应用，请把 `_headers` 放在框架的静态资源目录里，它的规则作用于静态文件，在部署保留已有密钥时也是如此。要给 Worker 响应设置头部，请在框架的服务端代码里处理。

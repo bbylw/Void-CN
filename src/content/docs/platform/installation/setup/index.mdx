@@ -1,0 +1,219 @@
+---
+title: 安装与配置登录
+description: 安装一个 Void 平台，并决定管理员与开发者如何登录。
+---
+
+import Callout from '@/components/docs/Callout.astro';
+
+对建议的 zone 或显示名直接按回车接受，也可以输入新的值替换它。安装名与应用域名要输入你自己的；示例里的 `company`、`example.com` 只是占位符。
+
+要用 workers.dev 测试，启动交互式安装并在下面选择你的登录方式：
+
+```sh
+void platform install --workers-dev
+```
+
+当 Void 需要创建 zone、添加通配 DNS 或配置 Access 时，它会索取一个管理 API 令牌。按令牌创建链接操作，并把令牌粘贴到掩码提示中。对于已有域名，把 **All Domains** 改为 **Specified Domains** 并选中你的 zone。
+
+浏览器登录可以复用已有的 proxied `*.<application domain>` 记录，但不能修改 DNS，也不能配置 Access。交互式安装不需要任何 shell 环境变量。
+
+<Callout type="info" title="在 shell 中复用已有的管理令牌">
+
+设置 `CLOUDFLARE_API_TOKEN` 即可用已有令牌替代提示输入。在 Bash 或 zsh 中，用不显示值、也不把它写入命令历史的方式读取：
+
+```sh
+printf 'Cloudflare management API token: '
+read -rs CLOUDFLARE_API_TOKEN
+printf '\n'
+export CLOUDFLARE_API_TOKEN
+void platform install
+```
+
+在 PowerShell 中：
+
+```powershell
+$env:CLOUDFLARE_API_TOKEN = [System.Net.NetworkCredential]::new('', (Read-Host 'Cloudflare management API token' -AsSecureString)).Password
+void platform install
+```
+
+</Callout>
+
+在核对过 `--plan` 之后，运行 `void platform install` 并选择你保存的计划，或者运行 **Next, run this command to install the platform** 下面打印的那条命令。两者都会把你的选择带进安装过程，并检查当前的 Cloudflare 状态。请复核刷新后的计划。在 **Apply this plan?** 处默认选中 **Yes**：按回车继续进入凭据提示，或选择 **No** 停止。Void 会打开相关的设置页面，并在终端里给出备用链接。它会复用你已经提供过的值。
+
+保存的计划里包含你的安装选择，包括认证配置文件或自定义运行时的路径。其中不含任何密钥，也不构成安装授权。拒绝该计划或取消管理令牌设置，都会把这些选择保留到下一次尝试。
+
+## 选择登录方式
+
+安装器提供 GitHub、Google、通用 OIDC 与 Cloudflare Access 四种登录。勾选你想要启用的全部方式，初始状态一个都不选。Cloudflare Access 保护与 Access 登录是两个独立的选择。下面的 GitHub OAuth 步骤适用于你选择了 GitHub 登录的情况。
+
+## 选择谁能访问应用
+
+安装器会问 **Who should be able to access deployed apps?**
+
+- **Same people allowed by the platform's Access policy** 复用你选定的企业身份与策略。在已启用平台 Access 保护时推荐这一项。
+- **Anyone — public apps** 允许公开访问。
+- **Choose a different Access policy** 为应用选择另一套企业规则。在没有平台保护时，该选项是 **Set up Cloudflare Access protection**。
+
+计划中会显示默认的应用访问方式。Void 会先完成并校验应用访问，再开放应用流量；新项目会自动继承所选的默认值。如果 setup 停止，请使用打印出的 resume 命令。已有安装在升级期间会保留它们的管理员设置。
+
+应用保护使用的是承载你平台的账户。如果平台登录或保护用的是另一个账户，请在提示时于承载账户中选择等价的身份提供方与策略。API 请使用应用域名的根域或一个 workers.dev 主机名，好让它落在应用通配记录之外。
+
+Void 会在 setup 期间检查账户级的 Default-Deny。对于位于「必须配置 Access 规则」账户中的公开应用，它会为每个应用及其已验证的自定义域名创建规则。其他子域名保持它们原有的访问规则。账户级 Default-Deny 会保持启用，Void 不会绕过平台 API 或 proxy。
+
+应用规则需要 **Access: Apps and Policies Edit** 与 **Organizations, Identity Providers, and Groups Read**。Void 会加密保存这个管理令牌，用于将来的应用与域名变更。安装器在保留一个仅供 setup 使用的令牌用于该目的之前会先征询你，或引导你创建一个专用令牌。没有 Default-Deny 的公开应用不需要长期的 Access 管理凭据。
+
+脚本场景请使用 `--app-access public|platform|custom`。需要应用规则时提供 `VOID_PLATFORM_APP_ACCESS_TOKEN`，或在你的 `--auth-config` 文件中加一个 `appAccess` 段：
+
+```json
+{
+  "appAccess": {
+    "mode": "custom",
+    "identityProviderIds": ["hosting-account-identity-provider-id"],
+    "policyIds": ["hosting-account-company-policy-id"],
+    "tokenEnv": "APP_ACCESS_API_TOKEN"
+  }
+}
+```
+
+请保留文件中已有的 `connections` 配置。`mode: "platform"` 会复用同一账户内的身份与策略选择。无人值守 setup 必须显式提供应用管理令牌；它绝不会悄悄保留一个仅供安装器使用的令牌。
+
+## 选择运行时日志记录什么
+
+默认情况下，运行时日志包含请求 URL、控制台输出与异常消息。项目所有者用 `void project logs` 查看，管理员用 `void platform deployment logs` 查看。日志始终留在你的 Cloudflare 账户里，即 Workers Logs 与平台的日志历史中。
+
+如果你的应用可能把个人数据写进 URL、日志或错误消息，请用最小化运行时日志来安装：
+
+```sh
+void platform install --runtime-logs minimal
+```
+
+使用最小化运行时日志时：
+
+- 平台 Worker 与项目 Worker 都会关闭 Workers Logs。
+- 平台的日志历史只保留请求时间、方法、状态码、结果、部署、日志级别与异常名，省略 URL 与消息文本。
+- 你仍然可以用 `--level` 过滤，或用 `--filter` 搜索异常名。日志视图会标明 URL 与消息未被记录。
+
+该设置作用于整个平台。之后要修改它，参见[变更运行时日志](/docs/platform/installation/maintenance)。
+
+## 选择默认存储位置
+
+为新项目的 R2 bucket 设置一个偏好位置：
+
+```sh
+void platform install --storage-location apac
+```
+
+支持的提示值是 `apac`、`eeur`、`enam`、`weur`、`wnam` 与 `oc`。默认由 Cloudflare 自动放置。项目可以用 [`storage.locationHint`](/docs/config) 覆盖这个默认值。
+
+之后要改默认值，运行 `void platform upgrade <id> --storage-location weur`。用 `--storage-location automatic` 清除它；不带该参数则保持当前设置。变更只影响新建的项目 bucket，不影响已有 bucket 或平台自身的资源 bucket。位置提示是[尽力而为](https://developers.cloudflare.com/r2/reference/data-location/)的，并非数据驻留承诺。
+
+## 完成登录配置
+
+对于 Google，创建一个 OAuth client 并注册打印出的回调 URL，你可以把它限制到指定的 Google Workspace 域名。对于 OIDC 或 Access 登录，提供 issuer URL、client ID 与 client secret。当已配置的企业策略应当允许同事自动创建账户、无需逐个邀请时，选择 **Company-approved users**。
+
+使用可配置 setup 时，安装会打印一个一次性 setup 码和一个 `/setup` URL。输入该码，用你选定的管理员方式完成认证，并在确认其管理员角色前核对该身份。这种方式会被启用；其余勾选的方式会作为待处理配置保存下来，等你在 Settings 里测试并启用。纯 Google 或纯 OIDC 的安装不需要任何 GitHub 账户。
+
+脚本场景请传入 `--auth-config <path>`，其中放非机密配置，密钥用环境变量引用。例如：
+
+```json
+{
+  "connections": [
+    {
+      "configuration": {
+        "id": "google",
+        "kind": "google",
+        "label": "Company Google",
+        "clientId": "your-google-client-id",
+        "allowedDomains": ["example.com"]
+      },
+      "clientSecretEnv": "GOOGLE_CLIENT_SECRET"
+    }
+  ],
+  "administratorConnectionId": "google",
+  "admission": {
+    "mode": "company",
+    "connections": ["google"],
+    "access": false
+  }
+}
+```
+
+`--plan` 会读取这份配置，而不需要被引用的那个 secret。真正应用安装时，请通过你的密钥管理器提供该 secret。
+
+### Cloudflare Access
+
+可以选择 Access 登录、平台保护，或两者都选。保护也可以与 GitHub 或其他登录方式搭配使用。在「企业批准注册」模式下，通过了企业准入的同事即使 GitHub 邮箱与公司邮箱不同，也能用 GitHub 创建一个普通账户。
+
+你的身份提供方决定员工如何登录，例如通过 Okta 或 Google Workspace。你的 Access 策略决定谁能访问平台，以及适用哪些 MFA 或设备要求。
+
+自动 setup 会使用已有的 Zero Trust 组织、选定的身份提供方与既有的企业策略。Void 会创建专用应用和一个受限范围的服务令牌，用于受保护的安装检查。它会保留你的企业策略，包括设备与 MFA 要求。
+
+如果没有合适的策略，请在策略列表中选择 **Allow my company's email domain** 并输入你的域名。Void 会在你的账户里创建那条 Allow 策略并保留下来供复用；你之后可以在 Cloudflare 里给它加 MFA 或设备规则。若要身份提供方组或其他规则，选择 **Create in Cloudflare** 并按打印出的步骤操作。
+
+一条 Allow 策略必须写明谁可以登录：邮箱、邮箱域名或列表、身份提供方组（Okta、Microsoft Entra ID、Google Workspace、GitHub organization 或 SAML）、认证上下文、某个 Cloudflare 账户的成员，或由它们构成的 Access group。Microsoft Entra ID 组与认证上下文只有来自你所选身份提供方时才计入。某个登录方式计入的条件是：它属于你选中的身份提供方之一，并使用 Cloudflare 为企业目录提供的连接器——Microsoft Entra ID、Okta、OneLogin、PingOne、Centrify、Google Workspace，或开启了 **Restrict to account members** 的 Cloudflare 登录。允许所有人、任意服务令牌或绕过 Access 的策略会被拒绝；仅依赖一次性 PIN、公开登录（例如 GitHub），或用通用 **OpenID Connect** / **SAML** 选项添加的登录（哪怕它前面就是你的企业目录）的策略同样会被拒绝。对于通用登录，Void 无法判断谁能登录；请在那条策略里加一条 Require 规则，例如 **Emails ending in** 你的公司域名。
+
+setup 凭据需要在身份所在账户里具备 **Access: Apps and Policies Write** 与 **Access: Organizations, Identity Providers, and Groups Read**。创建保护还需要 **Access: Service Tokens Write**。若在安装所在账户里完成 setup，最初的管理令牌链接就包含这些权限。Void 会在开通资源前检查 Access 的读取能力，并在 Access setup 期间复用那个管理令牌，因此你不需要第二个 API 令牌。对于位于另一个账户的应用，在被要求时提供限定到那个身份账户的令牌。脚本可以通过 `VOID_PLATFORM_ACCESS_SETUP_TOKEN` 提供显式覆盖。平台的运行时令牌不需要 Access 管理权限。参见 Cloudflare 的 [Access API](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/applications/) 与[服务令牌权限](https://developers.cloudflare.com/api/resources/zero_trust/subresources/access/subresources/service_tokens/methods/create/)。
+
+要把 Access setup 自动化，在认证配置文件中加入：
+
+```json
+{
+  "protection": true,
+  "cloudflareAccess": {
+    "mode": "create",
+    "identityProviderIds": ["your-company-identity-provider-id"],
+    "policyIds": ["your-company-allow-policy-id"]
+  }
+}
+```
+
+请保留上面示例中文件的 `connections` 列表；或者使用一条 `{"id":"access","kind":"cloudflare-access","label":"Company Access"}` 连接，从而同时创建 Access 登录。仅做登录配置时省略 `protection`。
+
+要接入在别处管理的应用，请选择 **Use Access applications your company already manages**，并输入拥有这些 Access 应用的账户——它可以与承载 Void 的账户不同。脚本使用 `mode: "existing"`、可选的 `accountId`，以及 `loginApplicationId` 和/或 `protectionApplicationId`。用于登录时设置 `loginClientSecretEnv`；用于保护时提供 `serviceToken`，其中带上已被该应用准入的令牌的 `id`、`clientIdEnv` 与 `clientSecretEnv`。所选策略必须同时覆盖打印出的 API 与 proxy origin。连接已有资源需要读取它们的应用、策略、组织、身份提供方、组与服务令牌的权限；Void 不会改动这些策略。
+
+单独的 Access 登录只凭 issuer、client ID 与 secret 就能连接另一个账户，不需要 `cloudflareAccess` 段，也不需要 Cloudflare 管理令牌。请按 Cloudflare 的 [OIDC 应用指南](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/saas-apps/generic-oidc-saas/)操作，并注册 Void 打印的那个完全一致的回调地址。
+
+### GitHub
+
+对于 GitHub 登录：
+
+1. 当需要 OAuth 凭据时，安装器会打开 [GitHub 的新建 OAuth App 表单](https://github.com/settings/applications/new)。请以将来持有这个登录集成的账户登录。
+2. 把 **Application name** 设为你的平台显示名，把 **Homepage URL** 设为 Void 刚打印出的 API URL。
+3. 把 **Redirect URI**（也叫 **Authorization callback URL**）设为打印出的、以 `/auth/callback` 结尾的那个确切 URL，然后注册应用。这个 URL 会被固定在你保存的草稿中，即使凭据设置被中断也保持不变。
+4. 保存 **Client ID**，生成一个 **Client Secret** 并一并保存。GitHub 的[注册指南](https://docs.github.com/en/apps/oauth-apps/building-oauth-apps/creating-an-oauth-app)说明了这个表单。
+
+这个 OAuth App 只负责登录。
+
+## 完成安装
+
+安装器会收集你的运行时令牌、PostgreSQL URL、登录提供方凭据与 R2 凭据，并生成[签名与加密密钥](/docs/platform/installation/credentials)。它会掩码密钥值，并通过系统 keychain 加密保存 setup 进度。请在密码管理器里留一份副本，以便在另一台机器上恢复。
+
+安装完成后，打开打印出的 admin dashboard 链接。仅用 GitHub 的 setup，请以安装期间选定的管理员身份登录。使用可配置登录时，用那个一次性 `/setup` 码确认管理员身份。用打印出的 API URL 来[连接并部署一个应用](/docs/platform/installation/first-deployment)。
+
+如果你通过 shell 提供了管理令牌，结束后请清除它：
+
+```sh
+unset CLOUDFLARE_API_TOKEN
+```
+
+在 PowerShell 中用 `Remove-Item Env:CLOUDFLARE_API_TOKEN`。已保存的那份令牌要为后续维护留着。
+
+<Callout type="info" title="setup 因 DNS 暂停或被打断时">
+
+如果 zone 是由 Void 创建的，它会停在 `waiting-for-dns` 并打印 nameserver。请到你的注册商处设置这些 nameserver，等 zone 生效后，用 Void 打印的安装 ID 恢复：
+
+```sh
+void platform install --resume --name <installation-id>
+```
+
+Resume 会复用已保存的管理令牌；若它缺失或被 Cloudflare 拒绝，会再向你索取一次。你也可以通过 `CLOUDFLARE_API_TOKEN` 覆盖它。使用源码构建时，还要传入同一个 `--runtime` 目录。Resume 使用已保存的 checkpoint 与原始密钥；不要另起一次新安装，也不要生成替代密钥。如果 setup 在保存 checkpoint 之前就停止了，请重跑 `void platform install` 并选择你保存的计划，或者重跑原来的命令。
+
+你也可以重跑 `void platform install` 并为未完成的安装选择 **Continue setup**。非交互式的恢复请用 `--resume --name <id>`。已完成的平台请用 `platform status`、`repair` 或 `upgrade` 来管理。
+
+Resume 会恢复你选定的 Hyperdrive。如果已保存的 checkpoint 里找不到那个选择，请在 resume 时加上 `--hyperdrive <existing-id>`，并使用你最初选定的那份配置。
+
+如果 Cloudflare 拒绝了已保存的运行时令牌，Void 会打开令牌页面并请提供替代。若是缺少[邮件相关权限](/docs/platform/installation/credentials)，请更新现有令牌的权限再恢复。如果你是通过环境变量提供的令牌，请更新那个变量。
+
+要替换一个已被吊销的运行时令牌，把 `VOID_PLATFORM_RUNTIME_CLOUDFLARE_API_TOKEN` 设为它的新值并恢复。Void 会保存新令牌，并更新被打断那次运行所部署的各个平台 Worker。
+
+</Callout>

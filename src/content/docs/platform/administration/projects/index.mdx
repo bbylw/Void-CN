@@ -1,0 +1,70 @@
+---
+title: 用户与项目
+description: 查找用户，查看他们的项目与用量，并调整账户所属的计划。
+---
+
+## 管理用户与项目
+
+先找到你要查看的用户：
+
+```sh
+void platform user list --search teammate
+void platform user show <user-id>
+```
+
+第二条命令使用列表里给出的 ID。详情视图会显示这个用户的项目与用量。你可以更换他们的计划，或只列出他们的项目：
+
+```sh
+void platform user plan <user-id> pro
+void platform project list --user <user-id>
+void platform project show <project-id>
+```
+
+项目详情包含资源、域名，以及近期的构建与部署。[命令参考](/docs/reference/cli/platform)还涵盖停用与恢复用户、删除项目、移除账户。
+
+### 项目团队
+
+在管理后台打开某个项目即可查看它的团队。搜索平台用户并选择一个角色就能立即添加，不要求填写邮箱。你同样可以变更或移除已有成员。要移除所有者，必须先转移所有权。
+
+待处理的邀请会一直可见，直到被接受或撤销。如果邀请无法通过邮件发出，把它的 ID 告诉对方，让其用 `void project team accept <invitation-id>` 接受。
+
+移除协作者或管理员、把 TA 改为只读、或停用/删除 TA 的账户，都会[替换该项目的平台凭据](/docs/project-collaboration)，与 CLI 的行为一致。
+
+### AI 日志
+
+要让项目的 AI Gateway 日志保留请求元数据、但不包含提示词与响应正文：
+
+```sh
+void platform project ai-logging <project-id> metadata
+```
+
+只有平台管理员能改这个设置。它覆盖该项目经过平台发起的所有 AI 请求，包括使用应用自己的提供方密钥的调用，以及来自 `void dev` 的调用。
+
+用 `off` 完全不记录日志条目，用 `full` 记录提示词与响应。用 `inherit` 遵循所有者[计划中的默认值](/docs/platform/administration/plans)，再回落到 gateway 自身的设置。项目自己的设置会覆盖计划默认值。
+
+命令会报告新请求预计何时开始遵循这次改动，通常在发布后 2 分钟内。可以在项目的后台页面或用 `void platform project show <project-id>` 查看进度。日志范围、状态信息与恢复步骤见[命令参考](/docs/reference/cli/platform-users)。
+
+### 转移项目所有权
+
+只有安装管理员能更换项目的所有者。新所有者必须已经在这个平台上有账户。在后台的项目页面搜索新所有者，并在生效前先预览这次转移。CLI 接受用户 ID：
+
+```sh
+void platform project owner <project-id> <new-owner-user-id> --plan
+void platform project owner <project-id> <new-owner-user-id> --yes
+```
+
+预览会显示两位所有者、他们的计划与停用状态、阻塞项，以及路由和用量计数器的变化。请等待进行中的回滚与构建完成。对于普通的活跃部署，要么等待，要么用 `void platform deployment cancel <id>`；回滚部署无法取消。托管的 Sandbox 控制器同样会阻塞转移，直到它的清理完成，即使当前没有 Sandbox 容器在运行；预览会指明它所属的部署。
+
+转移之后，原所有者成为项目管理员。已有的项目级 CI 部署凭据会被撤销，需要由新所有者重新创建。新所有者的计划与限额立即生效；它的 AI 日志默认值通常也在 2 分钟内生效，除非项目有自己的设置。
+
+历史用量仍归原所有者，之后的用量计入新所有者的限额。如果命令报告转移未完成，请先检查项目与 operator 事件日志，再重试。
+
+## 账户限额与管理员访问
+
+默认情况下，自托管安装上的新用户从 `custom` 档开始，它不会限制应用请求、AI 用量、部署频率或保留的 Worker 部署。像 `pro` 这样的具名档位会套用平台的配额与保留策略；它们不代表购买了 Cloudflare 服务，也不会向你的用户收费。存储数字并不是硬性存储配额边界。在把注册范围放开到邀请团队之外之前，请先设定运行预算与保留策略。
+
+用[计划与限额](/docs/platform/administration/plans)来定义你自己的计划、调整限额，或为新账户指定不同的默认档位。
+
+最后一位活跃的管理员不能被删除或停用，通过浏览器管理后台也不行——必须始终有另一位管理员能访问。自动的用量限额不会移除管理员权限，也不计为手动停用。
+
+在移除另一位管理员时，Void 会先撤销 TA 的管理员权限，再改动应用流量或删除资源。如果清理失败，权限保持撤销状态，错误信息会说明部分完成的结果。剩下的管理员可以检查情况并重试清理。
