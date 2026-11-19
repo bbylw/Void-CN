@@ -11,7 +11,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
   { feature: '应用回滚', cf: 'Worker 版本', platform: '保留的平台部署记录' },
   { feature: '带类型的 Durable State 与原生 Durable Objects', cf: true, platform: true },
   { feature: '沙箱', cf: '需要 Workers Paid 与 Docker', platform: '需要平台账户为 Workers Paid' },
-  { feature: '自定义应用域名', cf: true, platform: '核心安装不包含' },
+  { feature: '自定义应用域名', cf: true, platform: '用 --custom-domains 启用' },
   { feature: '用户后台与托管的 GitHub 构建', cf: '不需要', platform: '标准安装不包含' },
 ];
 ---
