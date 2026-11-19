@@ -1,6 +1,6 @@
 ---
 import Logo from './Logo.astro';
-import { DOCS_NAV, SITE } from '../data/site';
+import { SITE } from '../data/site';
 
 const year = new Date().getFullYear();
 const socials = [
@@ -16,10 +16,8 @@ const socials = [
   style="border-color:var(--c-line);background:var(--c-bg-sunken)"
 >
   <div class="mx-auto max-w-[88rem] px-4 pb-[env(safe-area-inset-bottom)] sm:px-6 lg:px-10">
-    <div
-      class="grid grid-cols-2 gap-x-6 gap-y-9 py-10 sm:py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:gap-8"
-    >
-      <div class="col-span-2 max-w-sm md:col-span-1">
+    <div class="grid gap-9 py-10 sm:py-14 md:grid-cols-[1.4fr_1fr] md:gap-8">
+      <div class="max-w-sm">
         <a href="/" class="inline-flex" aria-label="Void 首页">
           <Logo class="text-[1.15rem]" />
         </a>
@@ -39,47 +37,7 @@ const socials = [
         </p>
       </div>
 
-      <nav aria-label="文档">
-        <h2 class="eyebrow">文档</h2>
-        <ul class="mt-2 text-[0.85rem] md:mt-4 md:space-y-2.5">
-          {
-            DOCS_NAV.slice(0, 2).map((g) =>
-              g.items.map((i) => (
-                <li>
-                  <a
-                    href={i.href}
-                    class="link-underline block py-2.5 max-md:bg-none md:inline-block md:py-0"
-                    style="color:var(--c-fg-muted)"
-                  >
-                    {i.title}
-                  </a>
-                </li>
-              )),
-            )
-          }
-        </ul>
-      </nav>
-
-      <nav aria-label="数据">
-        <h2 class="eyebrow">数据</h2>
-        <ul class="mt-2 text-[0.85rem] md:mt-4 md:space-y-2.5">
-          {
-            (DOCS_NAV[2]?.items ?? []).map((i) => (
-              <li>
-                <a
-                  href={i.href}
-                  class="link-underline block py-2.5 max-md:bg-none md:inline-block md:py-0"
-                  style="color:var(--c-fg-muted)"
-                >
-                  {i.title}
-                </a>
-              </li>
-            ))
-          }
-        </ul>
-      </nav>
-
-      <div class="col-span-2 md:col-span-1">
+      <div>
         <h2 class="eyebrow">生态</h2>
         <ul class="mt-2 flex flex-wrap gap-x-6 text-[0.85rem] md:mt-4 md:block md:space-y-2.5">
           {
