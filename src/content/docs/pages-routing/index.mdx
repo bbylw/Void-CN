@@ -77,7 +77,7 @@ export default defineConfig({
 
 ## 目录结构
 
-页面既可以是 `about.vue` 这样的扁平文件，也可以是 `about/index.vue` 这样的目录式路由，两者映射到同一个 URL：
+页面既可以是 `about.vue` 这样的扁平文件，也可以是 `about/index.vue` 这样的目录式路由，两者映射到同一个 URL。每个环境中，一个 URL 只对应一个页面文件。
 
 ```text title="pages/"
 ├── layout.tsx           根布局（包裹所有页面）
@@ -86,8 +86,8 @@ export default defineConfig({
 ├── about.tsx            → /about
 ├── users/
 │   ├── layout.tsx       /users/* 的嵌套布局
-│   ├── [id].tsx         → /users/:id
-│   └── [id].server.ts   /users/:id 的服务端 loader 与 action
+│   ├── [id].tsx         → /users/[id]
+│   └── [id].server.ts   /users/[id] 的服务端 loader 与 action
 └── blog/
     └── hello.md         → /blog/hello（Markdown 页面）
 ```
@@ -98,13 +98,31 @@ export default defineConfig({
 - **actions**：处理来自表单与程序化调用的变更。一个页面可以导出单个 action，也可以导出多个具名 action。
 - `ssr = false`：让某条路由退出服务端渲染的组件 HTML，同时保留服务端 loader 与客户端路由。
 
-基于文件的路由规则与服务端路由相同：`[param]` 是动态段，`[...param]` 是 catch-all，`(group)/` 是路由组。
+配套文件同样支持 `.js`、`.mts` 与 `.mjs`，也可以用 `.tsx` / `.jsx` 写含 [JSX 的处理器](/docs/server-routing#jsx-处理器)。
+
+基于文件的路由规则与服务端路由相同：`[param]` 是动态段，`[...param]` 是 catch-all，`(group)/` 是路由组，`.dev` / `.prod` 后缀决定页面只在某个环境中可用。
+
+### 仅限某个环境的页面
+
+在扩展名之前加 `.dev` 或 `.prod` 后缀，选择页面何时可用：
+
+```text title="pages/"
+├── about.tsx       → /about，始终
+├── debug.dev.tsx   → /debug，仅开发环境
+├── stats.prod.tsx  → /stats，仅生产环境
+├── home.dev.tsx    → 开发环境的 /home
+└── home.prod.tsx   → 生产环境的 /home
+```
+
+`.dev` 页面只在 dev server 上运行；`.prod` 页面在构建、部署与生产预览中运行。后缀要保留在配套文件名中（`home.dev.server.ts`），岛屿页面则放在 `.island` 之前（`chart.dev.island.tsx`）。布局在所有环境中共享。
+
+生产部署会排除只被 `.dev` 页面及其配套文件使用的资源。运行 `void prepare` 会为两个环境生成类型。
 
 ## 导航是如何工作的
 
-第一次请求会收到渲染好的 HTML。之后的导航会运行 loader 并更新页面，而不重新加载文档。表单提交会运行 action，然后刷新页面 props 或重定向。
+第一次请求会收到渲染好的 HTML。之后的导航会运行 loader 并更新页面，而不重新加载文档。表单提交会运行 action，然后刷新页面 props 或重定向。页面数据格式发生变化后，已打开的标签页会在下一次导航时重新加载文档。
 
-要��某条特定路由退出服务端渲染的组件 HTML，从它配套的 `.server.ts` 中导出 `ssr = false`：
+要在某条特定路由退出服务端渲染的组件 HTML，从它配套的 `.server.ts` 中导出 `ssr = false`：
 
 ```ts title="pages/dashboard.server.ts"
 import { defineHandler } from 'void';
@@ -122,54 +140,82 @@ Loader 仍然会在第一次请求时运行，它的 props 也会嵌入 HTML 外
 
 | 页面导出                                | 行为                                       |
 | --------------------------------------- | ------------------------------------------ |
-| 未设置 `ssr` 或 `ssr = true`            | 在请求时服务端渲染组件 HTML                |
-| `ssr = false`                           | 在请求时返回一个客户端挂载的外壳           |
-| `ssr = false` + `prerender = true`      | 预渲染一个内嵌 loader 数据的客户端挂载外壳 |
-| `ssr = false` + `prerender = false`     | 只在请求时返回客户端挂载的外壳，永不预渲染 |
-| 岛屿页面 + `ssr = false`                | 无效，岛屿页面已经使用岛屿渲染器           |
-| `output: "static"` + 未设置 `prerender` | 自动预渲染路径已知的页面，包括纯客户端外壳 |
+| 未设置 `ssr` 或 `ssr = true`             | 在请求时服务端渲染组件 HTML                |
+| `ssr = false`                            | 在请求时返回一个客户端挂载的外壳           |
+| `ssr = false` + `prerender = true`       | 预渲染一个内嵌 loader 数据的客户端挂载外壳 |
+| `ssr = false` + `prerender = false`      | 只在请求时返回客户端挂载的外壳，永不预渲染 |
+| 岛屿页面 + `ssr = false`                 | 无效，岛屿页面已经使用岛屿渲染器           |
+| `output: "static"` + 未设置 `prerender`  | 自动预渲染路径已知的页面，包括纯客户端外壳 |
+
+`ssr` 与 `prerender` 必须直接从 `.server.ts` 导出 `true` 或 `false`；计算得到的值与再导出会被忽略并给出警告。同理，页面的 `layout` 导出也必须是字符串字面量或 `false`。
+
+## Loader 与响应状态
+
+直接从 loader 返回数据可以保留 `Date`、`Map`、`Set`、`bigint`、`RegExp`、`URL` 与 `undefined` 这类更丰富的值，重复引用与循环引用也能跨渲染、hydration、导航与 deferred 加载保持类型。返回 `Response.json()` 则改用 JSON 转换；函数与自定义类实例不能作为页面数据。
+
+如果要在返回正常 props 的同时带上 HTTP 错误状态（例如维护页），用 `c.status()`：
+
+```ts title="pages/maintenance.server.ts"
+import { defineHandler } from 'void/handler';
+
+export const loader = defineHandler((c) => {
+  c.status(503);
+  c.header('Retry-After', '120');
+  return { message: 'Down for maintenance' };
+});
+```
+
+浏览器收到 `503` 与 `Retry-After`，页面照常渲染 `{ message: ... }`；客户端导航使用相同的状态、props 与布局。也可以在中间件里 `await next()` 之前设置状态。所有决定响应状态的检查必须在 deferred 流式渲染开始之前完成。要改为显示错误组件，请[抛出 `HTTPException`](#未找到与错误边界)。
 
 ## Link 组件
 
-页面之间使用 `Link` 组件做 SPA 导航。它渲染一个 `<a>` 标签，拦截点击并导航，不触发整页重新加载：
+页面之间使用 `Link` 组件做 SPA 导航。它渲染一个 `<a>` 标签，拦截点击并导航，不触发整页重新加载。动态 URL 用 `routeUrl()` 构造，路由模式与参数都会被检查：
 
 ```tsx
 import { Link } from '@void/react';
+import { routeUrl } from 'void/routes';
 
 <Link href="/users">用户</Link>
-<Link href={`/users/${id}`}>查看</Link>
+<Link href={routeUrl('/users/[id]', { params: { id } })}>查看</Link>
 ```
 
 ```vue
 <script setup lang="ts">
 import { Link } from '@void/vue';
+import { routeUrl } from 'void/routes';
 </script>
 
 <template>
   <Link href="/users">用户</Link>
-  <Link :href="`/users/${id}`">查看</Link>
+  <Link :href="routeUrl('/users/[id]', { params: { id } })">查看</Link>
 </template>
 ```
 
 ```svelte
 <script>
   import { Link } from '@void/svelte';
+  import { routeUrl } from 'void/routes';
 </script>
 
 <Link href="/users">用户</Link>
-<Link href={`/users/${id}`}>查看</Link>
+<Link href={routeUrl('/users/[id]', { params: { id } })}>查看</Link>
 ```
 
 ```tsx
 import { Link } from '@void/solid';
+import { routeUrl } from 'void/routes';
 
 <Link href="/users">用户</Link>
-<Link href={`/users/${id}`}>查看</Link>
+<Link href={routeUrl('/users/[id]', { params: { id } })}>查看</Link>
 ```
+
+启用 [`routing.typedRoutes`](/docs/type-safety#检查-url-字符串) 后，链接与 router 调用里的 URL 字符串同样会被检查，错拼的 `/abuot` 在编译期就会报错。
 
 `Link` 还支持查询数据、替换历史记录、整页导航与取消导航：
 
 ```tsx
+import { Link } from '@void/react';
+
 <Link href="/users" data={{ page: 2, tag: ['active', 'new'] }}>
   筛选用户
 </Link>
@@ -188,33 +234,295 @@ import { Link } from '@void/solid';
 </Link>
 ```
 
-`prefetch` 与 `reloadDocument` 只对 GET 链接有效。GET 数据会变成查询参数，可以使用标量值或数组。
+Vue 使用短横线属性名：`:data`、`replace`、`reload-document`、`:on-navigate`。`prefetch` 与 `reloadDocument` 只对 GET 链接有效。GET 数据会变成查询参数，可以使用标量值或数组。
+
+### 当前页链接标记
+
+`Link` 会给指向当前页面的链接加上 `aria-current="page"` 与 `data-void-active`，可以直接用来给导航做样式：
+
+```css
+nav a[data-void-active] {
+  font-weight: 600;
+}
+```
+
+默认只在链接自己的路径上激活。设置 `activeMatch="prefix"` 可以让它在子页面保持激活：
+
+```tsx
+<nav>
+  <Link href="/">首页</Link>
+  <Link href="/users" activeMatch="prefix">
+    用户
+  </Link>
+</nav>
+```
+
+| 当前 URL          | `href="/users"` | `href="/users" activeMatch="prefix"` |
+| ----------------- | --------------- | ------------------------------------ |
+| `/users`          | 两个属性都有    | 两个属性都有                         |
+| `/users?page=2`   | 两个属性都有    | 两个属性都有                         |
+| `/users/42`       | 无              | `data-void-active`                   |
+| `/users-admin`    | 无              | 无                                   |
+
+`aria-current="page"` 只标记完全相同的那一页，因此可以用 `[aria-current="page"]` 把它与所在板块区分开。指向 `/` 的链接只在首页激活。
+
+查询参数让你区分分页链接与筛选标签：当前 URL 包含链接的全部查询参数且取值相同时才算激活，多余的参数与顺序都不影响；GET 链接的 `data` 也算它 query 的一部分。
+
+| 当前 URL                   | 链接                          | 激活状态       |
+| -------------------------- | ----------------------------- | -------------- |
+| `/posts?page=2`            | `href="/posts?page=1"`        | 无             |
+| `/posts?page=2`            | `href="/posts?page=2"`        | 两个属性都有   |
+| `/issues?status=open&page=2` | `href="/issues?status=open"`  | 两个属性都有   |
+| `/issues?status=open`      | `href="/issues?status=closed"` | 无             |
+
+在子页面上，`activeMatch="prefix"` 只比较路径，因此 `href="/reports?range=30d"` 在 `/reports/42` 上会带 `data-void-active`。
+
+路径区分大小写并遵循结尾斜杠，hash 被忽略；外部链接与非 GET 链接永远不会激活。要给「全部」这类默认筛选项打标，可以自己设置 `aria-current` 或 `data-void-active`，你的值会覆盖计算结果。
+
+### 待处理链接
+
+页面加载中时，`Link` 会给所有指向它的链接加上 `data-void-pending`，用来提示点击正在被处理：
+
+```css
+a[data-void-pending] {
+  opacity: 0.6;
+  /* 跳过那些很快就完成的导航，例如已预取过的页面 */
+  transition: opacity 0.15s 0.1s;
+}
+```
+
+待处理状态匹配目标的路径、query 与 hash：正在加载第 3 页时，指向 `/users?page=2` 的链接不会显示为待处理。非 GET 链接还要匹配请求方法。`router.refresh()` 期间，指向当前页的链接处于待处理状态。
+
+你自己传给 `Link` 的 `data-void-pending` 会替代计算值。要做覆盖整页的加载指示器，请使用 `useNavigation()`。
+
+### 预取
+
+给 `Link` 加上 `prefetch`，可以在用户点击之前就把目标页面加载好。这四种适配器写法相同：
+
+```html
+<Link href="/dashboard" prefetch>控制台</Link>
+```
+
+`prefetch` 接受 `true`、`false`、单个策略或策略数组（如 `['visible', 'hover']`，最先触发者生效，后续触发复用同一份数据）：
+
+| 取值              | 何时加载页面                                                       |
+| ----------------- | ------------------------------------------------------------------ |
+| `'hover'` 或 `true` | 指针在链接上停留满 `hoverDelay`、获得键盘聚焦或被触摸时            |
+| `'click'`         | 鼠标按下或手指按下、点击发生之前                                   |
+| `'mount'`         | 链接一渲染出来                                                     |
+| `'visible'`       | 链接在视区内停留 300 ms 之后；快速划过的链接会被跳过               |
+| `false`           | 从不                                                               |
+
+之后的访问会直接使用缓存数据。`cacheFor` 以毫秒或 `'5m'` 这样的时长控制复用时间；写成 `['30s', '5m']` 这样的组合时，页面在 30 秒内算新鲜、最长 5 分钟可复用（先展示缓存、后台刷新）。
+
+想为整个应用设置默认策略，在适配器插件选项里配置 `prefetch.defaultStrategy`（例如 `voidReact({ prefetch: { defaultStrategy: 'hover' } })`），链接自身的 `prefetch` 会覆盖它，`prefetch={false}` 则关闭。默认值是 `false`，`hoverDelay` 默认 75 ms，`cacheFor` 默认 `'30s'`。建议优先选择 `'hover'` 或 `'click'`——`'mount'` 与 `'visible'` 在长列表里会一次加载很多页面。
+
+只有同源的 GET 链接会预取；带非 GET `method` 或 `reloadDocument` 的链接不使用默认策略，而显式调用 `router.prefetch()` 仍会加载页面。浏览器报告省流量模式（Save-Data）或 2G 连接时，`Link` 会跳过预取（只有 Chromium 系浏览器会报告这些设置）。预取会运行目标页面的 loader，因此 loader 里不要做统计浏览量这类副作用。
 
 ## 程序化导航
 
-使用 `useRouter()`：
+使用 `useRouter()`。可以给它传类型化的目标对象：
 
 ```ts
-import { useRouter } from '@void/react';
+import { useRouter } from '@void/react'; // 或 "@void/vue"、"@void/svelte"、"@void/solid"
+import type { RouteDestination } from 'void/routes';
 
 const router = useRouter();
-router.visit('/users');
-router.refresh(); // 重新获取当前页面 props
+const profile = {
+  pathname: '/users/[id]',
+  params: { id: 42 },
+  query: { tab: 'activity' },
+} satisfies RouteDestination;
+
+await router.prefetch(profile);
+await router.visit(profile);
+router.flush(profile); // 清除它的预取数据
+router.refresh(); // 重新获取当前页面 props，保持同一条历史记录
 router.visit('/logout', { method: 'POST' }); // 非 GET 导航
 ```
 
+这些方法同样接受 URL 字符串或 `URL` 实例。参数取值与编码规则见[类型化 URL 与导航](/docs/type-safety#类型化-url-与导航)。
+
 `router.visit()` 对同源 URL 会就地更新页面。其他源上的 http(s) URL 会触发整页加载，`javascript:` 等其他协议则会被拒绝。
 
-对于动态路由参数，从同一个适配器包中导入 `useParams()`：
+对于动态路由参数，从同一个适配器包中导入 `useParams()`，并把页面的路由模式作为类型参数传入：
 
 ```tsx
 import { useParams } from '@void/react';
 
 export default function PostPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id } = useParams<'/posts/[id]'>(); // { id: string }
   return <h1>文章 {id}</h1>;
 }
 ```
+
+模式如何被检查参见[页面参数](/docs/type-safety#页面参数)。
+
+## Action 与表单
+
+从配套的 `.server.ts` 导出 `action`，配合 `withValidator()` 校验请求体：
+
+```ts title="pages/users/index.server.ts"
+export const action = defineHandler.withValidator({
+  body: insertUserSchema,
+})(async (c, { body }) => {
+  await db.insert(users).values(body);
+});
+```
+
+| action 的返回          | 行为                                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------------- |
+| 不返回（void）         | 重新运行 loader，页面用新的 props 重新渲染                                               |
+| `c.redirect(url)`      | 导航到其他页面。启用 `routing.typedRoutes` 后，该地址与链接一样被检查；无法检查的字符串用 `as Href` |
+
+action 之后中间件不会再次运行。要更新[共享数据](/docs/type-safety#上下文变量)，就在 action 里 `c.set('shared', ...)`，或者改为重定向：
+
+```ts
+export const action = defineHandler(async (c) => {
+  const user = await updateProfile(c);
+  c.set('shared', { ...c.get('shared'), auth: { user } });
+});
+```
+
+具名 action 用 `actions`（复数）导出，通过 URL 上的 `?actionName` 后缀分发，例如 `/users/42?update`；`useForm` 与 `action()` 会自动处理。POST action 渲染页面或使用默认 `c.redirect()` 后，页面 URL 会保留 action URL 上的普通查询参数：`/users/42?update&tab=profile` 变成 `/users/42?tab=profile`。同一文件里 `action` 与 `actions` 只能二选一。
+
+### useForm 的新行为
+
+```ts
+const form = useForm(
+  '/users',
+  { name: '', email: '' },
+  {
+    onSuccess: () => setDialogOpen(false),
+    onError: (error) => console.error(error),
+    throwOnError: false,
+    resetOnSuccess: true,
+  },
+);
+```
+
+- `onSuccess` / `onError`（React）响应提交结果。`onError` 收到字段错误映射或 `VoidActionError`。回调可以是 async：`form.pending` 会保持 `true` 直到回调结束，抛出的错误交给最近的错误边界；回调在 React 提交更新之前运行，若提交后才出现某个元素需要聚焦，请改用 effect 或 ref 回调。回调里 `await router.visit()` / `router.refresh()` 时请传 `{ resolveOn: 'data' }`。Vue、Svelte、Solid 的提交返回 Promise，用 `await form.post()` 做提交后的工作。
+- `setError(field, message)` 设置客户端校验错误；编辑某个字段会自动清除它的错误。
+- `throwOnError: false` 把认证与服务器失败留在 `form.error` 里而不是抛出。校验错误仍然进入 `form.errors`。网络错误等意外失败仍会抛出；被取消的提交不会设置表单错误。
+- `resetOnSuccess: true` 时，提交成功后默认值重置为挂载时的值，表单数据也一并重置（除非提交过程中被编辑过）——适合保存后清空的创建表单。
+- `hasChanges` 与「当前默认值」比较；提交成功后默认值更新为提交的值，因此除非在提交期间编辑过表单，它会变成 `false`。`reset(...fields)` 重置到当前默认值，把它放在第一位传入 `{ initial: true }` 可回到传给 `useForm` 的初始值。
+
+### 提交后的 query 与滚动
+
+action 与表单提交到当前页面时会保留当前的查询参数：
+
+```ts
+// action 与 loader 都会收到 page=2 与 search=foo
+await action('/items?vote');
+
+// 显式参数覆盖当前页面上的取值
+await action('/items?vote&page=1');
+```
+
+页面 URL、滚动位置与历史记录条目都保持不变。action 里的重定向不会带上页面的查询参数；想清除它们，返回 `c.redirect('/items')`。
+
+就地更新页面时滚动位置会被保留；重定向或打开其他页面的提交会滚动到顶部（或目标 hash 位置）。传入 `preserveScroll: false` 可以在就地更新后重置滚动，`true` 则连重定向后也保持：
+
+```ts
+await action('/users/[id]?update', {
+  params: { id: '42' },
+  data: { name: 'Alice' },
+  preserveScroll: false,
+});
+```
+
+React 把 `preserveScroll` 放在 `useForm()` 的第三个参数里；Vue、Svelte、Solid 传给提交方法，例如 `form.post({ preserveScroll: false })`。
+
+### 读取 action 错误
+
+`400`、`404`、`409`、`422`、`429` 这类预期错误留在表单或 `action()` 的返回值里；`4xx` 的 `error.message` 取自 `HTTPException` 的消息或纯文本响应体，其他响应格式则给出状态摘要，例如 `Action failed with 404 Not Found`。
+
+用 `isVoidActionError()` 读取 action 错误的 `status` 与 `message`，包括被抛出的那些；只想识别 `action()` 返回的预期错误时用 `isCallSiteActionError()`：
+
+```ts
+import { isVoidActionError } from '@void/react'; // 或 "@void/vue"、"@void/svelte"、"@void/solid"
+
+function describeError(error: unknown) {
+  if (isVoidActionError(error)) {
+    if (error.status === 401) return '请重新登录。';
+    if (error.status === 403) return error.message;
+  }
+  return '出了点问题。';
+}
+```
+
+### 文件上传
+
+`withValidator({ body })` 同样接受上传。`profile[name]`、`tags[0]`、`tags[]` 这样的嵌套字段名会变成对象与数组，其余取值需要在 schema 里自行转换：布尔到达时是 `'1'` 或 `'0'`，数字与日期是字符串，`null` 是空字符串。
+
+### 岛屿中的表单
+
+岛屿组件用 `useIslandForm`：表单状态与 `useForm` 相同，提交方法接受 action URL。启用 `routing.typedRoutes` 后该 URL 必须匹配某条路由，请用 `routeUrl()` 构造，或对你自己在运行时校验的 URL 使用 `as RouteUrl`。
+
+## 未找到与错误边界
+
+在 `pages/` 中添加 `_not-found` 与 `_error` 组件，页面缺失或出错时依然保留应用的导航与布局。两者都会收到带 `status` 与 `message` 的 `error` prop：
+
+```tsx title="pages/_error.tsx（也可以是 pages/_not-found.tsx）"
+import type { ErrorPageProps } from '@void/react';
+
+export default function ErrorPage({ error }: ErrorPageProps) {
+  return (
+    <main>
+      <h1>{error.status}</h1>
+      <p>{error.message}</p>
+      <a href="/">回首页</a>
+    </main>
+  );
+}
+```
+
+- **缺失页面**：让 loader 返回 `c.notFound()` 即可显示 `_not-found`；抛出 `HTTPException(404)` 效果相同。根级 `pages/_not-found` 负责所有不匹配任何页面或 API 路由的 URL。中间件里的 `c.notFound()` 直接显示根 `_not-found` 且不运行页面 loader；想改为自定义响应，就返回 `c.text('Not Found', 404)`。
+- **失败页面**：`_error` 处理 loader 与渲染的意外失败。生产环境中访客只看到通用消息，错误细节留在服务端日志；开发环境显示错误消息。
+- **HTTP 异常**：抛出带消息的 `HTTPException`，可以在页面布局里显示特定错误，例如 `throw new HTTPException(403, { message: 'Your account is suspended' })`。最近的 `_error` 会收到 `{ status: 403, message: ... }`，响应也使用 HTTP `403`，文档请求与客户端导航都如此。请只用适合展示给访客的消息；状态要用 4xx 或 5xx，`404` 会走 `_not-found`。中间件在 loader 之前抛出时，Void 显示根错误组件并跳过 loader；没有可用的错误组件时，返回异常自身的响应。错误组件只在页面的 GET 与 HEAD 上处理异常，API 路由与 action 保持各自的错误处理。
+- **嵌套**：把错误组件放进子目录即可自定义那一段区域，Void 使用最近的一个并保留它周围的布局。如果某个布局本身失败，就由该布局之外的错误组件处理；错误组件自己也失败时，Void 会尝试更外层的，最后使用内置错误页。
+- **不是路由**：这些边界组件没有 `.server` 配套、action 或自己的 `layout` 导出；`/error` 与 `/not-found` 仍然可以用作普通页面。`.dev` / `.prod` 变体的行为与其他页面组件一致。
+- **恢复**：在可交互的错误组件里调用 `useRouter().refresh()` 可以重试页面 loader，它只取新数据、不会重复提交表单；普通链接或整页刷新同样有效。错误响应不会被客户端路由缓存。客户端渲染错误仍交给框架自己的错误边界（事件处理器、脱离页面的异步任务、独立岛屿也是如此）。对于 deferred 数据，React 可能在渲染期间抛出被拒绝的 Promise，Vue、Svelte、Solid 则暴露组件可以读取的错误状态。
+- **渲染模式**：`ssr = false` 时错误组件在浏览器里渲染；岛屿页面在服务端渲染错误，且没有客户端路由。错误组件会收到它所替换页面的共享上下文。`output: 'static'` 时，根 `_not-found` 会产出 `404.html`（除非你自己提供）：它在构建期以空的共享数据与参数渲染，不运行请求中间件也不做 hydration，因此要保证它与其布局在未登录时也可用；未知 URL 的响应状态由静态托管决定。
+
+## Head 与元数据
+
+从 `.server.ts` 导出 `head()` 设置标题与元数据；`title` 由页面优先，`meta` 按 `name` / `property` 去重，`link`、`script` 与 `htmlAttrs` / `bodyAttrs` 依次合并。
+
+中间件的 `headDefaults` 也接受 `titleTemplate`，会覆盖配置里的模板，用来给站点某个板块加上自己的标题后缀：
+
+```ts title="middleware/admin.ts"
+import { defineMiddleware } from 'void';
+
+export default defineMiddleware(async (c, next) => {
+  if (c.req.path.startsWith('/admin')) {
+    c.set('headDefaults', { ...c.get('headDefaults'), titleTemplate: '%s | Admin' });
+  }
+  await next();
+});
+```
+
+此时 `/admin` 下返回 `{ title: "Users" }` 的页面产出 `<title>Users | Admin</title>`；其他页面仍使用配置的模板。把模板设为空字符串即可去掉整个后缀。
+
+社交预览图片可以写相对路径，Void 会用当前请求把它补成绝对 URL：
+
+```ts title="void.config.ts"
+export default defineConfig({
+  head: {
+    meta: [{ property: 'og:image', content: '/og-image.jpg' }],
+  },
+});
+```
+
+`/posts/hello` 的请求会得到 `content="https://example.com/og-image.jpg"`。配置、中间件与页面 head 中都生效，客户端导航同样处理，覆盖 `og:image`（含 `:url` / `:secure_url`）、`og:video`、`og:audio`、`og:url` 与 `twitter:image`。绝对 URL 与其他标签保持你写的值。预渲染页面请直接写绝对 URL——构建时并不知道站点源，相对路径会原样留下。
+
+## Markdown 页面
+
+`pages/` 中的 `.md` 文件会成为页面，继承布局，只在岛屿与客户端脚本上发送 JavaScript。`<script>` 块里的岛屿导入要用你框架的组件扩展名（`.vue`、`.tsx` 或 `.svelte`）。
+
+岛屿组件同样可以调用 `useFrontmatter()` 读取 frontmatter，因此请保证带岛屿页面的 frontmatter 是可以公开给浏览器的。`@void/md/pages` 的页面列表遵循[环境后缀](#仅限某个环境的页面)：`debug.dev.md` 在开发环境中以 `/debug` 出现。
+
+markdown 插件的代码块主题选项是 `themes`（旧的 `shiki.themes` 已废弃）；`copyLabel` 是代码复制按钮的提示文字与无障碍标签，默认 `"Copy Code"`，中文站点建议改成对应说法。代码块语言无需额外配置：未知主题名会让构建报错，不受支持的语言渲染为纯文本。
 
 ## 滚动位置恢复
 
@@ -222,6 +530,7 @@ Void 会自动管理页面模式的滚动位置：
 
 - 后退 / 前进导航与刷新会恢复已保存的滚动位置。
 - 新的导航会滚动到页面顶部。
+- action 与表单在当前页面就地更新时保持滚动位置；重定向遵循普通导航行为。
 - 锚点链接（`/docs#api`）会滚动到目标元素；同页锚点链接（`#section`）会完全跳过服务端请求。
 
 要保持当前滚动位置，传入 `preserveScroll: true`：

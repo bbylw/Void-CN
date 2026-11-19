@@ -21,10 +21,14 @@ await fetch('/api/users', {
 });
 
 // 动态参数按路由模式插入
-const user = await fetch('/api/users/:id', {
+const user = await fetch('/api/users/[id]', {
   params: { id: '42' },
 });
 ```
+
+路由模式使用与文件名相同的方括号。
+
+省略 `method` 就是 GET。如果某个路由没有 GET 处理器，需要显式指定一个受支持的方法，例如 `{ method: 'POST' }`。
 
 ## 哪些内容会被检查
 
@@ -62,7 +66,7 @@ const data = await fetch('/api/search', {
 import { fetch, FetchError } from 'void/client';
 
 try {
-  await fetch('/api/users/:id', { params: { id: '999' } });
+  await fetch('/api/users/[id]', { params: { id: '999' } });
 } catch (e) {
   if (e instanceof FetchError) {
     console.log(e.status); // 404
@@ -79,7 +83,7 @@ try {
     { name: 'method', type: 'string', description: 'HTTP 方法，默认 GET', default: '"GET"' },
     { name: 'body', type: 'object', description: '请求体（自动序列化为 JSON）' },
     { name: 'query', type: 'Record<string, string>', description: '查询字符串参数' },
-    { name: 'params', type: 'Record<string, string>', description: 'URL 路径参数（`:id` 片段）' },
+    { name: 'params', type: 'Record<string, string>', description: 'URL 路径参数（`[id]` 片段）' },
     { name: 'headers', type: 'HeadersInit', description: '额外的请求头' },
     { name: 'signal', type: 'AbortSignal', description: '中止信号' },
     { name: 'baseURL', type: 'string', description: '拼在路径前的 base URL，便于调用外部服务' },
@@ -108,5 +112,6 @@ export default defineRender(async (c, assetTags) => {
 ```
 
 <Callout type="tip" title="请求头转发">
-  服务端调用会转发传入请求的 cookie 与 authorization 头。显式传入的头优先。
+  服务端调用你自己的应用时，会转发传入请求的 cookie 与 authorization 头。显式传入的头优先。使用外部
+  `baseURL` 时，认证头需要你自己显式传入。
 </Callout>

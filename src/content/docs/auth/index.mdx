@@ -41,7 +41,7 @@ await auth.signIn.email({
 
 ### 3. 保护一个服务端路由
 
-在需要登录用户的路由处理器或页面 loader 中调用 `requireAuth`。它返回该用户，或在请求未认证时抛出 401：
+在需要登录用户的路由处理器或 action 中调用 `requireAuth`，它返回该用户，或以 `401` 拒绝未认证的请求：
 
 ```ts title="routes/api/profile.ts"
 import { defineHandler } from 'void';
@@ -53,19 +53,25 @@ export const GET = defineHandler((c) => {
 });
 ```
 
-在页面模式的 loader 中，如果你希望允许未认证访问，请使用 `getUser` 或 `getSession`：
+需要登录的页面，给 `requireAuth` 传入 `throwRedirect` 与登录地址：
 
 ```ts title="pages/dashboard.server.ts"
 import { defineHandler, type InferProps } from 'void';
-import { getUser } from 'void/auth';
+import { requireAuth } from 'void/auth';
 
 export type Props = InferProps<typeof loader>;
 
-export const loader = defineHandler(() => {
-  const user = getUser();
+export const loader = defineHandler((c) => {
+  const user = requireAuth(c, {
+    throwRedirect: '/login',
+  });
   return { user };
 });
 ```
+
+未认证的访客会被送往 `/login`，loader 的其余部分不再执行。同一个选项也可用于 action 与中间件；登录完成后不会重复执行那个要求登录的 action。
+
+若希望允许未认证访问，请使用 `getUser()` 并返回可空的用户。自定义守卫也可以在辅助函数里直接抛出一个重定向。
 
 ### 4. 退出登录
 
@@ -84,8 +90,12 @@ await auth.signOut();
 
 邮箱密码默认启用。要添加社交提供方：
 
-```json title="void.config.json"
-{ "auth": { "providers": ["email", "google", "github"] } }
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  auth: { providers: ['email', 'google', 'github'] },
+});
 ```
 
 提供方凭据来自 `AUTH_<PROVIDER>_CLIENT_ID` 与 `AUTH_<PROVIDER>_CLIENT_SECRET`。`cognito` 还需要域名、区域与用户池 ID：设置 `AUTH_COGNITO_DOMAIN`、`AUTH_COGNITO_REGION` 与 `AUTH_COGNITO_USER_POOL_ID`，或在 `auth.ts` 中设置它们。
@@ -108,21 +118,76 @@ AUTH_GITHUB_CLIENT_SECRET=
 `void/auth` 提供以下服务端辅助函数：
 
 ```ts
-import { getSession, getUser, requireAuth } from 'void/auth';
+import { getAuth, getSession, getUser, requireAuth } from 'void/auth';
 ```
 
-| 函数             | 返回                        |
-| ---------------- | --------------------------- |
-| `getUser()`      | 当前的 `AuthUser \| null`   |
-| `getSession()`   | `{ user, session } \| null` |
-| `requireAuth(c)` | 已认证的用户，否则抛出 401  |
+| 函数                                     | 返回                                    |
+| ---------------------------------------- | --------------------------------------- |
+| `getUser()`                              | 当前的 `AuthUser \| null`               |
+| `getSession()`                           | `{ user, session } \| null`             |
+| `requireAuth(c)`                         | 已认证的用户，否则抛出 401              |
+| `requireAuth(c, { throwRedirect })`      | 已认证的用户，否则抛出登录重定向        |
+| `getAuth(c)`                             | 该请求的 Better Auth 实例               |
 
-从 `void/auth` 导入 `AuthUser` 与 `AuthSession` 用于类型标注。
+从 `void/auth` 导入 `AuthUser` 与 `AuthSession` 用于类型标注。它们的字段来自你的 Better Auth 插件与 `user.additionalFields`，例如 `admin()` 带来的 `role`，类型由根目录的 `auth.ts` 推断得出。
+
+### 调用 Better Auth 的 API
+
+在处理器里用 `getAuth(c).api` 调用 Better Auth。Void 会把其中设置的 cookie 随响应一起发出，因此浏览器会话的改动会在下一个请求生效；跨源 `POST` 需要该源在 `trustedOrigins` 中，cookie 才会被发送。
+
+`getUser()` 与 `getSession()` 返回的是请求开始时的会话。action 改动登录用户之后，请通过重定向重新加载页面以拿到新会话。
+
+`signUpEmail` 这类调用会让当前浏览器登录为新用户；若要为他人创建账号，请使用 admin 插件的 `createUser`。
+
+## 查询认证表
+
+要查询用户，或在自己的表里引用用户，请导入 Void 生成的认证 schema。它导出 `userTable`、`sessionTable`、`accountTable`、`verificationTable`，以及 Better Auth 插件新增的表。
+
+先在根 `tsconfig.json` 中加入别名，并保留已有的其他路径别名（包括来自 `.void/tsconfig.json` 的 `@schema`）：
+
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "@auth-schema": ["./.void/better-auth-schema.ts"]
+    }
+  }
+}
+```
+
+之后就能用 Drizzle 查询用户：
+
+```ts
+import { userTable } from '@auth-schema';
+import { db, desc } from 'void/db';
+
+export function listUsers() {
+  return db.select().from(userTable).orderBy(desc(userTable.createdAt));
+}
+```
+
+要让文章关联作者，引用 `userTable.id`：
+
+```ts
+import { userTable } from '@auth-schema';
+import { sqliteTable, text } from 'void/schema-d1';
+
+export const postTable = sqliteTable('post', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => userTable.id, { onDelete: 'cascade' }),
+});
+```
+
+这个例子使用 D1 与默认的文本主键。PostgreSQL 或 MySQL 请改用 `void/schema-pg` 或 `void/schema-mysql`；设置 `advanced.database.generateId: 'serial'` 时，外键要使用整数。
+
+`.void/better-auth-schema.ts` 由 Void 重新生成。请在 `auth.ts` 中配置认证，而不是编辑这个生成文件。
 
 ## 行为
 
 - **会话存储**：认证会话使用与你应用相同的数据库。部署时如果缺少 `BETTER_AUTH_SECRET`，Void 会自动创建，并在后续部署中复用。本地开发无需设置密钥；若要在本地预览生产构建，请提供 `BETTER_AUTH_SECRET`。
-- **缓存**：已登录请求的响应会带上 `Cache-Control: no-store`，浏览器缓存与共享缓存都不会保留用户数据。当路由自己设置 `no-store`，或同时设置 `private` 与 `no-cache` 时会保留自己的策略。若要用 `304` 响应重复请求，请使用 Hono 的 `etag()` 中间件搭配 `private, no-cache`。如果自己设置 ETag，请确保它按用户区分，否则 `304` 会复用另一个账号的页面。
+- **缓存**：已登录请求的响应会带上 `Cache-Control: no-store`，浏览器缓存与共享缓存都不会保留用户数据。当路由自己设置 `no-store`，或同时设置 `private` 与 `no-cache` 时会保留自己的策略。若要用 `304` 响应重复请求，请使用 Hono 的 `etag()` 中间件搭配 `private, no-cache`。如果自己设置 ETag，请确保它按用户区分，否则 `304` 会复用另一个账号的页面。构建产物与 `public/` 里的静态文件对已登录请求保留各自的缓存策略，浏览器因此能复用已缓存的 JS 与 CSS。由你的应用处理请求时，策略会被标记为 `private`；刷新会话 cookie 的请求则使用 `no-store`。
 - **跨源请求**：来自其他源的 `POST`、`PUT`、`PATCH`、`DELETE` 请求与 WebSocket 连接不会使用已登录的会话，除非该源在 `trustedOrigins` 中。
 - **限流**：部署在 Cloudflare 上的应用会按客户端 IP 限制认证请求次数（Better Auth 的默认值，例如每 10 秒 3 次登录尝试），每个 Worker 实例各自计数。在 `auth.ts` 中通过 `rateLimit` 修改或关闭限制。若要在多个实例间共享同一计数，设置 `rateLimit: { storage: 'database' }`，然后对直接部署到 Cloudflare 的应用运行 `void db generate`。
 
@@ -172,9 +237,11 @@ export default defineAuth(({ defaults }) => ({
 
 `defaults` 已经包含了 Void 的约定。请显式扩展它，而不是期待深度合并。
 
+如果认证钩子用到的辅助函数导入了 `@auth-schema`，请在钩子内部用 `await import('./server/users')` 加载它：全新的克隆仓库里，生成的 schema 还不存在。当你自己的表引用了认证 schema 时，导入这些表的辅助函数同理。
+
 ## 数据库与迁移
 
-认证表与应用自己的表放在一起。本地开发期间，Void 会自动创建它们。
+认证表与应用自己的表放在一起。本地开发期间，Void 会自动创建它们。dev 服务器运行时，保存 `auth.ts`（或它导入的本地文件）会更新 Void 为应用生成的认证 schema；新增的认证表与列会在下次启动 dev 服务器时创建到本地数据库中。
 
 Void 平台会自动创建认证表。直接部署到 Cloudflare 时，请把它们包含进你已提交的迁移中：
 

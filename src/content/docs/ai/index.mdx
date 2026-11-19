@@ -20,7 +20,7 @@ npm run dev
 
 如果开发因为 Cloudflare 认证错误而停止，请以能够访问部署账户的用户在终端中运行 `void cloudflare login`（该账户由 `void cloudflare status` 展示），或设置 `CLOUDFLARE_API_TOKEN`。`wrangler login` 不影响开发。
 
-对于团队平台，使用 `void connect <platform-url>` 并关联你的项目。开发请求使用该平台的账户与用量限制。
+对于团队平台，使用 `void connect <platform-url>` 并关联你的项目。开发请求使用该平台的账户与用量限制。如果平台提示 AI 已关闭，请让管理员开启；模型列表、文档转 Markdown 与提供方原生请求同样受这个开关影响。
 
 ## 基本用法
 
@@ -132,11 +132,26 @@ const result = await ai.run('google/gemini-2.5-flash', {
 });
 ```
 
-作为第三个参数传入 AI Gateway 选项：`ai.run(model, inputs, { gateway: { skipCache: true } })`。在团队平台上，网关由平台选择并设置其元数据与日志；`skipCache`、`cacheTtl` 等选项仍然生效。直接部署时，请为提供方原生请求配置 `ai.gateway`。
+作为第三个参数传入 AI Gateway 选项：`ai.run(model, inputs, { gateway: { skipCache: true } })`。
+
+在团队平台上，网关与请求元数据由 Void 选定，日志记录策略（是否保留提示与响应内容）由管理员按项目与套餐控制，参见[平台](/docs/platform)。应用仍然可以自己设置 `skipCache`、`cacheTtl` 这类缓存选项。同一套日志策略也适用于已关联项目的 `void dev`；未关联的项目使用你自己的 Cloudflare 账户与网关设置。直接部署时，请为提供方原生请求配置 `ai.gateway`。
 
 ## 提供方原生请求
 
 用 `ai.provider(provider).fetch(path, init)` 调用第三方提供方的原生 API，使用你自己的提供方密钥。请求会经过配置好的 Cloudflare AI Gateway，并保留提供方的原生 HTTP 结构。在团队平台上，它还会经过该安装的代理；`cf-aig-cache-ttl`、`cf-aig-max-attempts` 等 AI Gateway 缓存、超时与重试头仍然生效，平台会忽略日志、元数据与成本头。
+
+传入 `AbortSignal` 可以取消请求，或停止读取响应流：
+
+```ts
+import { ai } from 'void/ai';
+
+const response = await ai.provider('openai').fetch('/chat/completions', {
+  signal: AbortSignal.timeout(30_000),
+  body: { model: 'gpt-4o', messages: [{ role: 'user', content: 'Hello' }] },
+});
+```
+
+如果信号在你读取流式响应的过程中中止，读取会以该信号的原因 reject，而不是以一个 `void:error` 事件结束。
 
 ```ts title="OpenAI"
 import { defineHandler } from 'void';

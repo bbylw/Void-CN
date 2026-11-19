@@ -8,7 +8,7 @@ import Steps from '@/components/docs/Steps.astro';
 
 ## 创建应用
 
-在一个空目录中，安装 Void 并运行初始化：
+需要 Node.js 24.22+ 或 26.12+。在一个空目录中，安装 Void 并运行初始化：
 
 ```bash title="npm"
 npm install -D void
@@ -26,8 +26,14 @@ yarn void init
 ```
 
 ```bash title="bun"
+# bunx 使用 PATH 上的 node 运行 Void：需要 Node.js 24.22+ 或 26.12+
 bun add -D void
 bunx void init
+```
+
+```bash title="vp"
+vp add -D void
+vpx void init
 ```
 
 选择你的 UI 框架、起始模板与部署目标。Vite+ 是默认的构建工具。D1 是一个很好的首选数据库：它不需要单独运行数据库服务就能在本地工作。选择 Cloudflare 即可部署到你自己的账户，或者暂时跳过部署配置。
@@ -43,6 +49,8 @@ bunx void init
 ```bash
 npm run dev
 ```
+
+按你的包管理器替换运行命令：`pnpm run dev`、`yarn run dev`、`bun run dev`，或使用 Vite+ 的 `vpr dev`。
 
 打开 `http://localhost:5173`。在 Pages 起始模板中，`pages/` 放你的 UI，配套的 `.server.ts` 文件放它们的服务端 loader 与 action。Loader 把数据作为带类型的 props 返回给页面组件。
 

@@ -12,7 +12,7 @@ import Callout from '@/components/docs/Callout.astro';
 
 核心平台支持 GitHub、Google、通用 OIDC 与 Cloudflare Access 登录，支持 CLI 部署、D1、KV、R2、队列、定时任务、Workers AI、WebSocket、SSE、ISR、路由、日志与回滚。
 
-核心安装包含托管的沙箱与邮件网关；当配置了共享邮件域名与 zone 时启用邮件。用户后台、GitHub 构建与 webhook、构建容器与自定义项目域名不属于核心安装。
+核心安装包含托管的沙箱与邮件网关；配置共享邮件域名与 zone 后即启用邮件。项目自定义域名用 `--custom-domains` 开启；用户后台与托管的 GitHub 构建需要自定义的平台构建，不属于标准安装。
 
 ## 部署能力对比
 
@@ -28,7 +28,7 @@ import Callout from '@/components/docs/Callout.astro';
 | 应用回滚                                      | Worker 版本                 | 保留的平台部署记录               |
 | 带类型的 Durable State 与原生 Durable Objects | 支持                        | 支持                             |
 | 沙箱                                          | 需要 Workers Paid 与 Docker | 需要平台账户为 Workers Paid      |
-| 自定义应用域名                                | 支持                        | 核心安装不包含                   |
+| 自定义应用域名                                | 支持                        | 用 `--custom-domains` 启用       |
 | 生成的 GitHub 部署工作流                      | 支持                        | 使用你自己的 CI 与受限开发者令牌 |
 | 用户后台与托管的 GitHub 构建                  | 不需要                      | 标准安装不包含                   |
 
@@ -49,6 +49,16 @@ import Callout from '@/components/docs/Callout.astro';
 7. **从 CI 安装**，在 CI 环境中自动化平台安装
 8. **停用与卸载**，安全地移除平台
 
+## 安装与升级要点
+
+- **运行时日志**：默认记录请求 URL、console 输出与异常消息。如果应用可能把个人数据写进 URL 或日志，请用 `void platform install --runtime-logs minimal` 安装：平台与项目 Workers 关闭 Workers Logs，平台的日志历史只保留时间、方法、状态、结果、部署、日志级别与异常名。之后可用 `void platform upgrade [id] --runtime-logs minimal` 或 `full` 切换，设置同样作用于已有部署；已存储的日志保留到 Cloudflare 的留存期结束。
+- **项目自定义域名**：安装时加 `--custom-domains`，或对已有安装运行 `void platform upgrade <id> --custom-domains`，这需要独立的应用 zone 以及该 zone 上 **SSL and Certificates: Edit** 的 runtime 令牌。先按 Cloudflare for SaaS 的要求为 `cname.<应用域名>` 建一条代理记录并把它设为 fallback origin，之后项目所有者运行 `void domain add <hostname>`，按提示配好 CNAME 与所有权 TXT 记录。
+- **存储位置**：`void platform install --storage-location apac` 为新项目的 R2 桶设定默认位置提示（`apac`、`eeur`、`enam`、`weur`、`wnam`、`oc`），`void platform upgrade <id> --storage-location weur` 可修改，`automatic` 清除。改动只影响新建的桶；项目可用 `storage.locationHint` 覆盖。位置提示是尽力而为，不是数据驻留保证。
+- **私有数据库**：外部 PostgreSQL 通过 Workers VPC 私网访问时，用 `VOID_PLATFORM_HYPERDRIVE_ORIGIN_SERVICE_ID` 给出服务 ID，替代 `VOID_PLATFORM_HYPERDRIVE_ORIGIN_HOST`；两者不要同时设置。`VOID_PLATFORM_DATABASE_URL` 仍需提供一个可应用的 owner 连接，用于执行迁移。
+- **AI 日志策略**：套餐在计划文件中用 `aiLogging` 设默认值（`off`、`metadata`、`full`、`inherit`），项目可用 `void platform project ai-logging <project-id> metadata` 覆盖。设置发布后通常在 2 分钟内对新请求生效，可用 `void platform project show <project-id>` 查看进度。
+- **升级顺序**：先在管理员机器上安装新 CLI 并升级平台，再让团队升级 CLI。使用 `void/sandbox` 的应用需要给 runtime 令牌加上 **Account → Containers → Edit** 与 **Account → Cloudchamber → Edit**。
+- **前置条件**：Workers for Platforms 需要自己的付费套餐；Analytics Engine 在 Workers Free 上即可启用，但必须为该账户手动开启，否则安装会以 code 10089 失败。
+
 ## 开发者视角
 
 作为平台的使用者，你通常只需要：
@@ -68,3 +78,5 @@ void deploy --platform void --project my-app
 ## 关联应用
 
 平台可以安装[关联应用](https://github.com/voidzero-dev/void/blob/main/docs/guide/platform/administration/connected-apps.md)：这些应用可以请求用户授权后为其执行部署，让你的用户在应用内直接把改动部署到你的 Cloudflare 账户。
+
+访问令牌有效期一小时；关联应用可以用 refresh token 在用户最初登录后的 30 天内续期。每个 refresh token 只能使用一次，重复使用会撤销该连接，需要用户重新授权；一次只为一个连接发送一个 refresh。发布用的令牌（`deploy:approve`）没有 refresh token，每次发布都要单独批准。`POST /oauth/revoke` 可以用访问令牌或 refresh token 撤销连接。

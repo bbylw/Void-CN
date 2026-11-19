@@ -9,7 +9,7 @@ import Callout from '@/components/docs/Callout.astro';
 
 在 `queues/` 中创建消费者。支持 TypeScript 与 JavaScript 文件（`.ts`、`.mts`、`.js`、`.mjs`）。它的路径决定队列名：`queues/emails.ts` 创建 `emails`，`queues/order/notifications.ts` 创建 `order-notifications`。每个队列必须有唯一的名字。
 
-生成的队列名必须符合 Cloudflare 的队列命名规则：1-63 个字符，只包含字母、数字与 `-`，且以字母或数字开头和结尾。
+生成的队列名必须符合 Cloudflare 的队列命名规则：1-63 个字符，只包含字母、数字与 `-`，且以字母或数字开头和结尾。用 `void deploy --platform cloudflare` 部署时，Cloudflare 上的队列名还会带上 Worker 名，因此这个长度限制作用于完整名称，参见下面的[Cloudflare 队列名](#cloudflare-队列名)。
 
 导出一个用 `defineQueue<T>` 包装的默认处理器。`T` 为消费者与 `send()` 调用同时定义消息体：
 
@@ -74,7 +74,7 @@ export default defineQueue<Message>(async (batch, env) => {
 | `batch.ackAll()`           | 确认批次中的所有消息                   |
 | `batch.retryAll(options?)` | 重试批次中的所有消息                   |
 
-每条消息以最先调用的为准。在 `retry()` 之后调用 `ack()`（或反过来）不会有任何效果。没有显式处理结果的消息，在处理器成功时会被确认，抛出异常时会被重试。
+每条消息以最先调用的 `ack()` 或 `retry()` 为准。没有显式给出结论的消息，在处理器成功时会被确认，抛出异常时会被重试；Void 会自动记录处理器抛出的错误，不会再把它丢弃。
 
 每条消息的 `timestamp` 字段是一个 `Date` 对象。
 
@@ -92,6 +92,7 @@ interface Message {
 
 export const maxBatchSize = 50;
 export const maxBatchTimeout = 10; // 秒
+export const maxConcurrency = 2;
 export const maxRetries = 5;
 export const retryDelay = 30; // 秒
 
@@ -102,12 +103,17 @@ export default defineQueue<Message>(async (batch, env) => {
 });
 ```
 
-| 选项              | 说明                           | 默认值 |
-| ----------------- | ------------------------------ | ------ |
-| `maxBatchSize`    | 每个批次的最大消息数           | `10`   |
-| `maxBatchTimeout` | 投递不完整批次前的最长等待秒数 | `5`    |
-| `maxRetries`      | 耗尽投递前的最大重试次数       | `3`    |
-| `retryDelay`      | 重试之间的间隔秒数             | `0`    |
+| 选项              | 说明                                       | 默认值                     |
+| ----------------- | ------------------------------------------ | -------------------------- |
+| `maxBatchSize`    | 每个批次的最大消息数                       | `10`                       |
+| `maxBatchTimeout` | 投递不完整批次前的最长等待秒数             | `5`                        |
+| `maxConcurrency`  | 同时处理的批次数，范围 `1` 到 `250`        | 由 Cloudflare 自动伸缩     |
+| `maxRetries`      | 耗尽投递前的最大重试次数                   | `3`                        |
+| `retryDelay`      | 重试之间的间隔秒数                         | `0`                        |
+
+这些选项要在队列文件里直接导出成整数字面量，例如 `export const maxRetries = 5`；不支持计算得到的值和再导出，多个队列共用的设置请在每个文件里各写一遍。
+
+当消费者要调用限速 API 或其他需要限制并行度的服务时设置 `maxConcurrency`：`maxBatchSize` 限制每批的消息数，`maxConcurrency` 限制同时运行的批次数。它对直连 Cloudflare 与 Void 托管两种部署都生效；省略它则由 Cloudflare 自动伸缩，参见 Cloudflare 的 consumer concurrency 文档。Void 托管部署要求平台版本 1.10.0 或更高。
 
 <Callout type="warn" title="死信队列">
   Void 托管的队列不配置死信队列。没有死信队列时，Cloudflare 会永久删除耗尽重试次数的消息，参见
@@ -115,6 +121,14 @@ export default defineQueue<Message>(async (batch, env) => {
 </Callout>
 
 部署时，Void 会开通队列并连接它们的生产者与消费者。
+
+### Cloudflare 队列名
+
+用 `void deploy --platform cloudflare` 部署时，队列名会带上 Worker 名：`app-staging` 这个项目里的 `queues/jobs.ts` 创建的队列是 `app-staging-jobs`，Worker 名里的下划线会转成连字符。应用代码在所有环境中始终使用 `queues.jobs.send()`。
+
+完整名称必须控制在 63 个字符以内，并在账户内保持唯一。每个 Cloudflare 队列只支持一个消费者，命名或消费者冲突会在部署时被 Void 报告出来。
+
+已有的部署会保留它们现有的队列与消息。要改用新的命名，先暂停生产者、把旧队列排空、在 Cloudflare 中移除它的 Worker 消费者，再重新部署；删除旧队列之前先确认它已经空了。
 
 ## 本地开发
 

@@ -87,6 +87,30 @@ export * from './schema/users';
 export * from './schema/posts';
 ```
 
+### 列名大小写
+
+没有显式命名的列（例如 `createdAt: timestamp()`）默认直接用 key 作为列名。把 `database.casing` 设为 `'snake_case'` 后，这类列会存成 `created_at`。它同时作用于 `void/db` 查询和 `void db generate`、`push`、`seed` 等命令。已经显式命名的列（例如 `text('created_at')`）保持原名。
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  database: { dialect: 'pg', casing: 'snake_case' },
+});
+```
+
+```ts title="db/schema.ts"
+import { pgTable, serial, text, timestamp } from 'void/schema-pg';
+
+export const posts = pgTable('posts', {
+  id: serial().primaryKey(),
+  title: text().notNull(),
+  createdAt: timestamp().notNull().defaultNow(), // created_at
+});
+```
+
+D1 项目省略 `dialect` 即可。数据库里已经有表时，改完 `casing` 要运行 `void db generate` 并检查生成的迁移，再决定是否应用。
+
 ## 查询
 
 Void 会从 `void/db` 重新导出所有常用的 Drizzle 查询运算符，因此你不需要单独安装 `drizzle-orm`。从 `void/db` 导入 `db`，从 `@schema` 导入你的表。
@@ -167,6 +191,25 @@ const names = await db.select({ name: users.name, email: users.email }).from(use
 // names: { name: string; email: string }[]
 
 const page = await db.select().from(users).orderBy(desc(users.createdAt)).limit(10).offset(20);
+```
+
+### 类型辅助
+
+`void/db` 也重新导出 Drizzle 类型 `SQL`、`SQLWrapper`、`AnyColumn` 与 `BatchItem`，用来给你的查询辅助函数和批次做标注：
+
+```ts
+import { posts } from '@schema';
+import { db, sql, type BatchItem, type SQL, type SQLWrapper } from 'void/db';
+
+function contains(column: SQLWrapper, text: string): SQL {
+  return sql`instr(${column}, ${text}) > 0`;
+}
+
+// 仅 D1：db.batch() 至少接受一个查询
+const writes: [BatchItem<'sqlite'>, ...Array<BatchItem<'sqlite'>>] = [
+  db.update(posts).set({ published: true }).where(contains(posts.title, 'void')),
+];
+await db.batch(writes);
 ```
 
 ### 关联
@@ -278,6 +321,10 @@ export const insertUserSchema = createInsertSchema(users, {
 | `void db migrate`  | 在本地应用待处理的迁移                 |
 | `void db status`   | 检查 schema 漂移与待处理迁移           |
 | `void db seed`     | 重置本地数据库并运行种子文件           |
+| `void db execute`  | 对本地或 `--remote` 数据库执行临时 SQL |
+| `void db restore`  | 回档直连 Cloudflare 部署的 D1 数据库   |
+
+`void db execute` 会为每条有返回行的语句打印结果表格，纯改动数据的语句不打印内容；包含多条语句的 SQL 作为脚本执行，不打印结果行。直连 Cloudflare 的 D1 部署上，超过 100 KB 的 `--file` 会走 D1 import：等待期间数据库不服务查询，也不打印结果行。`DELETE`、`UPDATE`、`DROP` 这类破坏性语句在 TTY 下会先要求确认，`--yes` 可跳过，非 TTY（CI）不会询问。
 
 ## 脚手架
 
@@ -294,6 +341,55 @@ void gen model posts title:string body:text published:boolean
 - `routes/api/posts/index.ts`：列表 GET 与带校验的插入 POST
 - `routes/api/posts/[id].ts`：按 id 查询的 GET，带 404 处理
 
+## 迁移出问题时回档
+
+在自有 Cloudflare 账户上部署 D1 时，`void deploy` 会在应用迁移之前保存一个恢复点，并打印出对应的 `void db restore` 命令。遇到坏迁移时：
+
+1. 如果线上版本依赖新的 schema，先用 `void project rollback` 回退代码。
+2. 用打印出的 bookmark 执行 `void db restore`；也可以传 `--timestamp`，值必须是带时区的 ISO 8601 时间，例如 `2026-10-16T09:30:00Z`。
+3. 修正或删掉失败的迁移之后再部署。恢复点同时会回退迁移历史，所以下一次部署会重新应用待处理的迁移文件。
+
+`void db restore` 只作用于直连 Cloudflare 部署的 D1（基于 Time Travel），需要单次指定目标时给它加 `--platform cloudflare`。
+
+<Callout type="warn" title="恢复会丢弃之后的写入">
+  回档会丢弃所选时间点之后的所有写入，Time Travel 的历史也有限：Workers Free 保留 7 天，Workers Paid 保留 30
+  天；更早的迁移只能用一个新的迁移反向修正。Void 执行前会要求确认，并打印一条可撤销本次恢复的命令；脚本与 CI 用
+  `--yes`。恢复之后请确认已部署的代码能与恢复到的 schema 配合。
+</Callout>
+
+## 接管已有的 Drizzle PostgreSQL 数据库
+
+要让 Void 接管一个已经由 Drizzle 迁移过的 PostgreSQL 数据库，必须在首次部署之前把它已应用的迁移记录下来。每个数据库都要各做一遍，development 与 production 的历史可能不同；接管完成后保留 Drizzle 的历史表，后续迁移一律交给 Void。
+
+1. 备份数据库并暂停部署，先在一个恢复出来的副本上演练整个流程。
+2. 在 `void.config.ts` 中设置 `database: 'pg'`。保留现有的 schema、SQL 文件名与 `db/migrations/meta/` 目录，接管期间不要重新生成或重命名迁移。
+3. 读取 Drizzle 的迁移历史。默认表是 `drizzle.__drizzle_migrations`，若你配置了别的 schema 或表名就换成自己的：
+
+   ```sql
+   SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY created_at;
+   ```
+
+   把每行的 `created_at` 对上 `meta/_journal.json` 里的 `when`，`hash` 对上对应 SQL 文件的 SHA-256。有差异先解决完再继续。
+
+4. 把下面这段存成 `adopt-void.sql`，`VALUES` 中只填**你已核实确实应用过**的文件名（含 `.sql`），待处理的迁移不要写进去：
+
+   ```sql title="adopt-void.sql"
+   BEGIN;
+   CREATE TABLE IF NOT EXISTS _void_migrations (
+     name TEXT PRIMARY KEY,
+     applied_at TEXT NOT NULL
+   );
+   INSERT INTO _void_migrations (name, applied_at)
+   VALUES
+     ('0000_create_users.sql', CURRENT_TIMESTAMP::text),
+     ('0001_add_email.sql', CURRENT_TIMESTAMP::text)
+   ON CONFLICT (name) DO NOTHING;
+   COMMIT;
+   ```
+
+5. 用你的 PostgreSQL 客户端执行这个文件，遇错即停，并使用 Void 将要使用的数据库与 search path。它只记录文件名，既不会重跑其中的 SQL，也不改动 Drizzle 的历史。
+6. 让 Void 连上该数据库，然后运行 `void db status`，应当只有新增的迁移是待处理状态。直连 Cloudflare 部署时，在执行 `void deploy` 的 shell 或 CI 环境里设置 `DATABASE_URL`。
+
 ## 手写迁移
 
 部署时，Void 会把 Drizzle schema 与 `db/migrations/meta/` 中的快照做比较。如果你有 SQL 迁移却没有这份元数据，运行 `void db generate` 会为同样的表再创建一个迁移。
@@ -307,15 +403,106 @@ void gen model posts title:string body:text published:boolean
 
 ## D1 的特别说明
 
-Void 在开通数据库时会启用 D1 读副本。通过 `void/db` 的 `db` 发出的查询，会为每个 Void 请求使用一个 D1 session，因此读取可以在靠近请求的位置执行，且同一请求中后续的查询能看到至少相同的数据。
+### 读副本需要显式开启
 
-<Callout type="warn" title="关于读副本">
-  副本在请求之间可能存在延迟。认证会话检查始终从主库开始，因此被撤销的会话不会因为副本延迟而被接受。如果某次读取必须拿到最新的主库数据，请使用
-  `cloudflare:workers` 中的 `env.DB.withSession('first-primary')`。其他查询库与原生 D1
-  调用需要各自调用 `withSession()` 才能使用副本；裸的 D1 绑定始终从主库读取。
+D1 read replication 现在改为 opt-in，在 `void.config.ts` 里设置后运行 `void deploy`：
+
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
+
+export default defineConfig({
+  database: { readReplication: true },
+});
+```
+
+新建数据库默认不带副本。省略 `readReplication` 时，部署不会改动数据库已有的副本设置——也就是说要关掉已有副本，必须显式写 `false` 再部署，光升级版本或删掉这个选项都没用。开启后，`void/db` 的 `db` 会为每个 Void 请求使用一个 D1 session，读取可以在靠近请求的位置执行，且同一请求中后续的查询能看到至少相同的数据。没有 Void 请求作用域的框架处理器会让每个数据库操作从主库开始；`createDb` 则为你传入的绑定开启一个可用副本的 session。
+
+<Callout type="warn" title="旧部署可能已经带副本">
+  Void 0.21.3 曾自动开启 D1 读副本，用该版本或其后的版本部署过的项目可能已经有副本，而副本会在请求之间提供陈旧数据。请升级到支持
+  `database.readReplication` 的版本（自托管的平台也要一起升级），把它设为 `false` 后重新部署。平台无法应用这个设置时，`void deploy`
+  会在上传任何东西之前报错停下。
 </Callout>
 
-使用 `cloudflare:workers` 中的 `env.DB` 可以配合其他查询库或原生 D1 API：
+### 用 primary-first session 避开陈旧读
+
+认证会话检查始终从主库开始，因此被撤销的会话不会因为副本延迟而被接受。其他必须拿到最新主库数据的读取，在请求内新建一个客户端：
+
+```ts
+import { users } from '@schema';
+import { env } from 'cloudflare:workers';
+import { defineHandler } from 'void';
+import { createDb } from 'void/db';
+
+export const GET = defineHandler(async () => {
+  const primaryDb = createDb(env.DB, { session: 'first-primary' });
+  return primaryDb.select().from(users).all();
+});
+```
+
+`session: 'first-primary'` 让第一个查询走主库，后续查询看到至少相同的数据。默认值 `'first-unconstrained'` 允许第一个查询使用副本。
+
+### 用 bookmark 在后续请求里看到自己的写入
+
+保存之后要在下一个请求读到它，就在请求之间携带 [D1 bookmark](https://developers.cloudflare.com/d1/best-practices/read-replication/#start-a-session-from-previous-context-bookmark)：它让 D1 只能使用至少已追平你先前观察到的数据库状态的副本。bookmark 只适用于签发它的那个数据库，不同数据库与环境要用不同的 cookie 名或存储 key，切换数据库时清掉已存的 bookmark（清除即开启一条新的一致性链）。把它当作不透明字符串，不要解析或自行构造。
+
+用 `void/db` 的 `setSession()` 在处理器或 Pages loader 之前设定默认 `db` 的 session，处理完再取回要返回给客户端的 bookmark：
+
+```ts title="middleware/01.database.ts"
+import { getCookie, setCookie } from 'hono/cookie';
+import { defineMiddleware } from 'void';
+import { getBookmark, setSession } from 'void/db';
+
+export default defineMiddleware(async (c, next) => {
+  const path = c.req.path;
+  if (path !== '/profile' && !path.startsWith('/profile/')) {
+    await next();
+    return;
+  }
+
+  const incoming = getCookie(c, 'db-bookmark');
+  setSession(incoming === undefined ? 'first-unconstrained' : { bookmark: incoming });
+  await next();
+
+  const bookmark = getBookmark();
+  if (bookmark) {
+    setCookie(c, 'db-bookmark', bookmark, {
+      httpOnly: true,
+      secure: new URL(c.req.url).protocol === 'https:',
+      sameSite: 'Lax',
+      path: '/',
+    });
+  }
+  c.header('Cache-Control', 'private, no-store');
+});
+```
+
+- 把参与一致性链的路径限定在你真正需要的一组页面上，其余路由保持原有缓存策略；同时给这些响应加上 `Cache-Control: private, no-store`。
+- bookmark 约束的是数据库查询，不是缓存的响应。参与的页面要关闭 ISR（在页面的 `.server.ts` 里 `export const revalidate = 0`）并绕过已有的响应缓存——只设响应头不足以绕过 ISR 命中。
+- 一致性关键的数据库操作要在处理器或 loader 返回前 await；中间件取 bookmark 之后才完成的延后查询不保证被反映进去。
+- 并发的响应可能用较旧的 bookmark 覆盖 cookie。纯 API 场景可改用 `X-DB-Bookmark` 请求/响应头，并在浏览器端用 Web Locks 只保留较大的那一个——同一数据库的 bookmark 可按字典序排序，较旧的响应不能覆盖较新的值。
+- 本地通过 `void/client` 发起的 server-side 请求共享同一个 session：`'first-unconstrained'` 会保留已满足的要求，中间件重跑也不会重置数据库进度。要做独立的主库优先读取或在使用 `db` 之后取更新的 bookmark，请改用 `createDb`。
+
+其他 D1 绑定或框架自己的端点（例如 Astro API 路由）没有 Void 的请求作用域，用 `createDb(binding, { session })` 建立客户端，查询后把 `getBookmark(client)` 写回响应头：
+
+```ts
+import { users } from '@schema';
+import { createDb, getBookmark } from 'void/db';
+
+export async function readUsers(request: Request, binding: D1Database) {
+  const incoming = request.headers.get('X-DB-Bookmark');
+  const client = createDb(binding, {
+    session: incoming === null ? 'first-unconstrained' : { bookmark: incoming },
+  });
+  const result = await client.select().from(users).all();
+
+  const headers = new Headers({ 'Cache-Control': 'private, no-store' });
+  const bookmark = getBookmark(client);
+  if (bookmark) headers.set('X-DB-Bookmark', bookmark);
+  return Response.json(result, { headers });
+}
+```
+
+裸的 D1 绑定始终从主库读取；其他查询库与原生 D1 调用要各自调用 `withSession()` 才会用到副本。用 `cloudflare:workers` 中的 `env.DB` 可以配合其他查询库或原生 D1 API：
 
 ```ts title="Kysely"
 import { env } from 'cloudflare:workers';

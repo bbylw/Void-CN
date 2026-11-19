@@ -68,10 +68,14 @@ export const GET = defineHandler(async (c) => {
 
 ## 自定义绑定
 
-用 `createStorage(bucket)` 接入你自己的 R2 绑定，或在测试中使用：
+要使用另一个 R2 桶，先在 `void.config.ts` 的 `cloudflare.r2_buckets` 中添加它，例如 `{ binding: 'MY_BUCKET', bucket_name: 'uploads' }`。运行 `void prepare` 后，把带类型的绑定传给 `createStorage()`：
 
 ```ts
+import { defineHandler } from 'void';
 import { createStorage } from 'void/storage';
 
-const storage = createStorage(env.MY_BUCKET);
+export const GET = defineHandler((c) => {
+  const storage = createStorage(c.env.MY_BUCKET);
+  return storage.list();
+});
 ```

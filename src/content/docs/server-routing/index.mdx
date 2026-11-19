@@ -7,19 +7,32 @@ import Callout from '@/components/docs/Callout.astro';
 
 ## 路由文件
 
-在 `routes/**/*.ts` 中创建路由处理器。每个文件会根据它在文件系统中的位置映射到一个 URL 路径：
+在 `routes/` 中创建路由处理器，可用扩展名为 `.ts`、`.tsx`、`.js`、`.jsx`、`.mts`、`.mjs`。每个文件会根据它在文件系统中的位置映射到一个 URL 路径：
 
 ```text title="routes/"
 ├── api/
 │   └── hello.ts       → GET|POST /api/hello
 ├── users/
 │   ├── index.ts       → GET|POST /api/users
-│   └── [id].ts        → GET|PUT|DELETE /api/users/:id
+│   └── [id].ts        → GET|PUT|DELETE /api/users/[id]
 └── search/
     └── [...query].ts  → GET /api/search/*   （catch-all）
 ```
 
-动态段使用方括号：`[id]` 会成为路由参数，`[...slug]` 会成为 catch-all。以 `_` 开头的文件或目录会被忽略。像 `(admin)` 这样用括号包裹的目录是路由组，它们帮助整理文件，而不改变 URL。
+动态段使用方括号：`[id]` 会成为路由参数，`[...slug]` 会成为 catch-all。以 `_` 或 `.` 为前缀的文件或目录会被排除在路由之外；`.well-known` 目录仍然可用，用来存放标准发现端点。像 `(admin)` 这样用括号包裹的目录是路由组，它们帮助整理文件，而不改变 URL。
+
+### 重叠的路由
+
+当多条路由重叠时，由最具体的那条处理请求。从左到右逐段比较，静态段优先于参数段，catch-all 路由总是最后匹配：
+
+```text title="routes/"
+├── users/[id].ts      → 处理 /users/about（users 胜过 [lang]）
+├── [lang]/about.ts    → 处理 /fr/about（about 胜过 [slug]）
+├── [lang]/[slug].ts   → 处理 /fr/contact
+└── [...path].ts       → 处理其他路由都不匹配的 URL
+```
+
+每种模式只用一个路由文件承接。`[id].ts` 与 `[slug].ts` 匹配的是同一批 URL——给参数换个名字不会改变优先级。
 
 ### 仅限某个环境的路由
 
@@ -27,16 +40,18 @@ import Callout from '@/components/docs/Callout.astro';
 
 ```text title="routes/"
 ├── api/
-│   ├── health.ts      → 始终存在
-│   ├── debug.dev.ts   → 仅开发环境
-│   └── metrics.prod.ts → 仅生产环境
+│   ├── health.ts       → 始终存在
+│   ├── debug.dev.ts    → 仅开发环境
+│   ├── metrics.prod.ts → 仅生产环境
+│   ├── preview.dev.tsx → 仅开发环境，使用 JSX
+│   └── report.prod.jsx → 仅生产环境，使用 JSX
 ```
 
 `.dev` 路由只在开发时运行；`.prod` 路由会在构建、部署与生产预览中运行。只被 `.dev` 路由使用的资源不会在生产环境中开通。
 
 <Callout type="info" title="后缀的作用域">
-  这些后缀只作用于 `routes/`，不作用于 `pages/`、`middleware/`、`crons/` 或 `queues/`。`void
-  prepare` 会为两个环境都生成类型。
+  这些后缀作用于 `routes/`，以及[页面模式](/docs/pages-routing)中 `pages/` 下的页面与配套的
+  `.server` 文件，不作用于 `middleware/`、`crons/` 或 `queues/`。`void prepare` 会为两个环境都生成类型。
 </Callout>
 
 ## 导出的方法
@@ -70,6 +85,39 @@ export const POST = defineHandler(async (c) => {
 ```
 
 使用 D1、PostgreSQL 或 MySQL 的查询参见[数据库](/docs/database)。
+
+`GET` 处理器会自动响应 `HEAD` 请求，因此不需要（也不允许）单独导出 `HEAD`。
+
+### JSX 处理器
+
+当服务端处理器里包含 JSX 时，把文件写成 `.tsx` 或 `.jsx`。路由文件使用应用自己的 JSX 配置。在 React 或 Solid 中，用框架的服务端渲染器把 JSX 转成 HTML，例如 React：
+
+```tsx title="routes/hello.tsx"
+import { renderToStaticMarkup } from 'react-dom/server';
+import { defineHandler } from 'void';
+
+export const GET = defineHandler((c) => c.html(renderToStaticMarkup(<h1>Hello!</h1>)));
+```
+
+对于纯 API 应用、Vue 或 Svelte 应用，请额外安装 `hono` 作为依赖，并在 Vite 配置中启用 [Hono 的 JSX](https://hono.dev/docs/guides/jsx)：
+
+```ts title="vite.config.ts"
+import { defineConfig } from 'vite-plus';
+import { voidPlugin } from 'void';
+
+export default defineConfig({
+  oxc: { jsx: { runtime: 'automatic', importSource: 'hono/jsx' } },
+  plugins: [voidPlugin()],
+});
+```
+
+这样 `c.html()` 就能直接接受 JSX：
+
+```tsx title="routes/hello.tsx"
+import { defineHandler } from 'void';
+
+export const GET = defineHandler((c) => c.html(<h1>Hello!</h1>));
+```
 
 ## defineHandler
 

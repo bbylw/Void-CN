@@ -12,7 +12,7 @@ SDK 的各项功能是可选且可组合的。Void 页面可使用 React、Vue�
 
 ## 快速开始
 
-请使用 Node.js 24.21.0 或更高版本。在一个空目录中运行：
+请使用 Node.js 24.22+ 或 26.12+。在一个空目录中运行：
 
 ```sh
 npm install -D void
@@ -36,7 +36,7 @@ Void 会构建应用、开通资源、执行数据库迁移，并打印出你的
 
 `void init` 会在新项目中添加一份精简的 `AGENTS.md`，并在修改已有项目的指令前先征求你的同意。它还会为检测到的编程智能体链接打包好的技能。
 
-- [服务端路由](https://void.cloud/guide/server-routing) 与 [页面](https://void.cloud/guide/pages-routing/overview)
+- [服务端路由](https://void.cloud/guide/server-routing)、[页面](https://void.cloud/guide/pages-routing/overview)与[错误组件](https://void.cloud/guide/pages-routing/errors)
 - [数据库](https://void.cloud/guide/database) 与 [类型安全](https://void.cloud/guide/type-safety)
 - [部署](https://void.cloud/guide/deployment)
 - [框架集成](https://void.cloud/integrations/frameworks/overview)

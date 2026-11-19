@@ -19,6 +19,10 @@ export default defineConfig({
 });
 ```
 
+TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校验配置（包括运行时计算出的值）。`void.config.ts` 内部只支持相对导入与包名，不支持 `@/lib/theme` 这类 TypeScript 路径别名。
+
+下面的 JSON 片段展示的是可以放进 `defineConfig({ ... })` 的单个字段。
+
 ## inference
 
 | 选项                  | 类型                                         | 说明                                                |
@@ -29,6 +33,20 @@ export default defineConfig({
 
 详见[支持的应用类型](/docs/app-types#显式配置)。
 
+## database
+
+`database` 也可以写成对象，用来指定方言，以及 `void/db` 查询与 `void db` 命令在未声明列名时采用的命名方式：
+
+```json title="void.config.json"
+{ "database": { "dialect": "pg", "casing": "snake_case" } }
+```
+
+| 键                | 取值                                      | 说明                                                                     |
+| ----------------- | ----------------------------------------- | ------------------------------------------------------------------------ |
+| `dialect`         | `"sqlite"`（默认，即 D1）、`"pg"`、`"mysql"` | 数据库后端                                                               |
+| `casing`          | `"snake_case"`、`"camelCase"`             | [Drizzle 命名风格](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing)。省略时以键名作为列名 |
+| `readReplication` | `boolean`（可选）                         | 仅 D1。部署时开启或关闭[读复制](/docs/database)。省略则保留现有设置，新数据库默认关闭 |
+
 ## routing
 
 ```json title="void.config.json"
@@ -36,6 +54,50 @@ export default defineConfig({
 ```
 
 当 Worker 处理未匹配的请求时，用 `routing.notFound` 指定要提供的生成器 404 页面。
+
+### routing.typedRoutes
+
+```ts
+export default defineConfig({
+  routing: { typedRoutes: true },
+});
+```
+
+开启后，链接、router 方法、重定向、rewrite、缓存重验证、岛屿表单与流客户端中的 URL 字符串都会与你的路由做类型比对。默认 `false`；`void init` 创建的新应用已启用。这只改变 TypeScript 检查，运行时的导航行为不变。细节见[检查 URL 字符串](/docs/type-safety#检查-url-字符串)。
+
+### routing.trailingSlash
+
+```ts
+export default defineConfig({
+  routing: { trailingSlash: true },
+});
+```
+
+给页面 URL 加上结尾斜杠，并按目录索引预渲染：`/posts/` 产出 `posts/index.html`，`/posts` 重定向到 `/posts/`。默认 `false`，即产出 `posts.html`。API 路由保持原有 URL，第三方框架使用各自的路由设置。
+
+### routing.alwaysUseHttps
+
+```ts
+export default defineConfig({
+  routing: { alwaysUseHttps: true },
+});
+```
+
+用 `308` 永久重定向把 HTTP 请求跳转到 HTTPS。省略或 `false` 表示关闭；需要 Cloudflare target，`localhost` 仍保持 HTTP。
+
+### routing.prerender
+
+启用 `routing.typedRoutes` 后，可以给预渲染路径数组加上 `RouteUrl` 标注，让 TypeScript 检查每个路径：
+
+```ts
+import type { RouteUrl } from 'void/routes';
+
+export default defineConfig({
+  routing: { prerender: ['/', '/about', '/pricing'] satisfies RouteUrl[] },
+});
+```
+
+`output: 'static'` 时，动态页面需要 `getPrerenderPaths()` 才能被预渲染；给它的返回类型标注 [`PageParams`](/docs/type-safety#预渲染路径) 即可检查参数名。
 
 ## deploy
 
@@ -57,6 +119,16 @@ export default defineConfig({
 
 提供方凭据来自 `AUTH_<PROVIDER>_CLIENT_ID` 与 `AUTH_<PROVIDER>_CLIENT_SECRET`。更复杂的配置请使用根级的 `auth.ts` 文件。
 
+## storage.locationHint
+
+```json title="void.config.json"
+{ "storage": { "locationHint": "apac" } }
+```
+
+为 Void 创建的 R2 桶选择一个优先区域，可选 `apac`（亚太）、`eeur`（东欧）、`enam`（北美东部）、`weur`（西欧）、`wnam`（北美西部）、`oc`（大洋洲）。这些只是[尽力而为的位置提示](https://developers.cloudflare.com/r2/reference/data-location/)，不构成数据驻留保证。
+
+项目设置优先于平台默认值；两者都没有时由 Cloudflare 自动选择。只影响新建的桶：修改提示不会移动或替换已有的桶，不使用 R2 的应用也不会创建桶。
+
 ## Cloudflare 绑定
 
 ```ts
@@ -68,6 +140,8 @@ export default defineConfig({
 ```
 
 声明绑定后，Void 会使用它所指定的数据库 ID；本地开发期间 `preview_database_id` 优先。
+
+运行 `void prepare`、dev server 或构建之后，这里声明的绑定会带上 `c.env` 类型；需要 RPC 方法等更专门的类型时，可以扩展 `CloudBindings`，见[自定义绑定类型](/docs/type-safety#自定义绑定类型)。
 
 ## CLI 命令速查
 

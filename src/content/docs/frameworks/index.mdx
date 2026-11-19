@@ -14,7 +14,7 @@ import Callout from '@/components/docs/Callout.astro';
 | SvelteKit       | `@sveltejs/kit`         |
 | Nuxt            | `nuxt`                  |
 | Analog          | `@analogjs/platform`    |
-| Astro           | `astro`                 |
+| Astro **v7+**   | `astro`                 |
 
 把 `voidPlugin()` 加进框架的 Vite 配置即可获得全部能力：
 
@@ -35,13 +35,22 @@ export default defineConfig({
 | 带类型的数据库代码生成与查询               | 支持               |
 | 迁移管理（`void db generate` / `migrate`） | 支持               |
 | 定时任务与队列                             | 支持               |
+| 环境变量（`void/env` 校验值）              | TanStack Start、React Router、vinext 支持 |
 | 缓存与路由规则                             | 支持               |
 | 部署（Cloudflare 与 Void 平台）            | 支持               |
 | 页面模式（loaders / actions）              | 不适用，由框架负责 |
 | Void 托管的认证                            | 不支持             |
 
+框架也可以按各自的方式直接访问绑定：SvelteKit 3、Analog 与 Astro 用 `cloudflare:workers` 的 `env`，SvelteKit 2 用 `platform.env`，Nuxt 用 `event.context.cloudflare.env`。
+
 <Callout type="warn" title="认证">
   框架模式下不支持 Void 托管的认证。请使用 Better Auth 针对你的框架的官方集成。
+</Callout>
+
+在 TanStack Start、React Router 与 vinext 中，可以从 `void/env` 导入 `env`，读取由 `env.ts` schema 校验的值：默认值、类型转换与异步校验器在开发与生产中都生效。读取缺失或非法的值会抛出错误，但未读取该值的请求不受影响。其他框架请使用框架自己的环境变量 API。
+
+<Callout type="info" title="vinext 的中间件与静态文件">
+  在 vinext 应用中，`middleware.ts` 与 `proxy.ts` 同样作用于 `public/` 中的文件。存在任一文件时，静态请求也会经过 Worker 并计入其请求用量；没有中间件的应用保持静态资源直出。
 </Callout>
 
 ## TanStack Start
@@ -87,7 +96,7 @@ export default defineConfig({
 
 ## Astro
 
-由 `astro` 识别。Astro 的 `vite.plugins` 配置支持 `voidPlugin()`：
+由 `astro` 识别，需要 Astro v7+。Astro 的 `vite.plugins` 配置支持 `voidPlugin()`：
 
 ```ts title="astro.config.mjs"
 import { defineConfig } from 'astro/config';
