@@ -2,7 +2,6 @@
 import ShikiCode from '../ShikiCode.astro';
 import InstallTabs from '../InstallTabs.astro';
 import Icon from '../Icon.astro';
-import { SITE } from '../../data/site';
 
 const schemaCode = `// db/schema.ts · 类型的唯一来源
 export const users = sqliteTable('users', {
@@ -25,6 +24,17 @@ const COMMANDS = {
   pnpm: 'pnpm add -D void && pnpm void init',
   yarn: 'yarn add -D void && yarn void init',
 };
+
+const DEPLOY_CORE_NPM = 'https://www.npmjs.com/package/@void/deploy-core';
+let deployCoreVersion = '';
+try {
+  const res = await fetch('https://registry.npmjs.org/@void/deploy-core/latest', {
+    signal: AbortSignal.timeout(8000),
+  });
+  if (res.ok) deployCoreVersion = ((await res.json()) as { version?: string }).version ?? '';
+} catch {
+  // registry 不可达时徽标只显示包名
+}
 ---
 
 <div class="aurora relative overflow-hidden" data-hero>
@@ -46,21 +56,23 @@ const COMMANDS = {
       <!-- 左：文案 -->
       <div class="min-w-0 max-w-[36rem]">
         <a
-          href={SITE.upstreamGuide}
+          href={DEPLOY_CORE_NPM}
           target="_blank"
           rel="noreferrer noopener"
           class="reveal group inline-flex items-center gap-2 rounded-full border py-1 pr-3 pl-1.5 text-[0.78rem] transition-colors hover:border-[color:var(--c-line-strong)]"
           style="--reveal-i:0;border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-muted)"
         >
-          <span
-            class="rounded-full px-2 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide"
-            style="background:var(--c-accent-soft);color:var(--c-accent)">新</span
-          >
-          中文文档已上线，翻译自官方指南
-          <Icon
-            name="arrowUpRight"
-            class="size-3 opacity-60 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
-          />
+          {
+            deployCoreVersion && (
+              <span
+                class="rounded-full px-2 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide"
+                style="background:var(--c-accent-soft);color:var(--c-accent)"
+              >
+                v{deployCoreVersion}
+              </span>
+            )
+          }
+          <span class="font-mono">@void/deploy-core</span>
         </a>
 
         <h1 class="reveal mt-7 text-display font-semibold" style="--reveal-i:1">
