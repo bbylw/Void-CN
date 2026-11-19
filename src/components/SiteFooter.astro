@@ -16,9 +16,11 @@ const socials = [
   class="relative mt-px border-t"
   style="border-color:var(--c-line);background:var(--c-bg-sunken)"
 >
-  <div class="mx-auto max-w-[88rem] px-4 sm:px-6 lg:px-10">
-    <div class="grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:gap-8">
-      <div class="max-w-sm">
+  <div class="mx-auto max-w-[88rem] px-4 pb-[env(safe-area-inset-bottom)] sm:px-6 lg:px-10">
+    <div
+      class="grid grid-cols-2 gap-x-6 gap-y-9 py-10 sm:py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:gap-8"
+    >
+      <div class="col-span-2 max-w-sm md:col-span-1">
         <a href="/" class="inline-flex" aria-label="Void 首页">
           <Logo class="text-[1.15rem]" />
         </a>
@@ -40,12 +42,16 @@ const socials = [
 
       <nav aria-label="文档">
         <h2 class="eyebrow">文档</h2>
-        <ul class="mt-4 space-y-2.5 text-[0.85rem]">
+        <ul class="mt-2 text-[0.85rem] md:mt-4 md:space-y-2.5">
           {
             DOCS_NAV.slice(0, 2).map((g) =>
               g.items.map((i) => (
                 <li>
-                  <a href={i.href} class="link-underline" style="color:var(--c-fg-muted)">
+                  <a
+                    href={i.href}
+                    class="link-underline block py-2.5 max-md:bg-none md:inline-block md:py-0"
+                    style="color:var(--c-fg-muted)"
+                  >
                     {i.title}
                   </a>
                 </li>
@@ -57,11 +63,15 @@ const socials = [
 
       <nav aria-label="数据">
         <h2 class="eyebrow">数据</h2>
-        <ul class="mt-4 space-y-2.5 text-[0.85rem]">
+        <ul class="mt-2 text-[0.85rem] md:mt-4 md:space-y-2.5">
           {
             (DOCS_NAV[2]?.items ?? []).map((i) => (
               <li>
-                <a href={i.href} class="link-underline" style="color:var(--c-fg-muted)">
+                <a
+                  href={i.href}
+                  class="link-underline block py-2.5 max-md:bg-none md:inline-block md:py-0"
+                  style="color:var(--c-fg-muted)"
+                >
                   {i.title}
                 </a>
               </li>
@@ -70,9 +80,9 @@ const socials = [
         </ul>
       </nav>
 
-      <div>
+      <div class="col-span-2 md:col-span-1">
         <h2 class="eyebrow">生态</h2>
-        <ul class="mt-4 space-y-2.5 text-[0.85rem]">
+        <ul class="mt-2 flex flex-wrap gap-x-6 text-[0.85rem] md:mt-4 md:block md:space-y-2.5">
           {
             socials.map((s) => (
               <li>
@@ -80,7 +90,7 @@ const socials = [
                   href={s.href}
                   target="_blank"
                   rel="noreferrer noopener"
-                  class="link-underline inline-flex items-center gap-1.5"
+                  class="link-underline inline-flex items-center gap-1.5 py-2.5 max-md:bg-none md:py-0"
                   style="color:var(--c-fg-muted)"
                 >
                   {s.label}
@@ -92,21 +102,23 @@ const socials = [
         </ul>
 
         <div
-          class="mt-6 rounded-[0.7rem] border p-3"
+          class="mt-4 flex items-center justify-between gap-3 rounded-[0.7rem] border p-3 md:mt-6 md:block"
           style="border-color:var(--c-line);background:var(--c-surface)"
         >
           <p class="font-mono text-[0.68rem]" style="color:var(--c-fg-subtle)">许可证</p>
-          <p class="mt-1 text-[0.85rem] font-medium" style="color:var(--c-fg)">MIT</p>
+          <p class="text-[0.85rem] font-medium md:mt-1" style="color:var(--c-fg)">MIT</p>
         </div>
       </div>
     </div>
 
     <div
-      class="flex flex-col gap-3 border-t py-6 text-[0.78rem] sm:flex-row sm:items-center sm:justify-between"
+      class="flex flex-col gap-2 border-t py-5 text-[0.78rem] sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-6"
       style="border-color:var(--c-line);color:var(--c-fg-subtle)"
     >
       <p>© {year} Void 中文文档 · 基于 <span class="font-mono">voidzero-dev/void</span> 构建</p>
-      <p class="font-mono text-[0.72rem]">Astro · TypeScript · React · MDX · Tailwind CSS · Bun</p>
+      <p class="font-mono text-[0.72rem] leading-relaxed">
+        Astro · TypeScript · React · MDX · Tailwind CSS · Bun
+      </p>
     </div>
   </div>
 </footer>
