@@ -1,6 +1,5 @@
 ---
 import Logo from './Logo.astro';
-import Icon from './Icon.astro';
 import { DOCS_NAV, SITE } from '../data/site';
 
 const year = new Date().getFullYear();
@@ -90,11 +89,10 @@ const socials = [
                   href={s.href}
                   target="_blank"
                   rel="noreferrer noopener"
-                  class="link-underline inline-flex items-center gap-1.5 py-2.5 max-md:bg-none md:py-0"
+                  class="link-underline inline-flex items-center py-2.5 max-md:bg-none md:py-0"
                   style="color:var(--c-fg-muted)"
                 >
                   {s.label}
-                  <Icon name="arrowUpRight" class="size-3 opacity-50" />
                 </a>
               </li>
             ))
