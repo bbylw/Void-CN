@@ -45,15 +45,15 @@ const { results } = await env.DB.prepare('SELECT * FROM users').all();
 
 ### 可用的绑定
 
-| 绑定               | 资源            | 在应用中的用法                      |
-| ------------------ | --------------- | ----------------------------------- |
-| `DB`               | D1              | `c.env.DB` 或 `void/db`            |
-| `KV`               | KV              | `c.env.KV` 或 `void/kv`            |
-| `STORAGE`          | R2              | `c.env.STORAGE` 或 `void/storage`   |
-| `AI`               | Workers AI      | `c.env.AI` 或 `void/ai`             |
-| `ASSETS`           | 静态资源        | `c.env.ASSETS.fetch(request)`       |
-| `QUEUE_*`          | Queues          | `defineQueue()` 或 `void/queues`    |
-| 由文件名推导       | Durable Objects | `durable-objects/` 下的一个模块     |
+| 绑定         | 资源            | 在应用中的用法                    |
+| ------------ | --------------- | --------------------------------- |
+| `DB`         | D1              | `c.env.DB` 或 `void/db`           |
+| `KV`         | KV              | `c.env.KV` 或 `void/kv`           |
+| `STORAGE`    | R2              | `c.env.STORAGE` 或 `void/storage` |
+| `AI`         | Workers AI      | `c.env.AI` 或 `void/ai`           |
+| `ASSETS`     | 静态资源        | `c.env.ASSETS.fetch(request)`     |
+| `QUEUE_*`    | Queues          | `defineQueue()` 或 `void/queues`  |
+| 由文件名推导 | Durable Objects | `durable-objects/` 下的一个模块   |
 
 需要启用、禁用或重命名某个推断出来的绑定时，使用[绑定配置](/docs/reference/resource-inference)。
 
@@ -132,14 +132,14 @@ Void 会创建缺失的资源、构建应用、检查密钥与迁移、上传 Wo
 
 按需设置以下 CI 密钥与变量：
 
-| 名称                                               | 什么时候需要                                                                                                                            |
-| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`                             | 必需。需要 Workers Scripts 的 Edit 权限、对所绑资源的读取权限，以及对 Void 负责开通的产品（provision）的编辑权限。                      |
-| `CLOUDFLARE_ACCOUNT_ID`                            | 当这个 token 能访问多个账户时。                                                                                                          |
-| `DATABASE_URL`                                     | PostgreSQL 与 MySQL 的资源开通与迁移。                                                                                                   |
-| `CLOUDFLARE_WORKERS_SUBDOMAIN`                     | 启用了 workers.dev 且该版本没有预览 URL 时。填 `my-team` 或 `my-team.workers.dev`。当 `workers_dev` 为 false 时，账户子域名不会生成就绪 URL。 |
-| `CF_ACCESS_CLIENT_ID`、`CF_ACCESS_CLIENT_SECRET`   | 就绪 URL 受 Cloudflare Access 保护时。                                                                                                   |
-| `CF_ACCESS_READINESS_ORIGIN`                       | Access 保护的是某个路由或自定义域名且 `workers_dev` 为 `false` 时，参见 [Cloudflare Access](#cloudflare-access)。                        |
+| 名称                                             | 什么时候需要                                                                                                                                  |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`                           | 必需。需要 Workers Scripts 的 Edit 权限、对所绑资源的读取权限，以及对 Void 负责开通的产品（provision）的编辑权限。                            |
+| `CLOUDFLARE_ACCOUNT_ID`                          | 当这个 token 能访问多个账户时。                                                                                                               |
+| `DATABASE_URL`                                   | PostgreSQL 与 MySQL 的资源开通与迁移。                                                                                                        |
+| `CLOUDFLARE_WORKERS_SUBDOMAIN`                   | 启用了 workers.dev 且该版本没有预览 URL 时。填 `my-team` 或 `my-team.workers.dev`。当 `workers_dev` 为 false 时，账户子域名不会生成就绪 URL。 |
+| `CF_ACCESS_CLIENT_ID`、`CF_ACCESS_CLIENT_SECRET` | 就绪 URL 受 Cloudflare Access 保护时。                                                                                                        |
+| `CF_ACCESS_READINESS_ORIGIN`                     | Access 保护的是某个路由或自定义域名且 `workers_dev` 为 `false` 时，参见 [Cloudflare Access](#cloudflare-access)。                             |
 
 邮件相关：先在本地运行 `void email setup --platform cloudflare`，提交 `void.lock.json`，并在 CI 中传入 `--require-email`。这个 token 还需要 Zone Read 与 Email Sending Edit；带有 `email/` 处理器的应用另需 Email Routing Edit。
 

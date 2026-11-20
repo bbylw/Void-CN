@@ -11,26 +11,24 @@ interface Props {
 const { headings, nested = false } = Astro.props;
 ---
 
-{
-  headings.length > 0 ? (
-    <nav aria-label="本页目录" data-toc={nested ? 'nested' : 'page'} class="pb-10">
-      <p class="eyebrow mb-3 px-3">本页目录</p>
-      <ul class="toc-list relative space-y-0.5">
-        {headings.map((h) => (
-          <li>
-            <a href={`#${h.slug}`} data-toc-link={h.slug} data-depth={h.depth} class="toc-link">
-              {h.text}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </nav>
-  ) : (
-    <p class="px-3 pb-10 text-[0.8rem]" style="color:var(--c-fg-subtle)">
-      本页暂无小节
-    </p>
-  )
-}
+{headings.length > 0 ? (
+  <nav aria-label="本页目录" data-toc={nested ? 'nested' : 'page'} class="pb-10">
+    <p class="eyebrow mb-3 px-3">本页目录</p>
+    <ul class="toc-list relative space-y-0.5">
+      {headings.map((h) => (
+        <li>
+          <a href={`#${h.slug}`} data-toc-link={h.slug} data-depth={h.depth} class="toc-link">
+            {h.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+) : (
+  <p class="px-3 pb-10 text-[0.8rem]" style="color:var(--c-fg-subtle)">
+    本页暂无小节
+  </p>
+)}
 
 <style>
   /* 高亮状态只由 aria-current="location" 驱动：脚本改一个属性，视觉与读屏语义天然同源。

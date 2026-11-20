@@ -7,32 +7,32 @@ description: 从 CLI 安装一个 Void 平台，设置它的域名，并执行�
 void platform install [options] [--yes]
 ```
 
-| 选项                                      | 用途                                                                               |
-| ----------------------------------------- | ---------------------------------------------------------------------------------- |
-| `--name <slug>`                           | 安装名，用于 `void-<name>-<role>` 形式的资源名；请选一个未被使用的名字            |
-| `--display-name <name>`                   | 供人阅读的平台名称                                                                 |
-| `--account <id>`                          | Cloudflare 账户 id                                                                 |
-| `--auth-config <path>`                    | 登录方式、注册策略，以及指向提供方机密的环境变量引用                               |
-| `--login-methods <methods>`               | 以逗号分隔的登录方式，可取 `github`、`google`、`oidc` 或 `cloudflare-access`      |
-| `--access-protection`                     | 用 Cloudflare Access 保护平台 UI 与 API                                            |
-| `--no-access-protection`                  | 跳过 Cloudflare Access 保护                                                        |
-| `--app-access <public\|platform\|custom>` | 公开应用、平台自己的 Access 策略，或单独选择的应用策略                             |
-| `--hyperdrive <create\|id>`               | 创建 Hyperdrive，或使用指定的已有配置                                              |
-| `--application-domain <domain>`           | 已部署应用的基础域名                                                               |
-| `--workers-dev`                           | 显式的测试模式；之后可再添加应用域名                                               |
-| `--zone <domain>`                         | 包含应用域名的 Cloudflare zone                                                     |
-| `--dedicated-zone`                        | 添加整 zone 范围的 catch-all 路由；仅当应用域名就是整个 zone 时有效                |
-| `--no-dedicated-zone`                     | 跳过整 zone 范围的应用 catch-all 路由                                              |
-| `--custom-domains`                        | 允许项目添加自己的域名；需要独占的 zone                                            |
-| `--runtime-logs <full\|minimal>`          | `minimal` 不会把请求 URL 与日志、异常消息写入运行时日志                            |
-| `--storage-location <hint\|automatic>`    | 新项目 R2 bucket 的默认位置提示；`automatic` 会清除它                             |
-| `--control-plane-domain <domain>`         | 可选的 API 自定义 hostname；默认为 `workers.dev`                                   |
-| `--no-control-plane-domain`               | 使用默认的 `workers.dev` API hostname                                              |
-| `--dashboard-url <origin>`                | 单独部署的可选 dashboard 的 HTTPS origin                                           |
-| `--plan`                                  | 预览 Cloudflare 变更并在本地保存安装选项                                           |
-| `--resume`                                | 继续与之对应的、已保存检查点的安装                                                 |
-| `--runtime <path>`                        | 部署一个本地构建、经过完整性校验的 runtime 目录                                    |
-| `--yes`                                   | 在非交互使用中确认 Cloudflare 变更                                                 |
+| 选项                                      | 用途                                                                         |
+| ----------------------------------------- | ---------------------------------------------------------------------------- |
+| `--name <slug>`                           | 安装名，用于 `void-<name>-<role>` 形式的资源名；请选一个未被使用的名字       |
+| `--display-name <name>`                   | 供人阅读的平台名称                                                           |
+| `--account <id>`                          | Cloudflare 账户 id                                                           |
+| `--auth-config <path>`                    | 登录方式、注册策略，以及指向提供方机密的环境变量引用                         |
+| `--login-methods <methods>`               | 以逗号分隔的登录方式，可取 `github`、`google`、`oidc` 或 `cloudflare-access` |
+| `--access-protection`                     | 用 Cloudflare Access 保护平台 UI 与 API                                      |
+| `--no-access-protection`                  | 跳过 Cloudflare Access 保护                                                  |
+| `--app-access <public\|platform\|custom>` | 公开应用、平台自己的 Access 策略，或单独选择的应用策略                       |
+| `--hyperdrive <create\|id>`               | 创建 Hyperdrive，或使用指定的已有配置                                        |
+| `--application-domain <domain>`           | 已部署应用的基础域名                                                         |
+| `--workers-dev`                           | 显式的测试模式；之后可再添加应用域名                                         |
+| `--zone <domain>`                         | 包含应用域名的 Cloudflare zone                                               |
+| `--dedicated-zone`                        | 添加整 zone 范围的 catch-all 路由；仅当应用域名就是整个 zone 时有效          |
+| `--no-dedicated-zone`                     | 跳过整 zone 范围的应用 catch-all 路由                                        |
+| `--custom-domains`                        | 允许项目添加自己的域名；需要独占的 zone                                      |
+| `--runtime-logs <full\|minimal>`          | `minimal` 不会把请求 URL 与日志、异常消息写入运行时日志                      |
+| `--storage-location <hint\|automatic>`    | 新项目 R2 bucket 的默认位置提示；`automatic` 会清除它                        |
+| `--control-plane-domain <domain>`         | 可选的 API 自定义 hostname；默认为 `workers.dev`                             |
+| `--no-control-plane-domain`               | 使用默认的 `workers.dev` API hostname                                        |
+| `--dashboard-url <origin>`                | 单独部署的可选 dashboard 的 HTTPS origin                                     |
+| `--plan`                                  | 预览 Cloudflare 变更并在本地保存安装选项                                     |
+| `--resume`                                | 继续与之对应的、已保存检查点的安装                                           |
+| `--runtime <path>`                        | 部署一个本地构建、经过完整性校验的 runtime 目录                              |
+| `--yes`                                   | 在非交互使用中确认 Cloudflare 变更                                           |
 
 第一次安装请照着[安装一个 Void 平台](/docs/platform)操作。交互式安装器会推荐使用域名，并把 **Use workers.dev for testing** 作为可见的备选提供出来。Void 会创建平台基础设施与数据表。两种模式都要求外部 PostgreSQL 和一个已配置的登录方式。请勾选你想启用的所有登录方式；初始状态一个都不选。非交互安装在没有提供登录配置时默认使用 GitHub。`--workers-dev` 会跳过 zone/DNS/证书相关操作，且不能与 `--application-domain`、`--zone` 或 `--dedicated-zone` 同时使用。
 
@@ -106,15 +106,15 @@ void platform uninstall [id] [--plan] [--purge-data | --purge-resources] [--yes]
 
 在另一台机器上完成 discovery 之后，请设置 `VOID_PLATFORM_DATABASE_URL`。重建缺失 Worker 所需的 secrets 见[从另一台机器管理安装](/docs/platform/installation/maintenance)。
 
-| 命令        | 行为                                                                                                        |
-| ----------- | ----------------------------------------------------------------------------------------------------------- |
-| `discover`  | 校验远端归属并恢复本地安装记录，不下载任何 secrets                                                          |
-| `repair`    | 重建缺失的、由安装器拥有的资源                                                                              |
-| `upgrade`   | 部署选定的 runtime 与受支持的待处理迁移                                                                     |
-| `rollback`  | 恢复到声明兼容的较早 runtime，但不逆转 PostgreSQL 迁移                                                      |
-| `disable`   | 阻断应用流量与平台 API 但不删除数据；只有 admin 状态与登录仍然可用                                          |
-| `enable`    | 重新部署并校验平台 Workers，然后恢复流量                                                                    |
-| `uninstall` | 阻断流量并移除符合条件的资源，默认保留数据                                                                  |
+| 命令        | 行为                                                               |
+| ----------- | ------------------------------------------------------------------ |
+| `discover`  | 校验远端归属并恢复本地安装记录，不下载任何 secrets                 |
+| `repair`    | 重建缺失的、由安装器拥有的资源                                     |
+| `upgrade`   | 部署选定的 runtime 与受支持的待处理迁移                            |
+| `rollback`  | 恢复到声明兼容的较早 runtime，但不逆转 PostgreSQL 迁移             |
+| `disable`   | 阻断应用流量与平台 API 但不删除数据；只有 admin 状态与登录仍然可用 |
+| `enable`    | 重新部署并校验平台 Workers，然后恢复流量                           |
+| `uninstall` | 阻断流量并移除符合条件的资源，默认保留数据                         |
 
 repair 与 upgrade 会保留停用状态。全新的、继续的以及此前被停用的安装，在所有目标 Worker 通过校验之前都会阻断用户流量；安装器的健康探测仍可运行。路由与自定义域名保持挂载。
 

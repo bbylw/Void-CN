@@ -24,18 +24,18 @@ CLI 会报告进度停滞与自动恢复，并在部署被接受后最多等待 
 
 对 Drizzle 项目，部署会执行一次只读的 schema 漂移检查。如果此时应当生成新迁移，部署会停止并提示你运行 `void db generate`、检查迁移、自行提交，然后重新执行 `void deploy`。
 
-| Flag                            | 用途                                                                                                           |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `--platform <cloudflare\|void>` | 覆盖 `.void/project.json` 中保存的平台                                                                         |
-| `--project <name>`              | 按 slug 指定某个 Void 项目；与 `--platform cloudflare` 不能同时使用                                            |
-| `--dir <path>`                  | 部署一个预先构建好的静态目录（跳过构建）                                                                       |
-| `--spa`                         | 静态部署时使用 SPA 模式而非 SSG                                                                                |
-| `--skip-build`                  | 跳过构建步骤；在 Cloudflare 上仅静态/SPA/SSG 部署支持                                                          |
-| `--skip-migrations`             | 部署时不应用应用或认证的 SQL 迁移；Cloudflare 与 Void 平台均支持                                               |
-| `--require-email`               | 邮件无法配置时直接失败，而不是不带邮件部署；需要 `--platform cloudflare`                                       |
-| `--provision`                   | 即使所有资源都已存在也重新执行资源开通；需要 `--platform cloudflare`                                           |
-| `--atomic`                      | 直接发布已有的 Durable Object Worker；流量切换之后再检查就绪状态                                               |
-| `--debug`                       | 把结构化部署日志同步输出到 stderr（日志本身也会写入 `~/.void/logs/`）                                          |
+| Flag                            | 用途                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| `--platform <cloudflare\|void>` | 覆盖 `.void/project.json` 中保存的平台                                   |
+| `--project <name>`              | 按 slug 指定某个 Void 项目；与 `--platform cloudflare` 不能同时使用      |
+| `--dir <path>`                  | 部署一个预先构建好的静态目录（跳过构建）                                 |
+| `--spa`                         | 静态部署时使用 SPA 模式而非 SSG                                          |
+| `--skip-build`                  | 跳过构建步骤；在 Cloudflare 上仅静态/SPA/SSG 部署支持                    |
+| `--skip-migrations`             | 部署时不应用应用或认证的 SQL 迁移；Cloudflare 与 Void 平台均支持         |
+| `--require-email`               | 邮件无法配置时直接失败，而不是不带邮件部署；需要 `--platform cloudflare` |
+| `--provision`                   | 即使所有资源都已存在也重新执行资源开通；需要 `--platform cloudflare`     |
+| `--atomic`                      | 直接发布已有的 Durable Object Worker；流量切换之后再检查就绪状态         |
+| `--debug`                       | 把结构化部署日志同步输出到 stderr（日志本身也会写入 `~/.void/logs/`）    |
 
 `--atomic` 只作用于单次部署。如果一个已有的 Durable Object Worker 持续无法进入 staged 阶段，请在 `void.config.ts` 里设置 `deploy: { cloudflare: { mode: 'atomic' } }`，这样普通的 `void deploy` 就会使用原子发布。默认值是 `staged`。
 
@@ -83,17 +83,17 @@ void deploy --platform cloudflare --require-email   # 邮件配置不了就失�
 
 Void 会在需要时通过浏览器让你登录，并保存所选账户。在 CI 中请设置 `CLOUDFLARE_API_TOKEN`；如果该 token 能访问多个账户，还要设置 `CLOUDFLARE_ACCOUNT_ID`。
 
-| 选项或配置                     | Cloudflare 行为                                                                                                                             |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--dir`、`--spa`               | 通过一个很小的 Worker 与 Workers Assets 部署静态产物                                                                                        |
-| `--skip-build`                 | 复用已有的静态、SPA 或 SSG 产物；Worker 应用不可用                                                                                          |
-| `--skip-migrations`            | 跳过数据库迁移；已有的 PostgreSQL/MySQL Hyperdrive 绑定不会仅因跳过 SQL 就要求 `DATABASE_URL`                                               |
-| `--project`                    | 不可用；Worker 与账户来自 `void.config.ts` 与 `void.lock.json`                                                                              |
-| 具名环境                       | 不可用；请使用顶层的 `cloudflare` 配置                                                                                                      |
-| `CLOUDFLARE_WORKERS_SUBDOMAIN` | 当 workers.dev 的 Worker 没有预览 URL 时，全新 CI 需要它；部署后会缓存在本地。当 `workers_dev` 为 false 时不生效                          |
-| `CF_ACCESS_READINESS_ORIGIN`   | 让 Access 凭据能够访问路由或 Custom Domain 上的就绪检查，例如 `https://app.example.com`                                                     |
-| `--require-email`              | 当邮件步骤无法执行时（例如 CI 中）宁可失败，也不要在没有邮件的情况下部署                                                                    |
-| `DATABASE_URL`                 | PostgreSQL 或 MySQL 的开通与迁移要求在部署环境中提供                                                                                        |
+| 选项或配置                     | Cloudflare 行为                                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| `--dir`、`--spa`               | 通过一个很小的 Worker 与 Workers Assets 部署静态产物                                                             |
+| `--skip-build`                 | 复用已有的静态、SPA 或 SSG 产物；Worker 应用不可用                                                               |
+| `--skip-migrations`            | 跳过数据库迁移；已有的 PostgreSQL/MySQL Hyperdrive 绑定不会仅因跳过 SQL 就要求 `DATABASE_URL`                    |
+| `--project`                    | 不可用；Worker 与账户来自 `void.config.ts` 与 `void.lock.json`                                                   |
+| 具名环境                       | 不可用；请使用顶层的 `cloudflare` 配置                                                                           |
+| `CLOUDFLARE_WORKERS_SUBDOMAIN` | 当 workers.dev 的 Worker 没有预览 URL 时，全新 CI 需要它；部署后会缓存在本地。当 `workers_dev` 为 false 时不生效 |
+| `CF_ACCESS_READINESS_ORIGIN`   | 让 Access 凭据能够访问路由或 Custom Domain 上的就绪检查，例如 `https://app.example.com`                          |
+| `--require-email`              | 当邮件步骤无法执行时（例如 CI 中）宁可失败，也不要在没有邮件的情况下部署                                         |
+| `DATABASE_URL`                 | PostgreSQL 或 MySQL 的开通与迁移要求在部署环境中提供                                                             |
 
 使用过 `--skip-migrations` 之后，直连 Cloudflare 的部署历史会把已应用的迁移状态显示为 unknown。回滚代码不会逆转数据库变更。
 

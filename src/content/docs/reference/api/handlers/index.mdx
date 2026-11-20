@@ -189,8 +189,8 @@ function defineQueue<T>(
 包装一个 SSR 渲染入口。第二个参数提供预先构建好的 `<head>` 与 `<body>` 资源标签，用于注入客户端脚本与样式。
 
 ```tsx
-import { defineRender } from "void";
-import { renderToString } from "react-dom/server";
+import { defineRender } from 'void';
+import { renderToString } from 'react-dom/server';
 
 export default defineRender((c, assetTags) => {
   const html = renderToString(<App />);

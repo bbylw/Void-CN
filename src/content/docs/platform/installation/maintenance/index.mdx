@@ -37,14 +37,14 @@ void platform install --resume --name <id>
 
 如果输入 setup 码之后登录仍然失败，页面会显示原因与一个错误码。当原因可能出在某个提供方设置上时，页面还会显示该提供方必须登记的回调 URL。
 
-| 错误码                                                                      | 要检查的内容                                                      |
-| --------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `github_incorrect_client_credentials`、`github_failed`、`oidc_token_failed` | client ID 与 client secret，以及提供方是否登记了回调 URL          |
-| `github_redirect_uri_mismatch`                                              | GitHub OAuth App 里登记的回调 URL                                 |
-| `oidc_discovery_failed`                                                     | issuer URL 是否一字不差，包括末尾的斜杠                           |
-| `github_unverified_user_email`                                              | 去确认该 GitHub 账户的主邮箱                                      |
-| `google_domain_not_allowed`、`oidc_group_not_allowed`                       | 改用一个被允许的账户登录，或调整允许的域名/组                     |
-| `login_denied`、`github_bad_verification_code`                              | 重新发起一次登录                                                  |
+| 错误码                                                                      | 要检查的内容                                             |
+| --------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `github_incorrect_client_credentials`、`github_failed`、`oidc_token_failed` | client ID 与 client secret，以及提供方是否登记了回调 URL |
+| `github_redirect_uri_mismatch`                                              | GitHub OAuth App 里登记的回调 URL                        |
+| `oidc_discovery_failed`                                                     | issuer URL 是否一字不差，包括末尾的斜杠                  |
+| `github_unverified_user_email`                                              | 去确认该 GitHub 账户的主邮箱                             |
+| `google_domain_not_allowed`、`oidc_group_not_allowed`                       | 改用一个被允许的账户登录，或调整允许的域名/组            |
+| `login_denied`、`github_bad_verification_code`                              | 重新发起一次登录                                         |
 
 如果提供方改为显示它自己的错误页，请精确登记与你的 setup 码一起打印出来的那个回调 URL。
 

@@ -49,43 +49,39 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
             class="mb-5 flex items-center gap-1.5 font-mono text-[0.7rem]"
             style="color:var(--c-fg-subtle)"
           >
-            <a href="/docs" class="transition-colors hover:text-[color:var(--c-fg)]">文档</a>
+            <a href="/docs" class="transition-colors hover:text-[color:var(--c-fg)]">
+              文档
+            </a>
             <Icon name="chevronRight" class="size-3 opacity-50" />
-            <span class="truncate" style="color:var(--c-fg-muted)">{title}</span>
+            <span class="truncate" style="color:var(--c-fg-muted)">
+              {title}
+            </span>
           </nav>
 
           <header class="border-b pb-8" style="border-color:var(--c-line)">
             <div class="flex flex-wrap items-center gap-2.5">
-              <h1
-                class="text-[2.1rem] leading-[1.12] font-semibold tracking-[-0.03em] sm:text-[2.6rem]"
-              >
+              <h1 class="text-[2.1rem] leading-[1.12] font-semibold tracking-[-0.03em] sm:text-[2.6rem]">
                 {title}
               </h1>
-              {
-                badge && (
-                  <span
-                    class="rounded-full border px-2 py-0.5 font-mono text-[0.62rem] leading-none font-medium"
-                    style="border-color:color-mix(in oklab, var(--c-accent) 40%, transparent);color:var(--c-accent)"
-                  >
-                    {badge}
-                  </span>
-                )
-              }
+              {badge && (
+                <span
+                  class="rounded-full border px-2 py-0.5 font-mono text-[0.62rem] leading-none font-medium"
+                  style="border-color:color-mix(in oklab, var(--c-accent) 40%, transparent);color:var(--c-accent)"
+                >
+                  {badge}
+                </span>
+              )}
             </div>
-            {
-              description && (
-                <p class="mt-4 text-[1.05rem] leading-relaxed" style="color:var(--c-fg-muted)">
-                  {description}
-                </p>
-              )
-            }
-            {
-              readingTime && (
-                <p class="mt-4 font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">
-                  预计阅读 {readingTime}
-                </p>
-              )
-            }
+            {description && (
+              <p class="mt-4 text-[1.05rem] leading-relaxed" style="color:var(--c-fg-muted)">
+                {description}
+              </p>
+            )}
+            {readingTime && (
+              <p class="mt-4 font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">
+                预计阅读 {readingTime}
+              </p>
+            )}
           </header>
 
           <div class="prose-void pt-2">
@@ -100,9 +96,7 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
       </main>
 
       <!-- 目录 -->
-      <aside
-        class="sticky top-16 hidden h-[calc(100dvh-4rem)] w-[15rem] shrink-0 overflow-y-auto py-12 xl:block scroll-thin"
-      >
+      <aside class="sticky top-16 hidden h-[calc(100dvh-4rem)] w-[15rem] shrink-0 overflow-y-auto py-12 xl:block scroll-thin">
         <DocsToc headings={tocHeadings} />
       </aside>
     </div>

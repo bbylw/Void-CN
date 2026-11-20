@@ -40,7 +40,11 @@ function fetch<P extends keyof RouteMap, M extends MethodsOf<P>>(
     { name: 'params', type: 'Record<string, string>', description: 'URL 路径参数（[id] 片段）。' },
     { name: 'headers', type: 'HeadersInit', description: '额外的请求头。' },
     { name: 'signal', type: 'AbortSignal', description: '中止信号。' },
-    { name: 'baseURL', type: 'string', description: '拼在路径前的 base URL，调用外部服务时很有用。' },
+    {
+      name: 'baseURL',
+      type: 'string',
+      description: '拼在路径前的 base URL，调用外部服务时很有用。',
+    },
     { name: 'retry', type: 'number', description: '重试次数（ofetch 默认对 GET 重试 1 次）。' },
     { name: 'timeout', type: 'number', description: '请求超时时间（毫秒）。' },
   ]}
@@ -81,14 +85,14 @@ try {
 
 类型化客户端构建在 [ofetch](https://github.com/unjs/ofetch) 之上，并在此之上加了一层类型化路由。与原生 `fetch` 的主要差异：
 
-| 行为                   | 原生 `fetch`                                              | `void/client` 的 `fetch`                                                                                     |
-| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **返回类型**     | `Promise<Response>`，需要自己调用 `.json()`               | `Promise<T>`，自动解析 JSON 并直接返回带类型的结果（`204` 返回 `undefined`）                                  |
-| **错误处理**     | 任何 HTTP 状态都会 resolve；需要检查 `response.ok`        | 非 2xx 响应抛出 `FetchError`                                                                                  |
-| **URL 构造**     | 原始 URL 字符串                                           | 路由路径 + 由 `options.params` 填入的 `[param]` 插值 + 由 `options.query` 生成的查询字符串                   |
-| **请求体序列化** | 手动 `JSON.stringify()` 并设置 `Content-Type` 头          | 自动把 `options.body` 序列化为 JSON，并设置 `Content-Type: application/json`                                 |
-| **类型安全**     | 接受任意 URL 与方法                                       | 路径被限制在 `RouteMap` 的键上，方法被限制在该路由实际定义的方法上。非法组合在编译期报错。                   |
-| **重试**         | 无                                                        | 对 408、429 与 5xx 自动重试（可通过 `retry` 选项配置）                                                        |
-| **超时**         | 无                                                        | 可通过 `timeout` 选项配置                                                                                     |
+| 行为             | 原生 `fetch`                                       | `void/client` 的 `fetch`                                                                   |
+| ---------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **返回类型**     | `Promise<Response>`，需要自己调用 `.json()`        | `Promise<T>`，自动解析 JSON 并直接返回带类型的结果（`204` 返回 `undefined`）               |
+| **错误处理**     | 任何 HTTP 状态都会 resolve；需要检查 `response.ok` | 非 2xx 响应抛出 `FetchError`                                                               |
+| **URL 构造**     | 原始 URL 字符串                                    | 路由路径 + 由 `options.params` 填入的 `[param]` 插值 + 由 `options.query` 生成的查询字符串 |
+| **请求体序列化** | 手动 `JSON.stringify()` 并设置 `Content-Type` 头   | 自动把 `options.body` 序列化为 JSON，并设置 `Content-Type: application/json`               |
+| **类型安全**     | 接受任意 URL 与方法                                | 路径被限制在 `RouteMap` 的键上，方法被限制在该路由实际定义的方法上。非法组合在编译期报错。 |
+| **重试**         | 无                                                 | 对 408、429 与 5xx 自动重试（可通过 `retry` 选项配置）                                     |
+| **超时**         | 无                                                 | 可通过 `timeout` 选项配置                                                                  |
 
 `headers` 与 `signal` 会原样透传给底层的 fetch。

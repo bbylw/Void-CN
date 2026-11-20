@@ -149,9 +149,10 @@ interface AuthSession {
 ```
 
 <Callout type="tip" title="auth.ts 中的类型">
-  在 `auth.ts` 及其导入的文件中，让 Better Auth 推断钩子类型，或使用它提供的 `User` 与 `Session` 类型。
-  在那里使用 Void 推断出的 auth 类型或 auth 辅助方法的返回值会形成循环引用。`sendResetPassword`
-  这类回调收到的是 Better Auth 基础的 `User` 类型。
+  在 `auth.ts` 及其导入的文件中，让 Better Auth 推断钩子类型，或使用它提供的 `User` 与 `Session`
+  类型。 在那里使用 Void 推断出的 auth 类型或 auth
+  辅助方法的返回值会形成循环引用。`sendResetPassword` 这类回调收到的是 Better Auth 基础的 `User`
+  类型。
 </Callout>
 
 ## `AuthState`

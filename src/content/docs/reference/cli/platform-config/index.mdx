@@ -35,13 +35,13 @@ void platform config plans sync
 
 `add` 与 `set` 的 `--file` 读取一个 JSON 对象。所有字段都是可选的；省略的字段保留当前值或所复制套餐的值。
 
-| 字段                | 取值                                                                                          |
-| ------------------- | --------------------------------------------------------------------------------------------- |
-| `name`              | 显示名                                                                                        |
-| `limits`            | 资源限额的部分对象，取非负整数；`0` 表示该套餐不限制                                          |
-| `buildInstanceType` | `standard-3` 或 `standard-4`                                                                  |
-| `allowShortSlugs`   | `true` 允许今后使用五个字符或更短的项目 slug；`false` 要求更长的名称                          |
-| `aiLogging`         | `off`、`metadata` 或 `full`；`inherit` 会清除该套餐的覆盖设置                                 |
+| 字段                | 取值                                                                 |
+| ------------------- | -------------------------------------------------------------------- |
+| `name`              | 显示名                                                               |
+| `limits`            | 资源限额的部分对象，取非负整数；`0` 表示该套餐不限制                 |
+| `buildInstanceType` | `standard-3` 或 `standard-4`                                         |
+| `allowShortSlugs`   | `true` 允许今后使用五个字符或更短的项目 slug；`false` 要求更长的名称 |
+| `aiLogging`         | `off`、`metadata` 或 `full`；`inherit` 会清除该套餐的覆盖设置        |
 
 构建超时由平台设定上限为 60 分钟；`0` 表示使用该上限。存储配额不可编辑。修改 `allowShortSlugs` 会保留已有的 URL。受支持的限额与文件示例见[套餐与限额](/docs/platform/administration/plans)，日志模式见 [AI Gateway 日志](/docs/reference/cli/platform-users)。
 

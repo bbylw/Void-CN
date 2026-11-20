@@ -65,9 +65,12 @@ const frameworks = [
         </h3>
       </div>
       <p class="mt-3 max-w-[46ch] text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
-        在 <code class="!bg-transparent !border-0 !p-0" style="color:var(--c-fg)">routes/</code>
-        下新建一个文件即可添加端点，导出你想支持的方法。动态段用方括号，catch-all 用省略号，括号目录是路由组，不改变
-        URL，只整理文件。
+        在{' '}
+        <code class="!bg-transparent !border-0 !p-0" style="color:var(--c-fg)">
+          routes/
+        </code>
+        下新建一个文件即可添加端点，导出你想支持的方法。动态段用方括号，catch-all
+        用省略号，括号目录是路由组，不改变 URL，只整理文件。
       </p>
       <div
         class="mt-5 overflow-hidden rounded-[0.85rem] border"
@@ -80,9 +83,7 @@ const frameworks = [
     </article>
 
     <!-- 类型管道 -->
-    <article
-      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
-    >
+    <article class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
@@ -100,17 +101,23 @@ const frameworks = [
       </p>
       <ul class="mt-4 space-y-2 text-[0.85rem]" style="color:var(--c-fg-muted)">
         <li class="flex items-start gap-2">
-          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.55em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           数据库列的类型在编译期即已知
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.55em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           处理器返回类型生成 <code class="!bg-transparent !border-0 !p-0">.void/</code> 路由表
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.55em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.55em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           客户端的路径、方法、请求体与响应全部受检
         </li>
@@ -129,9 +136,7 @@ const frameworks = [
     </article>
 
     <!-- 资源即代码 -->
-    <article
-      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
-    >
+    <article class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
@@ -161,9 +166,7 @@ const frameworks = [
     </article>
 
     <!-- 本地即生产 -->
-    <article
-      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
-    >
+    <article class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
@@ -192,9 +195,7 @@ const frameworks = [
     </article>
 
     <!-- 页面与表单 -->
-    <article
-      class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7"
-    >
+    <article class="reveal card card-hover relative min-w-0 flex flex-col overflow-hidden p-6 sm:p-7">
       <div class="flex items-center gap-2.5">
         <span
           class="grid size-8 place-items-center rounded-lg border"
@@ -253,19 +254,17 @@ const frameworks = [
         </div>
 
         <ul class="flex flex-wrap gap-2">
-          {
-            frameworks.map((f) => (
-              <li>
-                <a
-                  href="/docs/frameworks"
-                  class="inline-flex items-center rounded-lg border px-3 py-2 text-[0.82rem] font-medium transition-all duration-300 hover:-translate-y-0.5"
-                  style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-fg-muted)"
-                >
-                  {f}
-                </a>
-              </li>
-            ))
-          }
+          {frameworks.map((f) => (
+            <li>
+              <a
+                href="/docs/frameworks"
+                class="inline-flex items-center rounded-lg border px-3 py-2 text-[0.82rem] font-medium transition-all duration-300 hover:-translate-y-0.5"
+                style="border-color:var(--c-line);background:var(--c-surface-2);color:var(--c-fg-muted)"
+              >
+                {f}
+              </a>
+            </li>
+          ))}
         </ul>
       </div>
     </article>

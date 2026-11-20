@@ -121,13 +121,13 @@ AUTH_GITHUB_CLIENT_SECRET=
 import { getAuth, getSession, getUser, requireAuth } from 'void/auth';
 ```
 
-| 函数                                     | 返回                                    |
-| ---------------------------------------- | --------------------------------------- |
-| `getUser()`                              | 当前的 `AuthUser \| null`               |
-| `getSession()`                           | `{ user, session } \| null`             |
-| `requireAuth(c)`                         | 已认证的用户，否则抛出 401              |
-| `requireAuth(c, { throwRedirect })`      | 已认证的用户，否则抛出登录重定向        |
-| `getAuth(c)`                             | 该请求的 Better Auth 实例               |
+| 函数                                | 返回                             |
+| ----------------------------------- | -------------------------------- |
+| `getUser()`                         | 当前的 `AuthUser \| null`        |
+| `getSession()`                      | `{ user, session } \| null`      |
+| `requireAuth(c)`                    | 已认证的用户，否则抛出 401       |
+| `requireAuth(c, { throwRedirect })` | 已认证的用户，否则抛出登录重定向 |
+| `getAuth(c)`                        | 该请求的 Better Auth 实例        |
 
 从 `void/auth` 导入 `AuthUser` 与 `AuthSession` 用于类型标注。它们的字段来自你的 Better Auth 插件与 `user.additionalFields`，例如 `admin()` 带来的 `role`，类型由根目录的 `auth.ts` 推断得出。
 

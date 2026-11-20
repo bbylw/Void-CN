@@ -29,15 +29,13 @@ const LANG_LABEL: Record<string, string> = {
 <figure class:list={['code-block', className]} data-code-block>
   <figcaption class="code-block__bar">
     <span class="code-block__title">
-      {
-        title && (
-          <span
-            class="size-1.5 shrink-0 rounded-full"
-            style="background:var(--c-accent)"
-            aria-hidden="true"
-          />
-        )
-      }
+      {title && (
+        <span
+          class="size-1.5 shrink-0 rounded-full"
+          style="background:var(--c-accent)"
+          aria-hidden="true"
+        />
+      )}
       {title ?? <span style="color:var(--c-fg-subtle)">示例</span>}
     </span>
     <span class="code-block__lang">{LANG_LABEL[lang] ?? lang}</span>

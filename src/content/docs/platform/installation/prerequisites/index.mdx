@@ -49,14 +49,14 @@ void platform install --plan
 
 对于域名安装，按下表回答。测试模式会跳过应用域名、zone 与 catch-all 这几个问题：
 
-| 提示项                                  | 回答                                                |
-| --------------------------------------- | --------------------------------------------------- |
-| Installation name                       | 一个短名字，例如 `team`                             |
-| Application base domain                 | 你的域名，例如 `example.app`                        |
-| Cloudflare zone                         | 同一个域名                                          |
-| Platform display name                   | 团队能认出来的任意名字                              |
-| Optional custom API hostname            | 留空以使用 `workers.dev`                            |
-| Dedicate all unmatched traffic to Void? | 仅当整个 zone 都归属本平台时选 Yes                  |
+| 提示项                                  | 回答                               |
+| --------------------------------------- | ---------------------------------- |
+| Installation name                       | 一个短名字，例如 `team`            |
+| Application base domain                 | 你的域名，例如 `example.app`       |
+| Cloudflare zone                         | 同一个域名                         |
+| Platform display name                   | 团队能认出来的任意名字             |
+| Optional custom API hostname            | 留空以使用 `workers.dev`           |
+| Dedicate all unmatched traffic to Void? | 仅当整个 zone 都归属本平台时选 Yes |
 
 在账户里选一个没被用过的安装名。例如 `team` 会创建 `void-team-api`、`void-team-proxy` 这类资源。
 
@@ -81,10 +81,10 @@ void platform install --workers-dev --plan
 2. 打开提供方的连接详情并选择主数据库。使用直连或 session 模式的 pooler，不要用事务池化。这个连接必须在你的电脑和 Cloudflare 两侧都可用。
 3. 把 PostgreSQL 连接 URL（包含密码与 SSL 设置）复制进你的密码管理器。粘贴到 Void 的 `PostgreSQL DATABASE_URL` 提示里的只能是 URL——而不是外面包着的 `psql` 命令——并按提供方给出的原样填写，包含 `sslmode=verify-full` 这类 SSL 设置。Void 创建的 Hyperdrive 只信任公共证书颁发机构，因此如果你的数据库使用私有 CA，请改用下面描述的、由你另行管理的 Hyperdrive。
 
-| 提供方                                                                    | 连接设置                                                                                                                                                 |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 提供方                                                                   | 连接设置                                                                                                                                 |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | [PlanetScale Postgres](https://planetscale.com/docs/postgres/connecting) | 选择 **Postgres**，不要选 Vitess/MySQL。打开 **Connect**，创建 role 凭据，并使用 `5432` 端口上的直连主库，而不是 `6432` 上的 PgBouncer。 |
-| [Neon](https://neon.com/docs/get-started-with-neon/connect-neon)         | 打开 **Connect**，选择数据库与 owner 角色，并关闭 **connection pooling**。                                                                               |
+| [Neon](https://neon.com/docs/get-started-with-neon/connect-neon)         | 打开 **Connect**，选择数据库与 owner 角色，并关闭 **connection pooling**。                                                               |
 
 在为数据库选型时，要把共享这台服务器的每个平台安装与每个应用的连接池都算进去。按服务器容量调整每个 Hyperdrive 的 [origin connection limit](https://developers.cloudflare.com/hyperdrive/configuration/tune-connection-pool/)，并为迁移、管理操作、提供方保留连接以及临时突发留出余量。
 

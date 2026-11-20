@@ -152,9 +152,9 @@ void db export [--output <path>] [--no-data] [--no-schema] [--table <name>]
 
 对于包含视图、触发器、自定义类型、函数或独立序列的 PostgreSQL schema，请用 `pg_dump` 做完整备份。`void db export` 会在写出 schema 导出之前报告这些对象。
 
-| Flag              | 用途                             |
-| ----------------- | -------------------------------- |
-| `--output <path>` | 写入文件而不是 stdout            |
-| `--no-data`       | 只要 schema（不含 INSERT 语句）  |
-| `--no-schema`     | 只要数据（不含 CREATE TABLE）    |
-| `--table <name>`  | 只导出单张表                     |
+| Flag              | 用途                            |
+| ----------------- | ------------------------------- |
+| `--output <path>` | 写入文件而不是 stdout           |
+| `--no-data`       | 只要 schema（不含 INSERT 语句） |
+| `--no-schema`     | 只要数据（不含 CREATE TABLE）   |
+| `--table <name>`  | 只导出单张表                    |

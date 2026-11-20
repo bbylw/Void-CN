@@ -32,37 +32,41 @@ const socials = [
             target="_blank"
             rel="noreferrer noopener"
             class="underline underline-offset-2 transition-colors hover:text-[color:var(--c-fg)]"
-            >英文原站</a
-          > 为准。
+          >
+            英文原站
+          </a>{' '}
+          为准。
         </p>
       </div>
 
       <div>
         <h2 class="eyebrow">生态</h2>
         <ul class="mt-2 flex flex-wrap gap-x-6 text-[0.85rem] md:mt-4 md:block md:space-y-2.5">
-          {
-            socials.map((s) => (
-              <li>
-                <a
-                  href={s.href}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  class="link-underline inline-flex items-center py-2.5 max-md:bg-none md:py-0"
-                  style="color:var(--c-fg-muted)"
-                >
-                  {s.label}
-                </a>
-              </li>
-            ))
-          }
+          {socials.map((s) => (
+            <li>
+              <a
+                href={s.href}
+                target="_blank"
+                rel="noreferrer noopener"
+                class="link-underline inline-flex items-center py-2.5 max-md:bg-none md:py-0"
+                style="color:var(--c-fg-muted)"
+              >
+                {s.label}
+              </a>
+            </li>
+          ))}
         </ul>
 
         <div
           class="mt-4 flex items-center justify-between gap-3 rounded-[0.7rem] border p-3 md:mt-6 md:block"
           style="border-color:var(--c-line);background:var(--c-surface)"
         >
-          <p class="font-mono text-[0.68rem]" style="color:var(--c-fg-subtle)">许可证</p>
-          <p class="text-[0.85rem] font-medium md:mt-1" style="color:var(--c-fg)">MIT</p>
+          <p class="font-mono text-[0.68rem]" style="color:var(--c-fg-subtle)">
+            许可证
+          </p>
+          <p class="text-[0.85rem] font-medium md:mt-1" style="color:var(--c-fg)">
+            MIT
+          </p>
         </div>
       </div>
     </div>
@@ -71,7 +75,9 @@ const socials = [
       class="flex flex-col gap-2 border-t py-5 text-[0.78rem] sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:py-6"
       style="border-color:var(--c-line);color:var(--c-fg-subtle)"
     >
-      <p>© {year} Void 中文文档 · 基于 <span class="font-mono">voidzero-dev/void</span> 构建</p>
+      <p>
+        © {year} Void 中文文档 · 基于 <span class="font-mono">voidzero-dev/void</span> 构建
+      </p>
       <p class="font-mono text-[0.72rem] leading-relaxed">
         Astro · TypeScript · React · MDX · Tailwind CSS · Bun
       </p>

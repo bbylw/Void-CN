@@ -23,10 +23,10 @@ export const action = defineHandler.withValidator({
 });
 ```
 
-| action 的返回        | 行为                                                                                                                             |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 不返回（void）       | 重新运行 loader，页面用新的 props 重新渲染。                                                                                       |
-| `c.redirect(url)`    | 导航到其他页面。启用 [`routing.typedRoutes`](/docs/type-safety) 后，该地址与链接一样被检查。TypeScript 无法检查的字符串用 `as Href` 断言。 |
+| action 的返回     | 行为                                                                                                                                       |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| 不返回（void）    | 重新运行 loader，页面用新的 props 重新渲染。                                                                                               |
+| `c.redirect(url)` | 导航到其他页面。启用 [`routing.typedRoutes`](/docs/type-safety) 后，该地址与链接一样被检查。TypeScript 无法检查的字符串用 `as Href` 断言。 |
 
 action 之后中间件不会再次运行。要更新[共享数据](/docs/pages-routing/layouts)，就在 action 里更新它，或者改为重定向。
 
@@ -144,22 +144,22 @@ export default function CreateUser() {
 
 `useForm` 返回一个响应式对象，包含：
 
-| 属性 / 方法                      | 用途                                                                                                                               |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `data` / `setData`               | 当前表单取值，类型与 action 的 body schema 一致。                                                                                    |
-| `errors`                         | 字段级校验错误，键的类型就是 body 字段名。                                                                                             |
-| `error`                          | action 错误，或 `null`。                                                                                                             |
-| `throwOnError`（选项）           | 设为 `false` 时，认证与服务器失败留在 `form.error` 里而不是抛出。                                                                     |
-| `post`, `put`, `patch`, `delete` | 用对应方法提交表单。在 React 中它们是原生 form action 回调。                                                                          |
-| `pending`                        | 提交进行期间为 `true`。                                                                                                              |
-| `hasChanges`                     | 表单数据与当前默认值不同则为 `true`。提交成功后，默认值更新为提交的取值，因此除非在提交期间编辑过表单，`hasChanges` 会变成 `false`。  |
-| `wasSuccessful`                  | 提交成功后为 `true`，并保持到下一次提交。                                                                                              |
-| `recentlySuccessful`             | 提交成功后的 2 秒内为 `true`，适合做闪现提示。                                                                                          |
+| 属性 / 方法                      | 用途                                                                                                                                                   |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `data` / `setData`               | 当前表单取值，类型与 action 的 body schema 一致。                                                                                                      |
+| `errors`                         | 字段级校验错误，键的类型就是 body 字段名。                                                                                                             |
+| `error`                          | action 错误，或 `null`。                                                                                                                               |
+| `throwOnError`（选项）           | 设为 `false` 时，认证与服务器失败留在 `form.error` 里而不是抛出。                                                                                      |
+| `post`, `put`, `patch`, `delete` | 用对应方法提交表单。在 React 中它们是原生 form action 回调。                                                                                           |
+| `pending`                        | 提交进行期间为 `true`。                                                                                                                                |
+| `hasChanges`                     | 表单数据与当前默认值不同则为 `true`。提交成功后，默认值更新为提交的取值，因此除非在提交期间编辑过表单，`hasChanges` 会变成 `false`。                   |
+| `wasSuccessful`                  | 提交成功后为 `true`，并保持到下一次提交。                                                                                                              |
+| `recentlySuccessful`             | 提交成功后的 2 秒内为 `true`，适合做闪现提示。                                                                                                         |
 | `reset(...fields)`               | 把表单数据重置到当前默认值（提交成功后的默认值是最后提交的取值）。字段名可自动补全。把 `{ initial: true }` 放在第一位可重置到传给 `useForm` 的初始值。 |
-| `resetOnSuccess`（选项）         | 为 `true` 时，提交成功后默认值重置为挂载时的取值，表单数据也一并重置（除非在提交期间被编辑过）。适合保存后清空的创建表单。             |
-| `setError(field, message)`       | 给某个字段设置客户端校验错误。                                                                                                        |
-| `clearErrors(...fields)`         | 清除校验错误。字段名可自动补全。                                                                                                      |
-| `clearError()`                   | 清除 `error`。                                                                                                                       |
+| `resetOnSuccess`（选项）         | 为 `true` 时，提交成功后默认值重置为挂载时的取值，表单数据也一并重置（除非在提交期间被编辑过）。适合保存后清空的创建表单。                             |
+| `setError(field, message)`       | 给某个字段设置客户端校验错误。                                                                                                                         |
+| `clearErrors(...fields)`         | 清除校验错误。字段名可自动补全。                                                                                                                       |
+| `clearError()`                   | 清除 `error`。                                                                                                                                         |
 
 客户端校验用 `setError()`。编辑某个字段会自动清除它的错误。
 
@@ -475,8 +475,8 @@ export const action = defineHandler(async (c) => {
 
 ## 如何选用原语
 
-| 原语             | 更新页面 | 表单状态                        | 依赖框架 |
-| ---------------- | -------- | ------------------------------- | -------- |
-| `useForm`        | 是       | 是（错误、dirty、reset）        | 是       |
-| `action()`       | 是       | 否                              | 是       |
-| 原生 `fetch()`   | 否       | 否                              | 否       |
+| 原语           | 更新页面 | 表单状态                 | 依赖框架 |
+| -------------- | -------- | ------------------------ | -------- |
+| `useForm`      | 是       | 是（错误、dirty、reset） | 是       |
+| `action()`     | 是       | 否                       | 是       |
+| 原生 `fetch()` | 否       | 否                       | 否       |

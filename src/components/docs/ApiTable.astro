@@ -11,16 +11,14 @@ const { rows, caption } = Astro.props;
   style="border-color:var(--c-line)"
 >
   <table class="api-table w-full min-w-[32rem]">
-    {
-      caption && (
-        <caption
-          class="border-b px-4 py-2.5 text-left font-mono text-[0.7rem] tracking-[0.12em] uppercase"
-          style="border-color:var(--c-line);color:var(--c-fg-subtle)"
-        >
-          {caption}
-        </caption>
-      )
-    }
+    {caption && (
+      <caption
+        class="border-b px-4 py-2.5 text-left font-mono text-[0.7rem] tracking-[0.12em] uppercase"
+        style="border-color:var(--c-line);color:var(--c-fg-subtle)"
+      >
+        {caption}
+      </caption>
+    )}
     <thead>
       <tr>
         <th class="!w-[30%] !py-2.5 !pl-4">选项</th>
@@ -29,28 +27,26 @@ const { rows, caption } = Astro.props;
       </tr>
     </thead>
     <tbody>
-      {
-        rows.map((r) => (
-          <tr>
-            <td class="!py-2.5 !pl-4 whitespace-nowrap">
-              <code>{r.name}</code>
-            </td>
-            <td class="!py-2.5 whitespace-nowrap">
-              <span class="font-mono text-[0.78rem]" style="color:var(--c-fg-muted)">
-                {r.type}
+      {rows.map((r) => (
+        <tr>
+          <td class="!py-2.5 !pl-4 whitespace-nowrap">
+            <code>{r.name}</code>
+          </td>
+          <td class="!py-2.5 whitespace-nowrap">
+            <span class="font-mono text-[0.78rem]" style="color:var(--c-fg-muted)">
+              {r.type}
+            </span>
+          </td>
+          <td class="!py-2.5 !pr-4">
+            {r.description}
+            {r.default && (
+              <span class="ml-1 text-[0.8rem]" style="color:var(--c-fg-subtle)">
+                默认 <code>{r.default}</code>
               </span>
-            </td>
-            <td class="!py-2.5 !pr-4">
-              {r.description}
-              {r.default && (
-                <span class="ml-1 text-[0.8rem]" style="color:var(--c-fg-subtle)">
-                  默认 <code>{r.default}</code>
-                </span>
-              )}
-            </td>
-          </tr>
-        ))
-      }
+            )}
+          </td>
+        </tr>
+      ))}
     </tbody>
   </table>
 </div>

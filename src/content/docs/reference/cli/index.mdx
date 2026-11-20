@@ -11,67 +11,67 @@ import Callout from '@/components/docs/Callout.astro';
 
 ## 命令分组
 
-| 命令组                                     | 参考                                                          |
-| ------------------------------------------ | ------------------------------------------------------------- |
-| `init`、`prepare`、`info`、`migrate`       | [项目初始化](/docs/reference/cli/setup)                       |
-| `connect`、`auth`、`account`、`cloudflare` | [连接与认证](/docs/reference/cli/auth)                        |
-| `project`                                  | [项目、团队、日志与回滚](/docs/reference/cli/project)         |
-| `deploy`                                   | [部署](/docs/reference/cli/deploy)                            |
-| `db`                                       | [数据库](/docs/reference/cli/database)                        |
-| `gen`                                      | [代码生成](/docs/reference/cli/generate)                      |
-| `secret`、`env`                            | [密钥与环境变量](/docs/reference/cli/secrets)                 |
-| `github`、`build`                          | [GitHub 与构建](/docs/reference/cli/github)                   |
-| `domain`                                   | [自定义域名](/docs/reference/cli/domains)                     |
-| `email`                                    | [邮件](/docs/reference/cli/email)                             |
-| `platform`                                 | [平台安装与管理](/docs/reference/cli/platform)                |
+| 命令组                                     | 参考                                                  |
+| ------------------------------------------ | ----------------------------------------------------- |
+| `init`、`prepare`、`info`、`migrate`       | [项目初始化](/docs/reference/cli/setup)               |
+| `connect`、`auth`、`account`、`cloudflare` | [连接与认证](/docs/reference/cli/auth)                |
+| `project`                                  | [项目、团队、日志与回滚](/docs/reference/cli/project) |
+| `deploy`                                   | [部署](/docs/reference/cli/deploy)                    |
+| `db`                                       | [数据库](/docs/reference/cli/database)                |
+| `gen`                                      | [代码生成](/docs/reference/cli/generate)              |
+| `secret`、`env`                            | [密钥与环境变量](/docs/reference/cli/secrets)         |
+| `github`、`build`                          | [GitHub 与构建](/docs/reference/cli/github)           |
+| `domain`                                   | [自定义域名](/docs/reference/cli/domains)             |
+| `email`                                    | [邮件](/docs/reference/cli/email)                     |
+| `platform`                                 | [平台安装与管理](/docs/reference/cli/platform)        |
 
 ## 速查表
 
-| 命令                              | 用途                                                                          |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| `void deploy`                     | 构建并部署到已配置的平台                                                      |
-| `void deploy --skip-migrations`   | 只部署代码，不应用应用或认证的 SQL 迁移                                       |
-| `void prepare`                    | 生成 `.void` 产物，但不启动 Vite                                              |
-| `void info [--json]`              | 在迁移资源代码之前查看持久化资源的名称                                        |
-| `void gen model <name> [cols...]` | 生成 Drizzle 数据表与 API 路由的脚手架                                        |
-| `void gen route <path>`           | 创建 API 路由                                                                 |
-| `void db push`                    | 直接应用 schema，不生成迁移文件                                               |
-| `void db generate`                | 从 schema 变更生成 SQL 迁移                                                   |
-| `void db status`                  | 查看本地/远端迁移状态                                                         |
-| `void db reset`                   | 删除并重新应用全部迁移                                                        |
-| `void db seed`                    | 重置本地数据库并写入种子数据                                                  |
-| `void db execute <sql>`           | 对数据库执行 SQL（加 `--remote` 则作用于已部署数据库）                        |
-| `void db studio`                  | 打开 Drizzle Studio（加 `--remote` 可连已部署的外部数据库）                   |
-| `void db restore --bookmark <b>`  | 把已部署的 D1 数据库恢复到某个还原点（仅直连 Cloudflare）                     |
-| `void secret put <name=value>`    | 设置生产环境密钥                                                              |
-| `void secret list`                | 列出生产环境密钥                                                              |
-| `void secret sync <file>`         | 从 dotenv 文件批量上传密钥                                                    |
-| `void env check [--remote]`       | 校验 `env.ts` schema                                                          |
-| `void env types`                  | 从 `env.ts` 重新生成 `.void/env.d.ts`                                         |
-| `void auth login`                 | 用项目已保存的目标登录，或选择一个目标                                        |
-| `void account login`              | 登录某个 Void 平台                                                            |
-| `void cloudflare login`           | 通过 Void 登录 Cloudflare                                                     |
-| `void platform install`           | 在 Cloudflare 上安装企业自己的 Void 平台                                      |
-| `void connect <url>`              | 让 CLI 连接到一个 Void 平台；主机名默认使用 HTTPS                             |
-| `void project link`               | 把当前目录关联到一个项目                                                      |
-| `void project logs`               | 查看已部署项目的运行时日志                                                    |
-| `void project requests`           | 查看请求级别的流量（状态码、方法、耗时）                                      |
-| `void project rollback`           | 回滚到上一次部署                                                              |
-| `void project cancel`             | 取消进行中的部署                                                              |
-| `void project zero-trust`         | 查看或覆盖项目的 Zero Trust 防护                                              |
-| `void project purge-cache`        | 清除全部已缓存页面（Void 平台）                                               |
-| `void build logs`                 | 流式输出、截尾或下载构建日志                                                  |
-| `void email status`               | 在你自己的 Cloudflare 账户上查看邮件就绪状态（`--platform cloudflare`）       |
-| `void email setup`                | 在你自己的 Cloudflare 账户上配置邮件，无需部署                                |
-| `void email usage`                | 查看本月收件人尝试次数、收件回执与配额                                        |
-| `void email logs`                 | 查看最近的邮件投递记录                                                        |
-| `void email destinations`         | 列出已验证的收件人地址                                                        |
-| `void email allow <address>`      | 添加收件人并发送验证邮件                                                      |
-| `void email disallow <address>`   | 把收件人从白名单中移除                                                        |
-| `void email alias [name]`         | 查看共享邮件地址，或为它取一个更短的固定名称                                  |
-| `void email domain`               | 在 Cloudflare zone 上用自己的域名收发邮件                                     |
-| `void init`                       | 配置新的或已有的项目，包括编码 agent                                          |
-| `void migrate`                    | 更新项目配置                                                                  |
+| 命令                              | 用途                                                                    |
+| --------------------------------- | ----------------------------------------------------------------------- |
+| `void deploy`                     | 构建并部署到已配置的平台                                                |
+| `void deploy --skip-migrations`   | 只部署代码，不应用应用或认证的 SQL 迁移                                 |
+| `void prepare`                    | 生成 `.void` 产物，但不启动 Vite                                        |
+| `void info [--json]`              | 在迁移资源代码之前查看持久化资源的名称                                  |
+| `void gen model <name> [cols...]` | 生成 Drizzle 数据表与 API 路由的脚手架                                  |
+| `void gen route <path>`           | 创建 API 路由                                                           |
+| `void db push`                    | 直接应用 schema，不生成迁移文件                                         |
+| `void db generate`                | 从 schema 变更生成 SQL 迁移                                             |
+| `void db status`                  | 查看本地/远端迁移状态                                                   |
+| `void db reset`                   | 删除并重新应用全部迁移                                                  |
+| `void db seed`                    | 重置本地数据库并写入种子数据                                            |
+| `void db execute <sql>`           | 对数据库执行 SQL（加 `--remote` 则作用于已部署数据库）                  |
+| `void db studio`                  | 打开 Drizzle Studio（加 `--remote` 可连已部署的外部数据库）             |
+| `void db restore --bookmark <b>`  | 把已部署的 D1 数据库恢复到某个还原点（仅直连 Cloudflare）               |
+| `void secret put <name=value>`    | 设置生产环境密钥                                                        |
+| `void secret list`                | 列出生产环境密钥                                                        |
+| `void secret sync <file>`         | 从 dotenv 文件批量上传密钥                                              |
+| `void env check [--remote]`       | 校验 `env.ts` schema                                                    |
+| `void env types`                  | 从 `env.ts` 重新生成 `.void/env.d.ts`                                   |
+| `void auth login`                 | 用项目已保存的目标登录，或选择一个目标                                  |
+| `void account login`              | 登录某个 Void 平台                                                      |
+| `void cloudflare login`           | 通过 Void 登录 Cloudflare                                               |
+| `void platform install`           | 在 Cloudflare 上安装企业自己的 Void 平台                                |
+| `void connect <url>`              | 让 CLI 连接到一个 Void 平台；主机名默认使用 HTTPS                       |
+| `void project link`               | 把当前目录关联到一个项目                                                |
+| `void project logs`               | 查看已部署项目的运行时日志                                              |
+| `void project requests`           | 查看请求级别的流量（状态码、方法、耗时）                                |
+| `void project rollback`           | 回滚到上一次部署                                                        |
+| `void project cancel`             | 取消进行中的部署                                                        |
+| `void project zero-trust`         | 查看或覆盖项目的 Zero Trust 防护                                        |
+| `void project purge-cache`        | 清除全部已缓存页面（Void 平台）                                         |
+| `void build logs`                 | 流式输出、截尾或下载构建日志                                            |
+| `void email status`               | 在你自己的 Cloudflare 账户上查看邮件就绪状态（`--platform cloudflare`） |
+| `void email setup`                | 在你自己的 Cloudflare 账户上配置邮件，无需部署                          |
+| `void email usage`                | 查看本月收件人尝试次数、收件回执与配额                                  |
+| `void email logs`                 | 查看最近的邮件投递记录                                                  |
+| `void email destinations`         | 列出已验证的收件人地址                                                  |
+| `void email allow <address>`      | 添加收件人并发送验证邮件                                                |
+| `void email disallow <address>`   | 把收件人从白名单中移除                                                  |
+| `void email alias [name]`         | 查看共享邮件地址，或为它取一个更短的固定名称                            |
+| `void email domain`               | 在 Cloudflare zone 上用自己的域名收发邮件                               |
+| `void init`                       | 配置新的或已有的项目，包括编码 agent                                    |
+| `void migrate`                    | 更新项目配置                                                            |
 
 平台管理相关内容见[套餐与账户限额](/docs/platform/administration/plans)、[用户与项目](/docs/reference/cli/platform-users)，以及 [AI 日志记录](/docs/reference/cli/platform-users)。
 
@@ -103,7 +103,7 @@ void <group> help <command>
 
 ## 环境变量
 
-| 变量           | 用途                                                                    | 默认值 |
-| -------------- | ----------------------------------------------------------------------- | ------ |
-| `VOID_TOKEN`   | 覆盖鉴权 token，而不使用已保存的配置                                    | 无     |
-| `VOID_PROJECT` | 为 deploy、secret、domain、清除缓存等命令提供默认的项目 slug            | 无     |
+| 变量           | 用途                                                         | 默认值 |
+| -------------- | ------------------------------------------------------------ | ------ |
+| `VOID_TOKEN`   | 覆盖鉴权 token，而不使用已保存的配置                         | 无     |
+| `VOID_PROJECT` | 为 deploy、secret、domain、清除缓存等命令提供默认的项目 slug | 无     |

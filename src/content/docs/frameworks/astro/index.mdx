@@ -8,8 +8,8 @@ import Callout from '@/components/docs/Callout.astro';
 把 Void 用在 [Astro](https://astro.build/) 应用里，可以获得资源探测、带类型的数据库查询以及迁移能力。Astro 保留自己的构建流程和 Cloudflare 集成，Void 则接入它的 Vite 配置。
 
 <Callout type="warn" title="需要 Astro 7">
-  必须使用 [Astro 7+](https://astro.build/blog/astro-7/)，因为 Void 需要 Vite 8。此外还要在 Cloudflare 配置的
-  `compatibility_flags` 中开启 `"nodejs_als"`。
+  必须使用 [Astro 7+](https://astro.build/blog/astro-7/)，因为 Void 需要 Vite 8。此外还要在
+  Cloudflare 配置的 `compatibility_flags` 中开启 `"nodejs_als"`。
 </Callout>
 
 ## 接入步骤
@@ -132,6 +132,6 @@ import { env } from 'cloudflare:workers';
 
 export const prerender = false;
 
-const { results } = await env.DB.prepare("SELECT * FROM users").all();
+const { results } = await env.DB.prepare('SELECT * FROM users').all();
 ---
 ```

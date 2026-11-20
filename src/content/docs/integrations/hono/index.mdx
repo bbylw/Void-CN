@@ -39,7 +39,8 @@ export const GET = defineHandler(
 
 <Callout type="warn">
   `cache()` 按 URL 只保存一份响应，并把它返回给所有访客。它会跳过带 `Authorization`
-  头的请求，但不会跳过带 cookie 的请求。只在响应人人相同的 routes 上使用，绝不用于读取当前登录用户的路由。
+  头的请求，但不会跳过带 cookie 的请求。只在响应人人相同的 routes
+  上使用，绝不用于读取当前登录用户的路由。
   要缓存页面，请使用[再验证](/docs/edge/revalidation)，它会跳过携带 cookie 的请求。
 </Callout>
 

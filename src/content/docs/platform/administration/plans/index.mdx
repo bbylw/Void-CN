@@ -65,19 +65,19 @@ void platform config plans set team --file team-plan.json --yes
 
 限额是非负整数；`0` 表示计划不限制。构建超时始终有 60 分钟的平台上限；`0` 表示使用该上限。你可以配置：
 
-| 设置                            | 含义                                       |
-| ------------------------------- | ------------------------------------------ |
-| `requestsPerMonth`              | 每个账户账期内的应用请求数                 |
-| `cpuMsPerRequest`               | 每个应用请求默认的 CPU 毫秒数              |
-| `maxCpuMsPerRequest`            | 应用能申请的最高 CPU 上限                  |
-| `subRequestsPerInvocation`      | 每次调用的子请求数                         |
-| `deploysPerDay`                 | 每天的部署次数                             |
-| `aiNeuronsPerMonth`             | 每个账户账期内的 AI neuron 数              |
-| `retainedDeployments`           | 保留的 Worker 部署数                       |
-| `sandboxRuntimeSecondsPerMonth` | 每个账户账期内的 Sandbox 运行秒数          |
-| `sandboxMaxConcurrentInstances` | 同时运行的 Sandbox 实例数                  |
-| `concurrentBuilds`              | 同时进行的构建数                           |
-| `buildTimeoutMinutes`           | 构建超时（分钟）                           |
+| 设置                            | 含义                              |
+| ------------------------------- | --------------------------------- |
+| `requestsPerMonth`              | 每个账户账期内的应用请求数        |
+| `cpuMsPerRequest`               | 每个应用请求默认的 CPU 毫秒数     |
+| `maxCpuMsPerRequest`            | 应用能申请的最高 CPU 上限         |
+| `subRequestsPerInvocation`      | 每次调用的子请求数                |
+| `deploysPerDay`                 | 每天的部署次数                    |
+| `aiNeuronsPerMonth`             | 每个账户账期内的 AI neuron 数     |
+| `retainedDeployments`           | 保留的 Worker 部署数              |
+| `sandboxRuntimeSecondsPerMonth` | 每个账户账期内的 Sandbox 运行秒数 |
+| `sandboxMaxConcurrentInstances` | 同时运行的 Sandbox 实例数         |
+| `concurrentBuilds`              | 同时进行的构建数                  |
+| `buildTimeoutMinutes`           | 构建超时（分钟）                  |
 
 `cpuMsPerRequest` 不能超过 `maxCpuMsPerRequest`；默认 CPU 上限设为不限制时，上限也必须是不限制。构建实例规格有 `standard-3`（2 vCPU、8 GiB）与 `standard-4`（4 vCPU、12 GiB）。新的构建使用新的规格与超时，正在运行的构建沿用它们已记录的设置。
 

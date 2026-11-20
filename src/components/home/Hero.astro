@@ -38,21 +38,15 @@ try {
 ---
 
 <div class="aurora relative overflow-hidden" data-hero>
-  <div
-    class="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_85%_70%_at_50%_0%,#000_20%,transparent_72%)]"
-  >
-  </div>
+  <div class="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_85%_70%_at_50%_0%,#000_20%,transparent_72%)]"></div>
   <div
     class="absolute inset-x-0 top-0 h-px"
     style="background:linear-gradient(90deg,transparent,var(--c-accent),transparent)"
     aria-hidden="true"
-  >
-  </div>
+  ></div>
 
   <div class="relative mx-auto max-w-[88rem] px-4 pt-14 pb-16 sm:px-6 sm:pt-20 lg:px-10 lg:pb-28">
-    <div
-      class="grid items-center gap-14 lg:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)] lg:gap-16"
-    >
+    <div class="grid items-center gap-14 lg:grid-cols-[minmax(0,0.96fr)_minmax(0,1.04fr)] lg:gap-16">
       <!-- 左：文案 -->
       <div class="min-w-0 max-w-[36rem]">
         <a
@@ -62,29 +56,29 @@ try {
           class="reveal group inline-flex items-center gap-2 rounded-full border py-1 pr-3 pl-1.5 text-[0.78rem] transition-colors hover:border-[color:var(--c-line-strong)]"
           style="--reveal-i:0;border-color:var(--c-line);background:var(--c-surface);color:var(--c-fg-muted)"
         >
-          {
-            deployCoreVersion && (
-              <span
-                class="rounded-full px-2 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide"
-                style="background:var(--c-accent-soft);color:var(--c-accent)"
-              >
-                v{deployCoreVersion}
-              </span>
-            )
-          }
+          {deployCoreVersion && (
+            <span
+              class="rounded-full px-2 py-0.5 font-mono text-[0.65rem] font-medium tracking-wide"
+              style="background:var(--c-accent-soft);color:var(--c-accent)"
+            >
+              v{deployCoreVersion}
+            </span>
+          )}
           <span class="font-mono">@void/deploy-core</span>
         </a>
 
         <h1 class="reveal mt-7 text-display font-semibold" style="--reveal-i:1">
-          全栈开发，<br />类型<span class="text-signal">不断链</span>。
+          全栈开发，
+          <br />
+          类型<span class="text-signal">不断链</span>。
         </h1>
 
         <p
           class="reveal mt-7 max-w-[32rem] text-[1.06rem] leading-[1.85]"
           style="--reveal-i:2;color:var(--c-fg-muted)"
         >
-          Void 是运行在 Cloudflare Workers 之上、由 <span style="color:var(--c-fg)">Vite</span
-          > 驱动的全栈框架。 用 React、Vue、Svelte 或 Solid
+          Void 是运行在 Cloudflare Workers 之上、由 <span style="color:var(--c-fg)">Vite</span>{' '}
+          驱动的全栈框架。 用 React、Vue、Svelte 或 Solid
           构建界面，在同一个项目里编写服务端代码：路由、数据访问与部署连成一条线，类型从数据库查询一路贯穿到
           UI。
         </p>
@@ -123,8 +117,7 @@ try {
               class="ml-auto flex items-center gap-1.5 rounded border px-1.5 py-0.5 font-mono text-[0.6rem] uppercase"
               style="border-color:color-mix(in oklab, var(--c-green) 35%, transparent);color:var(--c-green)"
             >
-              <span class="size-1 rounded-full bg-current"></span>
-              0 处手动标注
+              <span class="size-1 rounded-full bg-current"></span>0 处手动标注
             </span>
           </div>
 
@@ -139,8 +132,9 @@ try {
               <span
                 class="ml-auto rounded border px-1.5 py-px text-[0.58rem] uppercase"
                 style="border-color:color-mix(in oklab, var(--c-accent) 32%, transparent);color:var(--c-accent)"
-                >真相来源</span
               >
+                真相来源
+              </span>
             </header>
             <div class="shiki-panel scroll-thin text-[0.755rem] leading-[1.62]">
               <ShikiCode code={schemaCode} lang="ts" />
@@ -209,8 +203,9 @@ try {
               <span
                 class="ml-auto rounded border px-1.5 py-px text-[0.58rem] uppercase"
                 style="border-color:color-mix(in oklab, var(--c-accent) 32%, transparent);color:var(--c-accent)"
-                >client</span
               >
+                client
+              </span>
             </header>
             <div class="shiki-panel scroll-thin text-[0.755rem] leading-[1.62]">
               <ShikiCode code={clientCode} lang="ts" />

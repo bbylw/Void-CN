@@ -11,23 +11,23 @@ import Callout from '@/components/docs/Callout.astro';
 
 以下值请从受保护的 CI secret 中注入。不要把它们提交进 workflow 或明文密钥文件。
 
-| 环境变量                                     | 取自交互式 setup 的值                                                                       |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`                       | 管理 API 令牌                                                                               |
-| `VOID_PLATFORM_RUNTIME_CLOUDFLARE_API_TOKEN` | 运行时 API 令牌                                                                             |
-| `VOID_PLATFORM_DATABASE_URL`                 | 专属 PostgreSQL URL                                                                         |
-| `VOID_PLATFORM_HYPERDRIVE_ID`                | 已存在、由外部管理的 Hyperdrive ID（如适用）                                                |
-| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_HOST`       | Hyperdrive origin 主机名（用于公开数据库 origin）                                           |
-| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_USER`       | Hyperdrive 运行期数据库用户                                                                 |
-| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_SERVICE_ID` | Workers VPC service ID（用于私有数据库 origin）                                             |
-| `VOID_PLATFORM_R2_ACCESS_KEY_ID`             | R2 Access Key ID                                                                            |
-| `VOID_PLATFORM_R2_SECRET_ACCESS_KEY`         | R2 Secret Access Key                                                                        |
-| `VOID_PLATFORM_JWT_SECRET`                   | 原始的 JWT 签名密钥                                                                         |
-| `VOID_PLATFORM_EMAIL_SIGNING_SECRET`         | 启用邮件时专用的邮件签名密钥                                                                |
-| `VOID_PLATFORM_PROJECT_SECRET_KEY`           | 原始的 base64 编码项目加密密钥                                                              |
-| `VOID_PLATFORM_RECOVERY_KEY`                 | 在没有 keychain 可用时，用于本地加密恢复状态的 base64 编码 32 字节密钥                      |
-| `VOID_EMAIL_SENDER_DOMAIN`                   | 可选的共享发信域名；需要 `VOID_EMAIL_SHARED_ZONE_ID`                                        |
-| `VOID_EMAIL_SHARED_ZONE_ID`                  | 该发信域名所在的 Cloudflare zone ID；需要 `VOID_EMAIL_SENDER_DOMAIN`                        |
+| 环境变量                                     | 取自交互式 setup 的值                                                  |
+| -------------------------------------------- | ---------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN`                       | 管理 API 令牌                                                          |
+| `VOID_PLATFORM_RUNTIME_CLOUDFLARE_API_TOKEN` | 运行时 API 令牌                                                        |
+| `VOID_PLATFORM_DATABASE_URL`                 | 专属 PostgreSQL URL                                                    |
+| `VOID_PLATFORM_HYPERDRIVE_ID`                | 已存在、由外部管理的 Hyperdrive ID（如适用）                           |
+| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_HOST`       | Hyperdrive origin 主机名（用于公开数据库 origin）                      |
+| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_USER`       | Hyperdrive 运行期数据库用户                                            |
+| `VOID_PLATFORM_HYPERDRIVE_ORIGIN_SERVICE_ID` | Workers VPC service ID（用于私有数据库 origin）                        |
+| `VOID_PLATFORM_R2_ACCESS_KEY_ID`             | R2 Access Key ID                                                       |
+| `VOID_PLATFORM_R2_SECRET_ACCESS_KEY`         | R2 Secret Access Key                                                   |
+| `VOID_PLATFORM_JWT_SECRET`                   | 原始的 JWT 签名密钥                                                    |
+| `VOID_PLATFORM_EMAIL_SIGNING_SECRET`         | 启用邮件时专用的邮件签名密钥                                           |
+| `VOID_PLATFORM_PROJECT_SECRET_KEY`           | 原始的 base64 编码项目加密密钥                                         |
+| `VOID_PLATFORM_RECOVERY_KEY`                 | 在没有 keychain 可用时，用于本地加密恢复状态的 base64 编码 32 字节密钥 |
+| `VOID_EMAIL_SENDER_DOMAIN`                   | 可选的共享发信域名；需要 `VOID_EMAIL_SHARED_ZONE_ID`                   |
+| `VOID_EMAIL_SHARED_ZONE_ID`                  | 该发信域名所在的 Cloudflare zone ID；需要 `VOID_EMAIL_SENDER_DOMAIN`   |
 
 对于已有的 Hyperdrive，设置它的 ID 与运行期用户，再加上 origin host 或 Workers VPC service ID 中的一个。host 与 service ID 不要同时设置。另外在 `VOID_PLATFORM_DATABASE_URL` 中单独提供数据库 owner 连接，好让 Void 能应用迁移。
 

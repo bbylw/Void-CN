@@ -85,11 +85,11 @@ badge: 可选徽标
 
 字体（均只取 latin 子集，中文由系统 CJK 字体承接）：
 
-| 用途      | 字体                                             |
-| --------- | ------------------------------------------------ |
-| 展示/标题 | Space Grotesk（`font-display`，h1–h3 自动应用）  |
-| 正文      | IBM Plex Sans                                    |
-| 代码      | JetBrains Mono                                   |
+| 用途      | 字体                                            |
+| --------- | ----------------------------------------------- |
+| 展示/标题 | Space Grotesk（`font-display`，h1–h3 自动应用） |
+| 正文      | IBM Plex Sans                                   |
+| 代码      | JetBrains Mono                                  |
 
 主题通过 `<html class="dark">` 切换，选择结果保存在 `localStorage` 的 `void-theme`，默认跟随系统偏好。
 

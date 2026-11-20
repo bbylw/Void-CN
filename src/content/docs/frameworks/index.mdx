@@ -13,14 +13,14 @@ TanStack Start 与 React Router 使用 Void 提供的 Cloudflare Vite 插件；S
 
 ## 识别方式
 
-| 框架                                    | 通过哪个依赖识别        | 集成方式                                                     |
-| --------------------------------------- | ----------------------- | ------------------------------------------------------------ |
-| [TanStack Start](/docs/frameworks/tanstack-start) | `@tanstack/react-start` | Vite 插件组合，`voidPlugin()` 与框架插件并列运行             |
-| [React Router v7](/docs/frameworks/react-router)  | `@react-router/dev`     | Vite 插件组合，接入方式与 TanStack Start 相同                |
-| [SvelteKit](/docs/frameworks/sveltekit)            | `@sveltejs/kit`         | 基于 Vite，使用它自己的 Cloudflare 适配器                    |
-| [Nuxt](/docs/frameworks/nuxt)                      | `nuxt`                  | 使用它自己的 CLI 与构建工具链                                |
-| [Analog](/docs/frameworks/analog)                  | `@analogjs/platform`    | 基于 Vite，使用 Nitro 加 Cloudflare preset                   |
-| [Astro **v7+**](/docs/frameworks/astro)            | `astro`                 | 使用它自己的 CLI 与 Cloudflare 适配器（要求 v7）             |
+| 框架                                              | 通过哪个依赖识别        | 集成方式                                         |
+| ------------------------------------------------- | ----------------------- | ------------------------------------------------ |
+| [TanStack Start](/docs/frameworks/tanstack-start) | `@tanstack/react-start` | Vite 插件组合，`voidPlugin()` 与框架插件并列运行 |
+| [React Router v7](/docs/frameworks/react-router)  | `@react-router/dev`     | Vite 插件组合，接入方式与 TanStack Start 相同    |
+| [SvelteKit](/docs/frameworks/sveltekit)           | `@sveltejs/kit`         | 基于 Vite，使用它自己的 Cloudflare 适配器        |
+| [Nuxt](/docs/frameworks/nuxt)                     | `nuxt`                  | 使用它自己的 CLI 与构建工具链                    |
+| [Analog](/docs/frameworks/analog)                 | `@analogjs/platform`    | 基于 Vite，使用 Nitro 加 Cloudflare preset       |
+| [Astro **v7+**](/docs/frameworks/astro)           | `astro`                 | 使用它自己的 CLI 与 Cloudflare 适配器（要求 v7） |
 
 识别是自动的：CLI 会读取你 `package.json` 里的依赖。
 
@@ -36,22 +36,24 @@ export default defineConfig({
 ```
 
 <Callout type="info" title="vinext 的中间件与静态文件">
-  在 vinext 应用中，`middleware.ts` 与 `proxy.ts` 同样作用于 `public/` 中的文件。存在任一文件时，静态请求也会经过 Worker 并计入其请求用量；没有中间件的应用保持静态资源直出。
+  在 vinext 应用中，`middleware.ts` 与 `proxy.ts` 同样作用于 `public/`
+  中的文件。存在任一文件时，静态请求也会经过 Worker
+  并计入其请求用量；没有中间件的应用保持静态资源直出。
 </Callout>
 
 ## 能力与限制
 
-| 能力                                       | 框架模式           |
-| ------------------------------------------ | ------------------ |
-| 绑定推断（D1、KV、R2、队列、AI…）          | 支持               |
-| 带类型的数据库代码生成与查询               | 支持               |
-| 迁移管理（`void db generate` / `migrate`） | 支持               |
-| 定时任务与队列                             | 支持               |
+| 能力                                       | 框架模式                                  |
+| ------------------------------------------ | ----------------------------------------- |
+| 绑定推断（D1、KV、R2、队列、AI…）          | 支持                                      |
+| 带类型的数据库代码生成与查询               | 支持                                      |
+| 迁移管理（`void db generate` / `migrate`） | 支持                                      |
+| 定时任务与队列                             | 支持                                      |
 | 环境变量（`void/env` 校验值）              | TanStack Start、React Router、vinext 支持 |
-| 缓存与路由规则                             | 支持               |
-| 部署（Cloudflare 与 Void 平台）            | 支持               |
-| 页面模式（loaders / actions）              | 不适用，由框架负责 |
-| Void 托管的认证                            | 不支持             |
+| 缓存与路由规则                             | 支持                                      |
+| 部署（Cloudflare 与 Void 平台）            | 支持                                      |
+| 页面模式（loaders / actions）              | 不适用，由框架负责                        |
+| Void 托管的认证                            | 不支持                                    |
 
 在框架的 Vite 配置里加上 `voidPlugin()` 之后，框架应用就能获得与 [Void 应用](/docs/app-types) 基本一致的后端与平台能力：
 
@@ -99,13 +101,13 @@ export default defineConfig({
 });
 ```
 
-| 字段                 | 用途                                                                                                                                        |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `inference.build`    | 覆盖默认的构建命令                                                                                                                          |
-| `inference.scanDirs` | 绑定推断要扫描的目录（默认值因框架而异）                                                                                                    |
-| `routing.prerender`  | 部署时预渲染为静态 HTML 的路径                                                                                                              |
-| `routing.revalidate` | 被缓存响应的默认再验证 TTL（秒）                                                                                                            |
-| `inference.bindings` | 覆盖推断出的绑定。仅当自动检测不符合预期时才需要它，取值 `true` 或自定义绑定名，例如 `"db": "MY_DB"`。                                      |
+| 字段                 | 用途                                                                                                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `inference.build`    | 覆盖默认的构建命令                                                                                                                                                |
+| `inference.scanDirs` | 绑定推断要扫描的目录（默认值因框架而异）                                                                                                                          |
+| `routing.prerender`  | 部署时预渲染为静态 HTML 的路径                                                                                                                                    |
+| `routing.revalidate` | 被缓存响应的默认再验证 TTL（秒）                                                                                                                                  |
+| `inference.bindings` | 覆盖推断出的绑定。仅当自动检测不符合预期时才需要它，取值 `true` 或自定义绑定名，例如 `"db": "MY_DB"`。                                                            |
 | `routing.notFound`   | **会被忽略。** SvelteKit、Nuxt、Analog 与 Astro 会把 `not_found_handling` 固定为 `"none"`——未匹配的 HTML 由框架 Worker 负责。设置了它，`void deploy` 会给出警告。 |
 
 完整参考见[配置](/docs/config)。

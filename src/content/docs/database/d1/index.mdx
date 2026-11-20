@@ -44,17 +44,18 @@ await db.batch([
 <Callout type="warn" title="已部署过的数据库可能已经开启副本">
   Void **0.21.3** 曾自动开启 D1 读副本。如果你用该版本或之后的版本、在副本改为显式开启之前部署过，你的数据库可能已经启用了副本，而副本会在请求之间提供陈旧数据。
 
-  除非你的应用确实要用副本并按下文处理一致性，否则我们建议：升级到支持 `database.readReplication` 的 Void 版本，在 `void.config.ts` 中把它设为 `false`，然后运行 `void deploy`。
+除非你的应用确实要用副本并按下文处理一致性，否则我们建议：升级到支持 `database.readReplication` 的 Void 版本，在 `void.config.ts` 中把它设为 `false`，然后运行 `void deploy`。
 
-  ```ts title="void.config.ts"
-  import { defineConfig } from 'void/config';
+```ts title="void.config.ts"
+import { defineConfig } from 'void/config';
 
-  export default defineConfig({
-    database: { readReplication: false },
-  });
-  ```
+export default defineConfig({
+  database: { readReplication: false },
+});
+```
 
-  如果你自托管 Void 平台，部署前也要一并升级它。平台无法应用 `database.readReplication` 时，`void deploy` 会在上传任何东西之前报错停下。只升级版本、或者删掉这个选项，都**不会**关闭已经开启的副本。
+如果你自托管 Void 平台，部署前也要一并升级它。平台无法应用 `database.readReplication` 时，`void deploy` 会在上传任何东西之前报错停下。只升级版本、或者删掉这个选项，都**不会**关闭已经开启的副本。
+
 </Callout>
 
 [D1 读副本](https://developers.cloudflare.com/d1/best-practices/read-replication/)需要显式开启。在 `void.config.ts` 里设置后运行 `void deploy`：
@@ -74,7 +75,9 @@ export default defineConfig({
 通过 `void/db` 的 `db` 发起的查询，会为每个 Void 请求使用一个 D1 session。开启副本后，读取可以在靠近请求的位置执行，且同一请求中后续的查询能看到至少相同的数据。没有 Void 请求作用域的框架处理器会让每个数据库操作从主库开始；`createDb` 则为你传入的绑定开启一个可用副本的 session。
 
 <Callout type="warn">
-  副本在请求之间可能滞后。请[携带 bookmark](#在后续请求里看到自己的写入)来保留先前观察到的数据库状态，或者在需要最新主库数据时使用[primary-first session](#用-primary-first-session-避开陈旧读)。
+  副本在请求之间可能滞后。请[携带
+  bookmark](#在后续请求里看到自己的写入)来保留先前观察到的数据库状态，或者在需要最新主库数据时使用[primary-first
+  session](#用-primary-first-session-避开陈旧读)。
 </Callout>
 
 原始 D1 调用或其他查询库要用 `withSession()` 才能读到副本。裸的 D1 绑定始终从主库读取。
@@ -104,7 +107,10 @@ export const GET = defineHandler(async () => {
 已保存的 bookmark 只适用于签发它的那个数据库。不同数据库与环境要用不同的 cookie 名或浏览器存储 key，切换到别的数据库时请清掉已存的 bookmark。清除 bookmark 即开启一条新的一致性链，后续请求不再带有先前 bookmark 的保证。请把它当作不透明字符串，不要解析或自行构造。
 
 <Callout type="warn">
-  bookmark 约束的是数据库查询，不是缓存的响应。缓存的响应可以早于你的写入而完全不执行查询。参与的页面要关闭 ISR（在页面的 `.server.ts` 文件里 `export const revalidate = 0`），并绕过这些路由上已有的响应缓存。只设置响应头不足以绕过 ISR 命中。
+  bookmark
+  约束的是数据库查询，不是缓存的响应。缓存的响应可以早于你的写入而完全不执行查询。参与的页面要关闭
+  ISR（在页面的 `.server.ts` 文件里 `export const revalidate =
+  0`），并绕过这些路由上已有的响应缓存。只设置响应头不足以绕过 ISR 命中。
 </Callout>
 
 用中间件在处理器或 Pages loader 运行之前设定默认 `db` 的 session，并在它们的查询结束后返回对应的 bookmark。对于浏览器应用，用一个 cookie 在重定向与页面跳转之间携带它。
@@ -116,7 +122,9 @@ export const GET = defineHandler(async () => {
 一致性关键的数据库操作要在处理器或 loader 返回之前 await。中间件取回响应 bookmark 之后才结束的延后或后台查询，不保证被反映进去。
 
 <Callout type="warn">
-  并发的响应可能用较旧的 bookmark 覆盖这个 cookie。[基于请求头的配方](#并发客户端的-api-请求)能在并发的 API 响应之间保留最新的 bookmark。清除 bookmark 存储或让它过期，会开启一条新的 bookmark 链。
+  并发的响应可能用较旧的 bookmark 覆盖这个
+  cookie。[基于请求头的配方](#并发客户端的-api-请求)能在并发的 API 响应之间保留最新的 bookmark。清除
+  bookmark 存储或让它过期，会开启一条新的 bookmark 链。
 </Callout>
 
 <Callout type="info">
@@ -159,7 +167,8 @@ export default defineMiddleware(async (c, next) => {
 对于下面这个浏览器 fetch 包装器发出的请求，用这个中间件交换 bookmark。它只把 `/api/profile` 及其子路径纳入 bookmark 处理并返回不缓存的响应，请按你参与一致性处理的路由调整路径。
 
 <Callout type="warn">
-  这个配方只通过下面的 fetch 包装器携带 bookmark，不覆盖普通的页面跳转、表单提交或 Pages 请求，也不与基于 cookie 的配方共享 bookmark。
+  这个配方只通过下面的 fetch 包装器携带 bookmark，不覆盖普通的页面跳转、表单提交或 Pages
+  请求，也不与基于 cookie 的配方共享 bookmark。
 </Callout>
 
 <Callout type="info">
@@ -260,7 +269,8 @@ export async function saveAndReadProfile(accountId: string, name: string) {
 只有 `/profile`、`/api/profile` 及其子路径参与处理，并返回 `Cache-Control: private, no-store`。请按你的应用调整这份列表，在参与的页面上关闭 ISR，并保持无关路由的缓存策略不变。
 
 <Callout type="warn">
-  fetch 包装器能在并发响应之间保留最新的 bookmark，但 cookie 仍可能被乱序覆盖。如果重定向的目标页必须读到最新数据，请使用 primary-first session。
+  fetch 包装器能在并发响应之间保留最新的 bookmark，但 cookie
+  仍可能被乱序覆盖。如果重定向的目标页必须读到最新数据，请使用 primary-first session。
 </Callout>
 
 ```ts title="middleware/01.database.ts"
@@ -362,5 +372,6 @@ const { results } = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bin
 无论使用哪种查询层，Void 仍然负责绑定推断与部署。
 
 <Callout type="warn" title="元框架的限制">
-  Nuxt 与 SvelteKit 2 在本地开发期间不支持 `cloudflare:workers` 导入。请改用 `void/db` 或框架自己的绑定访问 API。SvelteKit 3 支持这些导入。
+  Nuxt 与 SvelteKit 2 在本地开发期间不支持 `cloudflare:workers` 导入。请改用 `void/db`
+  或框架自己的绑定访问 API。SvelteKit 3 支持这些导入。
 </Callout>

@@ -74,6 +74,7 @@ TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校�
 较高级的 Better Auth 配置。
 
 用 `auth.providers` 选择 Void 默认应启用哪些内置认证提供方。需要邮箱/密码登录就包含 `"email"`。社交提供方从 `AUTH_<PROVIDER>_CLIENT_ID` 与 `AUTH_<PROVIDER>_CLIENT_SECRET` 读取凭据。`cognito` 还需要域名、区域与用户池 ID：设置 `AUTH_COGNITO_DOMAIN`、`AUTH_COGNITO_REGION` 与 `AUTH_COGNITO_USER_POOL_ID`，或者在 `auth.ts` 中设置。
+
 ```json title="void.config.json"
 {
   "auth": {
@@ -132,11 +133,11 @@ TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校�
 }
 ```
 
-| 取值          | 说明                                                   |
-| ------------- | ------------------------------------------------------ |
-| _(省略)_      | D1（SQLite），由 Void 全托管，无需额外配置             |
-| `"pg"`        | 通过 Hyperdrive 使用 PostgreSQL；数据库自带            |
-| `"mysql"`     | 通过 Hyperdrive 使用 MySQL；数据库自带                 |
+| 取值      | 说明                                        |
+| --------- | ------------------------------------------- |
+| _(省略)_  | D1（SQLite），由 Void 全托管，无需额外配置  |
+| `"pg"`    | 通过 Hyperdrive 使用 PostgreSQL；数据库自带 |
+| `"mysql"` | 通过 Hyperdrive 使用 MySQL；数据库自带      |
 
 `database` 也可以写成对象，用来指定方言，以及 `void/db` 查询与 `void db` 命令在未声明列名时采用的命名方式：
 
@@ -144,11 +145,11 @@ TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校�
 { "database": { "dialect": "pg", "casing": "snake_case" } }
 ```
 
-| 键                | 取值                                          | 说明                                                                                       |
-| ----------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `dialect`         | `"sqlite"`（默认）、`"pg"`、`"mysql"`         | 数据库后端。`"sqlite"` 即 D1                                                               |
-| `casing`          | `"snake_case"`、`"camelCase"`                 | [Drizzle 命名风格](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing)，作用于 `void/db` 查询与 `void db` 命令。省略时以键名作为列名 |
-| `readReplication` | `boolean`（可选）                             | 仅 D1。部署时开启（`true`）或关闭（`false`）[读复制](/docs/database/d1)。省略则保留现有设置，新数据库默认关闭 |
+| 键                | 取值                                  | 说明                                                                                                                                                          |
+| ----------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dialect`         | `"sqlite"`（默认）、`"pg"`、`"mysql"` | 数据库后端。`"sqlite"` 即 D1                                                                                                                                  |
+| `casing`          | `"snake_case"`、`"camelCase"`         | [Drizzle 命名风格](https://orm.drizzle.team/docs/sql-schema-declaration#camel-and-snake-casing)，作用于 `void/db` 查询与 `void db` 命令。省略时以键名作为列名 |
+| `readReplication` | `boolean`（可选）                     | 仅 D1。部署时开启（`true`）或关闭（`false`）[读复制](/docs/database/d1)。省略则保留现有设置，新数据库默认关闭                                                 |
 
 使用外部数据库时：
 
@@ -169,8 +170,8 @@ TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校�
 }
 ```
 
-| 字段   | 类型     | 说明                                                                                             |
-| ------ | -------- | -------------------------------------------------------------------------------------------------- |
+| 字段   | 类型     | 说明                                                                                 |
+| ------ | -------- | ------------------------------------------------------------------------------------ |
 | `from` | `string` | `sendEmail()` 的默认发件人：一个地址，可以带显示名（`Acme <noreply@mail.acme.com>`） |
 
 开发期间，`email.from` 是本地收件箱的默认发件人。在 Void 平台上，请使用项目的共享发件人或已注册的域名。
@@ -181,15 +182,15 @@ TypeScript 会提供编辑器补全与检查，Void 在运行时还会再次校�
 
 pages 模式下站点级的 HTML `<head>` 默认值。用于设置标题模板、默认 meta 标签、link、script 以及 html/body 属性。页面级的 `head()` 导出与中间件默认值会按明确的优先级叠加在其上：**页面 > 中间件 > 配置**。
 
-| 字段            | 类型                     | 说明                                                              |
-| --------------- | ------------------------ | ------------------------------------------------------------------- |
-| `title`         | `string`                 | 默认页面标题（被页面 `head()` 覆盖）                              |
-| `titleTemplate` | `string`                 | 包裹最终标题。`%s` 会被替换为页面标题。                           |
-| `meta`          | `Array<object>`          | 默认 `<meta>` 标签（按 `name`/`property` 去重，页面优先）         |
-| `link`          | `Array<object>`          | 默认 `<link>` 标签（顺序拼接：配置、中间件、页面）                |
-| `script`        | `Array<object>`          | 默认 `<script>` 标签（顺序拼接：配置、中间件、页面）              |
-| `htmlAttrs`     | `Record<string, string>` | `<html>` 上的属性（浅合并，页面优先）                             |
-| `bodyAttrs`     | `Record<string, string>` | `<body>` 上的属性（浅合并，页面优先）                             |
+| 字段            | 类型                     | 说明                                                      |
+| --------------- | ------------------------ | --------------------------------------------------------- |
+| `title`         | `string`                 | 默认页面标题（被页面 `head()` 覆盖）                      |
+| `titleTemplate` | `string`                 | 包裹最终标题。`%s` 会被替换为页面标题。                   |
+| `meta`          | `Array<object>`          | 默认 `<meta>` 标签（按 `name`/`property` 去重，页面优先） |
+| `link`          | `Array<object>`          | 默认 `<link>` 标签（顺序拼接：配置、中间件、页面）        |
+| `script`        | `Array<object>`          | 默认 `<script>` 标签（顺序拼接：配置、中间件、页面）      |
+| `htmlAttrs`     | `Record<string, string>` | `<html>` 上的属性（浅合并，页面优先）                     |
+| `bodyAttrs`     | `Record<string, string>` | `<body>` 上的属性（浅合并，页面优先）                     |
 
 ```json title="void.config.json"
 {
@@ -211,10 +212,10 @@ pages 模式下站点级的 HTML `<head>` 默认值。用于设置标题模板�
 
 输出模式，控制页面的默认渲染策略。
 
-| 取值                 | 默认预渲染        | 单页覆盖                           | 预渲染时机               |
-| -------------------- | ----------------- | ---------------------------------- | ------------------------ |
-| `"server"`（默认）   | `false`           | `export const prerender = true`    | 部署时（平台 ISR）       |
-| `"static"`           | `true`            | `export const prerender = false`   | 构建时或部署的构建之后   |
+| 取值               | 默认预渲染 | 单页覆盖                         | 预渲染时机             |
+| ------------------ | ---------- | -------------------------------- | ---------------------- |
+| `"server"`（默认） | `false`    | `export const prerender = true`  | 部署时（平台 ISR）     |
+| `"static"`         | `true`     | `export const prerender = false` | 构建时或部署的构建之后 |
 
 设为 `"static"` 时，页面会被预渲染成 `dist/client/` 下的 HTML。单个页面可以用 `export const prerender = false` 退出。动态页面需要 [`getPrerenderPaths()`](/docs/ssg) 才会被预渲染；给它的返回类型标注 [`PageParams`](/docs/reference/api/types)，TypeScript 就会检查参数名。
 
@@ -258,15 +259,15 @@ VOID_REMOTE=1 pnpm dev
 }
 ```
 
-| 字段                | 类型     | 默认值                      |
-| ------------------- | -------- | --------------------------- |
-| `binding`           | `string` | `SANDBOX`                   |
-| `className`         | `string` | `SandboxV1`                 |
-| `containerName`     | `string` | `void-sandbox-v1`           |
+| 字段                | 类型     | 默认值                        |
+| ------------------- | -------- | ----------------------------- |
+| `binding`           | `string` | `SANDBOX`                     |
+| `className`         | `string` | `SandboxV1`                   |
+| `containerName`     | `string` | `void-sandbox-v1`             |
 | `image`             | `string` | 随包提供的 Node.js Dockerfile |
-| `imageBuildContext` | `string` | `image` 所在目录            |
-| `platformImage`     | `string` | `cloudflare/debian-trixie`  |
-| `instanceType`      | `string` | `lite`                      |
+| `imageBuildContext` | `string` | `image` 所在目录              |
+| `platformImage`     | `string` | `cloudflare/debian-trixie`    |
+| `instanceType`      | `string` | `lite`                        |
 
 支持的规格是 `lite`、`basic` 以及 `standard-1` 到 `standard-4`。原生部署用 Docker 构建 Dockerfile；registry 镜像必须是 Cloudflare 托管 registry 中带 digest 的引用。自定义镜像必须包含配套的 Sandbox SDK helper。如果用的是本地 Dockerfile，在部署到托管平台时请提供 `platformImage`。镜像准备与运行时示例见 [Sandboxes](/docs/sandboxes)。
 
@@ -276,12 +277,12 @@ Sandbox 需要 [Workers Paid](https://dash.cloudflare.com/?to=/:account/workers/
 
 部署目标的运行时，默认 `"cloudflare"`。
 
-| 取值           | 说明                                                   |
-| -------------- | -------------------------------------------------------- |
-| `"cloudflare"` | Cloudflare Workers（默认），具备完整平台特性             |
-| `"node"`       | Node.js，使用 `@hono/node-server`                      |
-| `"bun"`        | Bun，使用 `Bun.serve()`                                |
-| `"deno"`       | Deno，使用 `Deno.serve()`                              |
+| 取值           | 说明                                         |
+| -------------- | -------------------------------------------- |
+| `"cloudflare"` | Cloudflare Workers（默认），具备完整平台特性 |
+| `"node"`       | Node.js，使用 `@hono/node-server`            |
+| `"bun"`        | Bun，使用 `Bun.serve()`                      |
+| `"deno"`       | Deno，使用 `Deno.serve()`                    |
 
 非 Cloudflare 目标会禁用 CF 绑定导入（`void/db`、`void/kv`、`void/auth`、`void/storage`、`void/ai`、`void/sandbox`、`void/env`）。在非 CF 目标下导入其中任何一个都会产生编译期错误。基于文件的路由、中间件与 `void/client` 都照常工作。
 
@@ -305,12 +306,12 @@ Void 托管的 WebSocket 路由文件（`*.ws.ts`）仅限 Cloudflare，因为�
 
 Cloudflare Workers 的设置，包括 `void init` 固定的 `compatibility_date`。`d1_databases`、`kv_namespaces`、`r2_buckets` 这类绑定数组请写在 [`cloudflare`](#cloudflare) 里。
 
-| 字段                  | 类型       | 说明                                   |
-| --------------------- | ---------- | ---------------------------------------- |
-| `compatibility_date`  | `string`   | Cloudflare Workers 兼容日期            |
-| `compatibility_flags` | `string[]` | Cloudflare Workers 兼容标志            |
-| `vars`                | `object`   | 明文 worker 变量                       |
-| `limits`              | `object`   | Worker 资源限额覆盖                    |
+| 字段                  | 类型       | 说明                        |
+| --------------------- | ---------- | --------------------------- |
+| `compatibility_date`  | `string`   | Cloudflare Workers 兼容日期 |
+| `compatibility_flags` | `string[]` | Cloudflare Workers 兼容标志 |
+| `vars`                | `object`   | 明文 worker 变量            |
+| `limits`              | `object`   | Worker 资源限额覆盖         |
 
 ```json title="void.config.json"
 {
@@ -593,13 +594,13 @@ SvelteKit、Nuxt、Analog 与 Astro 使用它们自己的错误页面，会忽�
 { "inference": { "bindings": { "db": true, "kv": false, "storage": "MY_BUCKET", "ai": "MY_AI" } } }
 ```
 
-| 键        | 默认绑定    | 类型          | 自定义名称               |
-| --------- | ----------- | ------------- | ------------------------ |
-| `db`      | `DB`        | `D1Database`  | `"db": "MY_DB"`          |
-| `kv`      | `KV`        | `KVNamespace` | `"kv": "MY_KV"`          |
-| `storage` | `STORAGE`   | `R2Bucket`    | `"storage": "MY_BUCKET"` |
-| `ai`      | `AI`        | `Ai`          | `"ai": "MY_AI"`          |
-| `email`   | —           | —             | 只能是布尔值             |
+| 键        | 默认绑定  | 类型          | 自定义名称               |
+| --------- | --------- | ------------- | ------------------------ |
+| `db`      | `DB`      | `D1Database`  | `"db": "MY_DB"`          |
+| `kv`      | `KV`      | `KVNamespace` | `"kv": "MY_KV"`          |
+| `storage` | `STORAGE` | `R2Bucket`    | `"storage": "MY_BUCKET"` |
+| `ai`      | `AI`      | `Ai`          | `"ai": "MY_AI"`          |
+| `email`   | —         | —             | 只能是布尔值             |
 
 自定义绑定名在开发与部署期间都适用于 `void/db`、`void/kv` 与 `void/storage`。自定义 AI 名称在直连 Cloudflare 部署时也适用于 `void/ai`；托管的 Workers AI 使用平台的代理。
 

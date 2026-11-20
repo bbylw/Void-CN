@@ -18,7 +18,8 @@ void github link
 通过浏览器把已登录的 Void 账户与 GitHub 关联起来。`void github install` 在需要时会自动完成这一步。
 
 <Callout type="warn" title="已有 GitHub 登录">
-  一个 GitHub 身份只能属于一个 Void 账户。如果它已经关联到其他账户，请登录那个 Void 账户，或者授权另一个 GitHub 身份。
+  一个 GitHub 身份只能属于一个 Void 账户。如果它已经关联到其他账户，请登录那个 Void
+  账户，或者授权另一个 GitHub 身份。
 </Callout>
 
 ## `void github install`
@@ -59,14 +60,14 @@ void github connect [project] [options]
 
 **选项**
 
-| Flag                  | 说明                                                                             |
-| --------------------- | -------------------------------------------------------------------------------- |
-| `--project <name>`    | 项目名（位置参数的别名）                                                         |
-| `--installation <id>` | GitHub App installation ID（你有多个 installation 时必填）                       |
-| `--repo <owner/repo>` | 仓库全名——除非该 installation 恰好只授权一个仓库，否则必填                       |
-| `--branch <name>`     | 部署来源分支——**非交互模式下必填**                                               |
-| `--executor <type>`   | 构建执行器：`container`（默认）或 `github_actions`                               |
-| `--workflow <path>`   | 被授权的部署 workflow 文件——默认为 `.github/workflows/void-deploy.yml`          |
+| Flag                  | 说明                                                                   |
+| --------------------- | ---------------------------------------------------------------------- |
+| `--project <name>`    | 项目名（位置参数的别名）                                               |
+| `--installation <id>` | GitHub App installation ID（你有多个 installation 时必填）             |
+| `--repo <owner/repo>` | 仓库全名——除非该 installation 恰好只授权一个仓库，否则必填             |
+| `--branch <name>`     | 部署来源分支——**非交互模式下必填**                                     |
+| `--executor <type>`   | 构建执行器：`container`（默认）或 `github_actions`                     |
+| `--workflow <path>`   | 被授权的部署 workflow 文件——默认为 `.github/workflows/void-deploy.yml` |
 
 平台构建选择 `container`，部署 workflow 选择 `github_actions`。CLI 会询问执行器，以及 GitHub Actions 对应的 workflow 文件；传入相应 flag 即可跳过这些询问。
 
@@ -95,12 +96,12 @@ void github update [project] [options]
 
 **选项**
 
-| Flag                | 说明                                                           |
-| ------------------- | -------------------------------------------------------------- |
-| `--project <name>`  | 项目名（位置参数的别名）                                       |
-| `--branch <name>`   | 新的部署来源分支                                               |
-| `--executor <type>` | 新的构建执行器：`container` 或 `github_actions`                |
-| `--workflow <path>` | 新的被授权部署 workflow 文件（位于 `.github/workflows/` 下）   |
+| Flag                | 说明                                                         |
+| ------------------- | ------------------------------------------------------------ |
+| `--project <name>`  | 项目名（位置参数的别名）                                     |
+| `--branch <name>`   | 新的部署来源分支                                             |
+| `--executor <type>` | 新的构建执行器：`container` 或 `github_actions`              |
+| `--workflow <path>` | 新的被授权部署 workflow 文件（位于 `.github/workflows/` 下） |
 
 CLI 会以当前值为默认逐项询问新设置。在 CI 中，请至少传入 `--branch`、`--executor` 或 `--workflow` 之一。
 
@@ -118,9 +119,9 @@ void github status [project]
 
 **选项**
 
-| Flag               | 说明                                     |
-| ------------------ | ---------------------------------------- |
-| `--project <name>` | 项目名（位置参数的别名）                 |
+| Flag               | 说明                     |
+| ------------------ | ------------------------ |
+| `--project <name>` | 项目名（位置参数的别名） |
 
 ```sh
 void github status my-app
@@ -138,10 +139,10 @@ void github disconnect [project]
 
 **选项**
 
-| Flag               | 说明                                                |
-| ------------------ | --------------------------------------------------- |
-| `--project <name>` | 项目名（位置参数的别名）                            |
-| `--yes`            | 跳过确认提示（非交互 shell 中必需）                 |
+| Flag               | 说明                                |
+| ------------------ | ----------------------------------- |
+| `--project <name>` | 项目名（位置参数的别名）            |
+| `--yes`            | 跳过确认提示（非交互 shell 中必需） |
 
 ```sh
 void github disconnect my-app --yes
@@ -159,11 +160,11 @@ void build logs [build] [--follow] [--output <file>] [--project <slug>]
 
 流式输出、截尾查看或下载一次 **container** 构建的构建日志。不带 `[build]` 参数时，目标是该项目最近一次构建。
 
-| Flag                     | 用途                                                                 | 默认值 |
-| ------------------------ | -------------------------------------------------------------------- | ------ |
-| `--follow`, `-f`         | 实时跟踪：轮询直到构建结束并取到最终日志。                           | 关闭   |
-| `--output <file>`, `-o`  | 把日志写入文件而不是 stdout（跟踪模式下以追加方式写入）。            | stdout |
-| `--project <slug>`, `-p` | 目标项目。                                                           | 已关联 |
+| Flag                     | 用途                                                      | 默认值 |
+| ------------------------ | --------------------------------------------------------- | ------ |
+| `--follow`, `-f`         | 实时跟踪：轮询直到构建结束并取到最终日志。                | 关闭   |
+| `--output <file>`, `-o`  | 把日志写入文件而不是 stdout（跟踪模式下以追加方式写入）。 | stdout |
+| `--project <slug>`, `-p` | 目标项目。                                                | 已关联 |
 
 运行在 **GitHub Actions** 上的构建把日志留在 GitHub——该命令会打印 Actions run 的 URL 而不是做流式输出。container 构建只保留最后 10000 行日志。
 
