@@ -19,13 +19,24 @@ export default defineConfig({
 
 <ApiTable
   rows={[
-    { name: 'persistTo', type: 'string', description: '持久化本地开发状态（D1、KV、R2）的目录路径，默认项目根目录下的 .void/' },
-    { name: 'auxiliaryWorkers', type: 'AuxiliaryWorkerConfig[]', description: '与你的应用一起运行的额外 Worker，例如共享绑定的独立 API Worker 与管理后台。每一项接受 configPath（JSON、JSONC 或 TOML）、config（配置对象或回调）、viteEnvironment 与 devOnly' },
+    {
+      name: 'persistTo',
+      type: 'string',
+      description: '持久化本地开发状态（D1、KV、R2）的目录路径，默认项目根目录下的 .void/',
+    },
+    {
+      name: 'auxiliaryWorkers',
+      type: 'AuxiliaryWorkerConfig[]',
+      description:
+        '与你的应用一起运行的额外 Worker，例如共享绑定的独立 API Worker 与管理后台。每一项接受 configPath（JSON、JSONC 或 TOML）、config（配置对象或回调）、viteEnvironment 与 devOnly',
+    },
   ]}
 />
 
 ## 项目配置
+
 ### `defineConfig(config)`
+
 在根目录的 `void.config.ts` 中从 `void/config` 导入。它返回带有编辑器补全与 TypeScript 检查的配置。Void 在加载配置时会再次校验结果，包括运行时计算出的值。
 
 ```ts

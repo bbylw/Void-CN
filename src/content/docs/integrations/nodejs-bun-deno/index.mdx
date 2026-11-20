@@ -105,15 +105,15 @@ dist/
 
 以下导入在非 Cloudflare target 上**不可用**，会产生编译期错误：
 
-| 导入           | Cloudflare 特性          |
-| -------------- | ------------------------ |
-| `void/db`      | D1（SQL 数据库）         |
-| `void/kv`      | KV（键值存储）           |
-| `void/storage` | R2（对象存储）           |
-| `void/auth`    | Void 托管的 Better Auth  |
-| `void/ai`      | Workers AI               |
-| `void/sandbox` | Cloudflare Sandboxes     |
-| `void/env`     | 带类型的环境变量 schema  |
+| 导入           | Cloudflare 特性         |
+| -------------- | ----------------------- |
+| `void/db`      | D1（SQL 数据库）        |
+| `void/kv`      | KV（键值存储）          |
+| `void/storage` | R2（对象存储）          |
+| `void/auth`    | Void 托管的 Better Auth |
+| `void/ai`      | Workers AI              |
+| `void/sandbox` | Cloudflare Sandboxes    |
+| `void/env`     | 带类型的环境变量 schema |
 
 需要数据库或存储时，请使用外部服务商，并通过标准 Node.js 库连接。
 

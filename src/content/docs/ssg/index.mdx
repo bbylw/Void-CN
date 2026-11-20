@@ -69,10 +69,10 @@ export async function getPrerenderPaths(): Promise<PageParams<'/blog/[slug]'>[]>
 
 ## 与边缘预渲染的对比
 
-| `output` 取值        | 默认 prerender    | 页面级覆盖                       | 预渲染时机                 |
-| -------------------- | ----------------- | -------------------------------- | -------------------------- |
-| `"server"`（默认）   | `false`           | `export const prerender = true`  | 部署时（平台 ISR）         |
-| `"static"`           | `true`            | `export const prerender = false` | 构建期或部署后的 post-build |
+| `output` 取值      | 默认 prerender | 页面级覆盖                       | 预渲染时机                  |
+| ------------------ | -------------- | -------------------------------- | --------------------------- |
+| `"server"`（默认） | `false`        | `export const prerender = true`  | 部署时（平台 ISR）          |
+| `"static"`         | `true`         | `export const prerender = false` | 构建期或部署后的 post-build |
 
 在默认的 `output: "server"` 下，请使用 `export const prerender = true` 做部署时的[边缘预渲染](/docs/edge/prerendering)。
 
@@ -94,8 +94,8 @@ export async function getPrerenderPaths(): Promise<PageParams<'/blog/[slug]'>[]>
 
 `inference.appType` 字段描述的是应用类型（SPA、static、void），而 `output` 控制的是渲染策略：
 
-|              | `inference.appType: "static"`                   | `output: "static"`                            |
-| ------------ | ----------------------------------------------- | --------------------------------------------- |
-| **是什么**   | 部署一个已经构建好的静态站点（不使用 Void 插件） | 在构建期预渲染一个 Void 应用                  |
-| **Worker**   | 没有（只有静态资源）                            | 只在服务端代码与边缘规则时需要                |
-| **适用场景** | VitePress、纯 HTML、外部 SSG 工具               | 内容基本或完全静态的 Void 应用                |
+|              | `inference.appType: "static"`                    | `output: "static"`             |
+| ------------ | ------------------------------------------------ | ------------------------------ |
+| **是什么**   | 部署一个已经构建好的静态站点（不使用 Void 插件） | 在构建期预渲染一个 Void 应用   |
+| **Worker**   | 没有（只有静态资源）                             | 只在服务端代码与边缘规则时需要 |
+| **适用场景** | VitePress、纯 HTML、外部 SSG 工具                | 内容基本或完全静态的 Void 应用 |

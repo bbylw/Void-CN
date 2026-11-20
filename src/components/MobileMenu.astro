@@ -71,24 +71,25 @@ import { HOME_NAV } from '../data/site';
     </div>
 
     <nav class="flex flex-col" aria-label="移动端导航">
-      {
-        HOME_NAV.map((l, i) => (
-          <a
-            href={l.href}
-            data-menu-link
-            class="flex items-baseline gap-3 border-b py-3.5 text-[1.05rem] font-medium"
-            style="border-color:var(--c-line);color:var(--c-fg)"
-          >
-            <span class="font-mono text-[0.68rem]" style="color:var(--c-fg-subtle)">
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            {l.title}
-          </a>
-        ))
-      }
+      {HOME_NAV.map((l, i) => (
+        <a
+          href={l.href}
+          data-menu-link
+          class="flex items-baseline gap-3 border-b py-3.5 text-[1.05rem] font-medium"
+          style="border-color:var(--c-line);color:var(--c-fg)"
+        >
+          <span class="font-mono text-[0.68rem]" style="color:var(--c-fg-subtle)">
+            {String(i + 1).padStart(2, '0')}
+          </span>
+          {l.title}
+        </a>
+      ))}
     </nav>
 
-    <a href="/docs/quickstart" data-menu-link class="btn btn-primary mt-1 w-full"> 快速开始 </a>
+    <a href="/docs/quickstart" data-menu-link class="btn btn-primary mt-1 w-full">
+      {' '}
+      快速开始{' '}
+    </a>
   </div>
 </dialog>
 

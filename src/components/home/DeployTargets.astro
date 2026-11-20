@@ -49,24 +49,32 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
         <div>
           <span style="color:var(--c-fg-subtle)">$</span> void connect --platform cloudflare
         </div>
-        <div><span style="color:var(--c-fg-subtle)">$</span> void deploy</div>
+        <div>
+          <span style="color:var(--c-fg-subtle)">$</span> void deploy
+        </div>
       </div>
       <ul
         class="mt-5 space-y-2 border-t pt-5 text-[0.86rem]"
         style="border-color:var(--c-line);color:var(--c-fg-muted)"
       >
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.5em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           资源直接开通在你的账户中
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.5em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           支持自定义应用域名
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.5em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           日志使用 Cloudflare 实时 tail
         </li>
@@ -78,8 +86,7 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
         class="pointer-events-none absolute inset-x-0 -top-px h-px"
         style="background:linear-gradient(90deg,transparent,var(--c-accent),transparent)"
         aria-hidden="true"
-      >
-      </div>
+      ></div>
       <div class="flex items-center gap-3">
         <span
           class="grid size-10 place-items-center rounded-xl border"
@@ -91,13 +98,16 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
           <h3 class="text-[1.15rem] font-semibold tracking-[-0.02em]" style="color:var(--c-fg)">
             Void 平台
           </h3>
-          <p class="font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">--platform void</p>
+          <p class="font-mono text-[0.72rem]" style="color:var(--c-fg-subtle)">
+            --platform void
+          </p>
         </div>
         <span
           class="ml-auto rounded-full border px-2 py-0.5 font-mono text-[0.6rem] uppercase"
           style="border-color:color-mix(in oklab, var(--c-accent) 35%, transparent);color:var(--c-accent)"
-          >团队</span
         >
+          团队
+        </span>
       </div>
       <p class="mt-4 text-[0.93rem] leading-[1.8]" style="color:var(--c-fg-muted)">
         在你的 Cloudflare 账户中安装一套共享环境，供团队或客户使用。开发者连接它的
@@ -107,9 +117,12 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
         class="mt-5 overflow-hidden rounded-[0.85rem] border p-3.5 font-mono text-[0.76rem] leading-[1.9]"
         style="border-color:var(--c-line);background:var(--c-bg-sunken);color:var(--c-fg-muted)"
       >
-        <div><span style="color:var(--c-fg-subtle)">$</span> void connect platform.example.com</div>
         <div>
-          <span style="color:var(--c-fg-subtle)">$</span> void deploy --platform void --project my-app
+          <span style="color:var(--c-fg-subtle)">$</span> void connect platform.example.com
+        </div>
+        <div>
+          <span style="color:var(--c-fg-subtle)">$</span> void deploy --platform void --project
+          my-app
         </div>
       </div>
       <ul
@@ -117,17 +130,23 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
         style="border-color:var(--c-line);color:var(--c-fg-muted)"
       >
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.5em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           访问控制、资源限额与用量统计
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.5em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           保留的部署历史与平台日志
         </li>
         <li class="flex items-start gap-2">
-          <span class="mt-[0.5em] size-1 shrink-0 rounded-full" style="background:var(--c-accent)"
+          <span
+            class="mt-[0.5em] size-1 shrink-0 rounded-full"
+            style="background:var(--c-accent)"
           ></span>
           关联应用可请求用户授权部署
         </li>
@@ -146,79 +165,83 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
           <tr style="background:var(--c-surface-2)">
             <th
               class="border-b px-4 py-3 text-[0.78rem] font-semibold whitespace-nowrap"
-              style="border-color:var(--c-line);color:var(--c-fg)">能力</th
+              style="border-color:var(--c-line);color:var(--c-fg)"
             >
+              能力
+            </th>
             <th
               class="border-b px-4 py-3 text-[0.78rem] font-semibold whitespace-nowrap"
-              style="border-color:var(--c-line);color:var(--c-fg)">Cloudflare</th
+              style="border-color:var(--c-line);color:var(--c-fg)"
             >
+              Cloudflare
+            </th>
             <th
               class="border-b px-4 py-3 text-[0.78rem] font-semibold whitespace-nowrap"
-              style="border-color:var(--c-line);color:var(--c-fg)">核心自托管平台</th
+              style="border-color:var(--c-line);color:var(--c-fg)"
             >
+              核心自托管平台
+            </th>
           </tr>
         </thead>
         <tbody>
-          {
-            rows.map((r, i) => (
-              <tr
-                style={
-                  i % 2 ? 'background:color-mix(in oklab, var(--c-fg) 2%, transparent)' : undefined
-                }
+          {rows.map((r, i) => (
+            <tr
+              style={
+                i % 2 ? 'background:color-mix(in oklab, var(--c-fg) 2%, transparent)' : undefined
+              }
+            >
+              <td
+                class="border-b px-4 py-3 text-[0.86rem]"
+                style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-muted)' }}
               >
-                <td
-                  class="border-b px-4 py-3 text-[0.86rem]"
-                  style={{ borderColor: 'var(--c-line)', color: 'var(--c-fg-muted)' }}
-                >
-                  {r.feature}
-                </td>
-                <td
-                  class="border-b px-4 py-3 text-[0.85rem] whitespace-nowrap"
-                  style="border-color:var(--c-line)"
-                >
-                  {typeof r.cf === 'boolean' ? (
-                    r.cf ? (
-                      <span
-                        class="inline-flex items-center"
-                        style="color:var(--c-accent)"
-                        role="img"
-                        aria-label="支持"
-                        title="支持"
-                      >
-                        <Icon name="check" class="size-4" strokeWidth={2.2} />
-                      </span>
-                    ) : (
-                      <span style="color:var(--c-fg-subtle)">-</span>
-                    )
+                {r.feature}
+              </td>
+              <td
+                class="border-b px-4 py-3 text-[0.85rem] whitespace-nowrap"
+                style="border-color:var(--c-line)"
+              >
+                {typeof r.cf === 'boolean' ? (
+                  r.cf ? (
+                    <span
+                      class="inline-flex items-center"
+                      style="color:var(--c-accent)"
+                      role="img"
+                      aria-label="支持"
+                      title="支持"
+                    >
+                      <Icon name="check" class="size-4" strokeWidth={2.2} />
+                    </span>
                   ) : (
-                    <span style="color:var(--c-fg-muted)">{r.cf}</span>
-                  )}
-                </td>
-                <td
-                  class="border-b px-4 py-3 text-[0.85rem] whitespace-nowrap"
-                  style="border-color:var(--c-line)"
-                >
-                  {typeof r.platform === 'boolean' ? (
-                    r.platform ? (
-                      <span
-                        class="inline-flex items-center"
-                        style="color:var(--c-accent)"
-                        role="img"
-                        aria-label="支持"
-                        title="支持"
-                      >
-                        <Icon name="check" class="size-4" strokeWidth={2.2} />
-                      </span>
-                    ) : (
-                      <span style="color:var(--c-fg-subtle)">-</span>
-                    )
+                    <span style="color:var(--c-fg-subtle)">-</span>
+                  )
+                ) : (
+                  <span style="color:var(--c-fg-muted)">{r.cf}</span>
+                )}
+              </td>
+              <td
+                class="border-b px-4 py-3 text-[0.85rem] whitespace-nowrap"
+                style="border-color:var(--c-line)"
+              >
+                {typeof r.platform === 'boolean' ? (
+                  r.platform ? (
+                    <span
+                      class="inline-flex items-center"
+                      style="color:var(--c-accent)"
+                      role="img"
+                      aria-label="支持"
+                      title="支持"
+                    >
+                      <Icon name="check" class="size-4" strokeWidth={2.2} />
+                    </span>
                   ) : (
-                    <span style="color:var(--c-fg-muted)">{r.platform}</span>
-                  )}
-                </td>
-              </tr>
-            ))
-          }
+                    <span style="color:var(--c-fg-subtle)">-</span>
+                  )
+                ) : (
+                  <span style="color:var(--c-fg-muted)">{r.platform}</span>
+                )}
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -226,8 +249,8 @@ const rows: { feature: string; cf: string | boolean; platform: string | boolean 
 
   <p class="mt-4 text-[0.8rem] leading-relaxed" style="color:var(--c-fg-subtle)">
     团队平台需要 Workers for Platforms 与相应的基础设施；具体功能取决于安装时的配置。
-    <a href="/docs/platform" class="link-underline" style="color:var(--c-fg-muted)"
-      >阅读平台安装指南 →</a
-    >
+    <a href="/docs/platform" class="link-underline" style="color:var(--c-fg-muted)">
+      阅读平台安装指南 →
+    </a>
   </p>
 </Section>

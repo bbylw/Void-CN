@@ -17,26 +17,24 @@ const uid = `it${Math.random().toString(36).slice(2, 8)}`;
   data-cmds={JSON.stringify(commands)}
 >
   <div class="flex items-center gap-0.5" role="tablist" aria-label="包管理器">
-    {
-      names.map((n, i) => (
-        <button
-          type="button"
-          role="tab"
-          id={`${uid}-tab-${i}`}
-          aria-controls={`${uid}-panel`}
-          aria-selected={i === 0 ? 'true' : 'false'}
-          tabindex={i === 0 ? 0 : -1}
-          data-pm={n}
-          class="rounded-lg px-2.5 py-1.5 font-mono text-[0.75rem] transition-colors"
-          style={{
-            color: i === 0 ? 'var(--c-bg)' : 'var(--c-fg-subtle)',
-            background: i === 0 ? 'var(--c-fg)' : 'transparent',
-          }}
-        >
-          {n}
-        </button>
-      ))
-    }
+    {names.map((n, i) => (
+      <button
+        type="button"
+        role="tab"
+        id={`${uid}-tab-${i}`}
+        aria-controls={`${uid}-panel`}
+        aria-selected={i === 0 ? 'true' : 'false'}
+        tabindex={i === 0 ? 0 : -1}
+        data-pm={n}
+        class="rounded-lg px-2.5 py-1.5 font-mono text-[0.75rem] transition-colors"
+        style={{
+          color: i === 0 ? 'var(--c-bg)' : 'var(--c-fg-subtle)',
+          background: i === 0 ? 'var(--c-fg)' : 'transparent',
+        }}
+      >
+        {n}
+      </button>
+    ))}
   </div>
 
   <code
@@ -69,9 +67,7 @@ const uid = `it${Math.random().toString(36).slice(2, 8)}`;
       aria-hidden="true"
       data-icon-copy
     >
-      <path
-        d="M8 8V5.5A1.5 1.5 0 0 1 9.5 4h6A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H13M6.5 8h6a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12.5 17h-6A1.5 1.5 0 0 1 5 15.5v-6A1.5 1.5 0 0 1 6.5 8Z"
-      ></path>
+      <path d="M8 8V5.5A1.5 1.5 0 0 1 9.5 4h6A1.5 1.5 0 0 1 17 5.5v6a1.5 1.5 0 0 1-1.5 1.5H13M6.5 8h6a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12.5 17h-6A1.5 1.5 0 0 1 5 15.5v-6A1.5 1.5 0 0 1 6.5 8Z"></path>
     </svg>
   </button>
 </div>

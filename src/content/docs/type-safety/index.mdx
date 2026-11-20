@@ -250,36 +250,36 @@ dev server 会保持路由类型最新。修改 `routing.typedRoutes` 后需要�
 
 ## 哪些内容会被检查
 
-| 层次                  | 被类型检查的内容                                                                                                                              |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| 数据库                | 来自 Drizzle schema 的表列、值类型、insert / update 结构                                                                                      |
-| 处理器                | `c.env` 绑定、校验器输入、返回类型                                                                                                            |
-| fetch 客户端          | 路由路径、HTTP 方法、body / query / params、响应类型                                                                                          |
-| 导航                  | `routeUrl()` 与目标对象中的路由模式、必需参数名与参数值                                                                                       |
-| 链接                  | 启用 `routing.typedRoutes` 后，`Link`、router 方法、`c.rewrite()`、`useIslandForm()`、SSE 与 live 流客户端中的 URL 字符串                    |
-| `c.redirect`          | 启用 `routing.typedRoutes` 后，路由 URL、同页 query 与 hash、目标对象、`URL` 值，以及 `http(s)` / `mailto:` / `tel:` 字面量；无法检查的字符串需要 `as Href` |
-| `useParams`           | 页面模式，以及该模式返回的参数名                                                                                                              |
-| `c.req.param`         | 结果标注为 `PageParams` 时的页面参数名                                                                                                        |
-| `getPrerenderPaths`   | 返回类型标注为 `PageParams` 时的页面参数名                                                                                                    |
-| `revalidate`          | 启用 `routing.typedRoutes` 后，`paths` 中的 URL 字符串                                                                                        |
-| `routing.prerender`   | 数组标注为 `satisfies RouteUrl[]` 时的路径                                                                                                    |
-| `useForm`             | action URL、数据字段、错误键、`reset()` 参数（含 `{ initial: true }`）、params、`resetOnSuccess`                                              |
-| `action()`            | action URL、数据负载、params                                                                                                                  |
+| 层次                | 被类型检查的内容                                                                                                                                            |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 数据库              | 来自 Drizzle schema 的表列、值类型、insert / update 结构                                                                                                    |
+| 处理器              | `c.env` 绑定、校验器输入、返回类型                                                                                                                          |
+| fetch 客户端        | 路由路径、HTTP 方法、body / query / params、响应类型                                                                                                        |
+| 导航                | `routeUrl()` 与目标对象中的路由模式、必需参数名与参数值                                                                                                     |
+| 链接                | 启用 `routing.typedRoutes` 后，`Link`、router 方法、`c.rewrite()`、`useIslandForm()`、SSE 与 live 流客户端中的 URL 字符串                                   |
+| `c.redirect`        | 启用 `routing.typedRoutes` 后，路由 URL、同页 query 与 hash、目标对象、`URL` 值，以及 `http(s)` / `mailto:` / `tel:` 字面量；无法检查的字符串需要 `as Href` |
+| `useParams`         | 页面模式，以及该模式返回的参数名                                                                                                                            |
+| `c.req.param`       | 结果标注为 `PageParams` 时的页面参数名                                                                                                                      |
+| `getPrerenderPaths` | 返回类型标注为 `PageParams` 时的页面参数名                                                                                                                  |
+| `revalidate`        | 启用 `routing.typedRoutes` 后，`paths` 中的 URL 字符串                                                                                                      |
+| `routing.prerender` | 数组标注为 `satisfies RouteUrl[]` 时的路径                                                                                                                  |
+| `useForm`           | action URL、数据字段、错误键、`reset()` 参数（含 `{ initial: true }`）、params、`resetOnSuccess`                                                            |
+| `action()`          | action URL、数据负载、params                                                                                                                                |
 
 ## 序列化
 
 类型化 fetch 客户端推断的是 JSON 转换之后的类型：服务端的 `Date` 在客户端是 `string`，数组与 tuple 内部同样如此。
 
-| 源类型或值                                  | 客户端类型或行为                                       |
-| ------------------------------------------- | ------------------------------------------------------ |
-| `string`、`number`、`boolean`、`null`       | 不变                                                   |
-| `Date`                                      | `string`                                               |
-| 数组与 tuple                                | 逐个转换元素，保留 tuple 的位置与 `readonly`           |
-| 数组中的 `undefined`、函数、symbol          | `null`                                                 |
-| 对象值为 `undefined`、函数、symbol          | 该属性被省略                                           |
-| symbol 键                                   | 被省略                                                 |
-| `Response`                                  | 从推断的 JSON 类型中排除，运行时原样透传               |
-| `bigint`                                    | JSON 不支持                                            |
+| 源类型或值                            | 客户端类型或行为                             |
+| ------------------------------------- | -------------------------------------------- |
+| `string`、`number`、`boolean`、`null` | 不变                                         |
+| `Date`                                | `string`                                     |
+| 数组与 tuple                          | 逐个转换元素，保留 tuple 的位置与 `readonly` |
+| 数组中的 `undefined`、函数、symbol    | `null`                                       |
+| 对象值为 `undefined`、函数、symbol    | 该属性被省略                                 |
+| symbol 键                             | 被省略                                       |
+| `Response`                            | 从推断的 JSON 类型中排除，运行时原样透传     |
+| `bigint`                              | JSON 不支持                                  |
 
 值可能被省略的属性在客户端类型中变为可选：处理器返回 `{ label: string | undefined }`，客户端得到 `{ label?: string }`。
 

@@ -16,25 +16,23 @@ const Tag = href ? 'a' : 'div';
   style="color:inherit"
 >
   <span class="flex items-center gap-2">
-    {
-      icon && (
-        <span
-          class="grid size-7 shrink-0 place-items-center rounded-lg border"
-          style="border-color:var(--c-line);color:var(--c-accent);background:var(--c-surface-2)"
-        >
-          <Icon name={icon as never} class="size-3.5" />
-        </span>
-      )
-    }
-    <span class="text-[0.95rem] font-semibold" style="color:var(--c-fg)">{title}</span>
-    {
-      href && (
-        <Icon
-          name="arrowUpRight"
-          class="ml-auto size-3.5 opacity-0 transition-all duration-300 group-hover:opacity-60 group-hover:translate-x-0.5"
-        />
-      )
-    }
+    {icon && (
+      <span
+        class="grid size-7 shrink-0 place-items-center rounded-lg border"
+        style="border-color:var(--c-line);color:var(--c-accent);background:var(--c-surface-2)"
+      >
+        <Icon name={icon as never} class="size-3.5" />
+      </span>
+    )}
+    <span class="text-[0.95rem] font-semibold" style="color:var(--c-fg)">
+      {title}
+    </span>
+    {href && (
+      <Icon
+        name="arrowUpRight"
+        class="ml-auto size-3.5 opacity-0 transition-all duration-300 group-hover:opacity-60 group-hover:translate-x-0.5"
+      />
+    )}
   </span>
   <span class="text-[0.85rem] leading-relaxed" style="color:var(--c-fg-muted)">
     <slot />

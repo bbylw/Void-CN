@@ -23,12 +23,12 @@ export default defineEmail(async (message, env, ctx) => {
 
 处理器收到的是 Cloudflare 原生的 `ForwardableEmailMessage`，此外还有可选的第四个参数 `info`，其中的 `params` 会为动态 / 带标签的路由片段填充内容：
 
-| 方法                               | 用途                                       |
-| ---------------------------------- | ------------------------------------------ |
-| `message.setReject(reason)`        | 用 SMTP 错误拒收这封邮件。                 |
-| `message.forward(to, headers?)`    | 转发到一个已验证的目的地。                 |
-| `replyEmail(message, options)`     | 发送一封带会话主题的回信。                 |
-| `message.reply({ from, to, raw })` | 用你自己构造的 MIME 字节或流来回复。       |
+| 方法                               | 用途                                 |
+| ---------------------------------- | ------------------------------------ |
+| `message.setReject(reason)`        | 用 SMTP 错误拒收这封邮件。           |
+| `message.forward(to, headers?)`    | 转发到一个已验证的目的地。           |
+| `replyEmail(message, options)`     | 发送一封带会话主题的回信。           |
+| `message.reply({ from, to, raw })` | 用你自己构造的 MIME 字节或流来回复。 |
 
 没有执行任何动作就直接返回，等于接受这封邮件。`forward` 与 `message.reply` 要使用纯邮箱地址。
 

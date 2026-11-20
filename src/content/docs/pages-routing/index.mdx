@@ -142,12 +142,12 @@ Loader 仍然会在第一次请求时运行，它的 props 也会嵌入 HTML 外
 
 | 页面导出                                | 行为                                       |
 | --------------------------------------- | ------------------------------------------ |
-| 未设置 `ssr` 或 `ssr = true`             | 在请求时服务端渲染组件 HTML                |
-| `ssr = false`                            | 在请求时返回一个客户端挂载的外壳           |
-| `ssr = false` + `prerender = true`       | 预渲染一个内嵌 loader 数据的客户端挂载外壳 |
-| `ssr = false` + `prerender = false`      | 只在请求时返回客户端挂载的外壳，永不预渲染 |
-| 岛屿页面 + `ssr = false`                 | 无效，岛屿页面已经使用岛屿渲染器           |
-| `output: "static"` + 未设置 `prerender`  | 自动预渲染路径已知的页面，包括纯客户端外壳 |
+| 未设置 `ssr` 或 `ssr = true`            | 在请求时服务端渲染组件 HTML                |
+| `ssr = false`                           | 在请求时返回一个客户端挂载的外壳           |
+| `ssr = false` + `prerender = true`      | 预渲染一个内嵌 loader 数据的客户端挂载外壳 |
+| `ssr = false` + `prerender = false`     | 只在请求时返回客户端挂载的外壳，永不预渲染 |
+| 岛屿页面 + `ssr = false`                | 无效，岛屿页面已经使用岛屿渲染器           |
+| `output: "static"` + 未设置 `prerender` | 自动预渲染路径已知的页面，包括纯客户端外壳 |
 
 `ssr` 与 `prerender` 必须直接从 `.server.ts` 导出 `true` 或 `false`；计算得到的值与再导出会被忽略并给出警告。同理，页面的 `layout` 导出也必须是字符串字面量或 `false`。
 
@@ -343,23 +343,23 @@ nav a[data-void-active] {
 </nav>
 ```
 
-| 当前 URL          | `href="/users"` | `href="/users" activeMatch="prefix"` |
-| ----------------- | --------------- | ------------------------------------ |
-| `/users`          | 两个属性都有    | 两个属性都有                         |
-| `/users?page=2`   | 两个属性都有    | 两个属性都有                         |
-| `/users/42`       | 无              | `data-void-active`                   |
-| `/users-admin`    | 无              | 无                                   |
+| 当前 URL        | `href="/users"` | `href="/users" activeMatch="prefix"` |
+| --------------- | --------------- | ------------------------------------ |
+| `/users`        | 两个属性都有    | 两个属性都有                         |
+| `/users?page=2` | 两个属性都有    | 两个属性都有                         |
+| `/users/42`     | 无              | `data-void-active`                   |
+| `/users-admin`  | 无              | 无                                   |
 
 `aria-current="page"` 只标记完全相同的那一页，因此可以用 `[aria-current="page"]` 把它与所在板块区分开。指向 `/` 的链接只在首页激活。
 
 查询参数让你区分分页链接与筛选标签：当前 URL 包含链接的全部查询参数且取值相同时才算激活，多余的参数与顺序都不影响；GET 链接的 `data` 也算它 query 的一部分。
 
-| 当前 URL                   | 链接                          | 激活状态       |
-| -------------------------- | ----------------------------- | -------------- |
-| `/posts?page=2`            | `href="/posts?page=1"`        | 无             |
-| `/posts?page=2`            | `href="/posts?page=2"`        | 两个属性都有   |
-| `/issues?status=open&page=2` | `href="/issues?status=open"`  | 两个属性都有   |
-| `/issues?status=open`      | `href="/issues?status=closed"` | 无             |
+| 当前 URL                     | 链接                           | 激活状态     |
+| ---------------------------- | ------------------------------ | ------------ |
+| `/posts?page=2`              | `href="/posts?page=1"`         | 无           |
+| `/posts?page=2`              | `href="/posts?page=2"`         | 两个属性都有 |
+| `/issues?status=open&page=2` | `href="/issues?status=open"`   | 两个属性都有 |
+| `/issues?status=open`        | `href="/issues?status=closed"` | 无           |
 
 在子页面上，`activeMatch="prefix"` 只比较路径，因此 `href="/reports?range=30d"` 在 `/reports/42` 上会带 `data-void-active`。
 
@@ -391,13 +391,13 @@ a[data-void-pending] {
 
 `prefetch` 接受 `true`、`false`、单个策略或策略数组（如 `['visible', 'hover']`，最先触发者生效，后续触发复用同一份数据）：
 
-| 取值              | 何时加载页面                                                       |
-| ----------------- | ------------------------------------------------------------------ |
-| `'hover'` 或 `true` | 指针在链接上停留满 `hoverDelay`、获得键盘聚焦或被触摸时            |
-| `'click'`         | 鼠标按下或手指按下、点击发生之前                                   |
-| `'mount'`         | 链接一渲染出来                                                     |
-| `'visible'`       | 链接在视区内停留 300 ms 之后；快速划过的链接会被跳过               |
-| `false`           | 从不                                                               |
+| 取值                | 何时加载页面                                            |
+| ------------------- | ------------------------------------------------------- |
+| `'hover'` 或 `true` | 指针在链接上停留满 `hoverDelay`、获得键盘聚焦或被触摸时 |
+| `'click'`           | 鼠标按下或手指按下、点击发生之前                        |
+| `'mount'`           | 链接一渲染出来                                          |
+| `'visible'`         | 链接在视区内停留 300 ms 之后；快速划过的链接会被跳过    |
+| `false`             | 从不                                                    |
 
 之后的访问会直接使用缓存数据。`cacheFor` 以毫秒或 `'5m'` 这样的时长控制复用时间；写成 `['30s', '5m']` 这样的组合时，页面在 30 秒内算新鲜、最长 5 分钟可复用（先展示缓存、后台刷新）。
 
@@ -493,10 +493,10 @@ export const action = defineHandler.withValidator({
 });
 ```
 
-| action 的返回          | 行为                                                                                     |
-| ---------------------- | ---------------------------------------------------------------------------------------- |
-| 不返回（void）         | 重新运行 loader，页面用新的 props 重新渲染                                               |
-| `c.redirect(url)`      | 导航到其他页面。启用 `routing.typedRoutes` 后，该地址与链接一样被检查；无法检查的字符串用 `as Href` |
+| action 的返回     | 行为                                                                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------- |
+| 不返回（void）    | 重新运行 loader，页面用新的 props 重新渲染                                                          |
+| `c.redirect(url)` | 导航到其他页面。启用 `routing.typedRoutes` 后，该地址与链接一样被检查；无法检查的字符串用 `as Href` |
 
 action 之后中间件不会再次运行。要更新[共享数据](/docs/type-safety#上下文变量)，就在 action 里 `c.set('shared', ...)`，或者改为重定向：
 

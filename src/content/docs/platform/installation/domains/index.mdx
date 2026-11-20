@@ -89,16 +89,16 @@ void platform repair <installation-id> --dashboard-url https://dash.example.com 
 
 新的平台资源在 Cloudflare 允许的场合使用确定性的 `void-<installation-name>-<role>` 命名，例如 `void-team-api`。请在账户里选一个未被使用的安装名；遇到无人占用的名字冲突时 Void 会停下来，而不是替换那个资源。已有的安装保留它们记录在案的名字，包括带后缀的旧式名字。
 
-| 资源                                      |                              数量 | 用途                                                                                       |
-| ----------------------------------------- | ------------------------------------: | ------------------------------------------------------------------------------------------ |
-| Worker                                    | 5 个，另加每个使用 workers.dev 的应用各 1 个 | API/控制面、proxy、tail 摄取、dispatch、email gateway，以及测试 origin 的转发器 |
-| KV namespace                              |                                   3 | 路由、ISR 缓存与静态资源存储                                                               |
-| R2 bucket                                 |                                   1 | 静态资源与部署产物                                                                         |
-| 队列                                      |                                   3 | 用量事件、cron 触发与部署                                                                  |
-| Workers for Platforms dispatch namespace  |                                   1 | 用户的应用 Worker                                                                          |
-| Hyperdrive 配置                           |                                   1 | 外部的平台 PostgreSQL                                                                      |
-| AI Gateway                                |                                   1 | 按安装隔离的 AI 路由与计量                                                                 |
-| Proxied 通配 DNS 记录                     |                              0 或 1 | 仅在配置了应用域名时创建                                                                   |
-| Zone                                      |                              0 或 1 | 仅在请求的应用 zone 不存在时创建                                                           |
+| 资源                                     |                                         数量 | 用途                                                                            |
+| ---------------------------------------- | -------------------------------------------: | ------------------------------------------------------------------------------- |
+| Worker                                   | 5 个，另加每个使用 workers.dev 的应用各 1 个 | API/控制面、proxy、tail 摄取、dispatch、email gateway，以及测试 origin 的转发器 |
+| KV namespace                             |                                            3 | 路由、ISR 缓存与静态资源存储                                                    |
+| R2 bucket                                |                                            1 | 静态资源与部署产物                                                              |
+| 队列                                     |                                            3 | 用量事件、cron 触发与部署                                                       |
+| Workers for Platforms dispatch namespace |                                            1 | 用户的应用 Worker                                                               |
+| Hyperdrive 配置                          |                                            1 | 外部的平台 PostgreSQL                                                           |
+| AI Gateway                               |                                            1 | 按安装隔离的 AI 路由与计量                                                      |
+| Proxied 通配 DNS 记录                    |                                       0 或 1 | 仅在配置了应用域名时创建                                                        |
+| Zone                                     |                                       0 或 1 | 仅在请求的应用 zone 不存在时创建                                                |
 
 API Worker 使用四个 Durable Object 类，分别负责用量、cron 调度、错误监控与并发。Worker 绑定会在 Analytics Engine 中创建请求与日志 dataset，而 Analytics Engine 必须[为该账户启用](/docs/platform/installation/prerequisites)。核心安装不会创建 Container application、GitHub App、dashboard Worker 或构建 Worker。

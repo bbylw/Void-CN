@@ -67,11 +67,11 @@ void email status --platform cloudflare
 
 当 `email.from` 设在 `mail.acme.com` 上时，处理器收到的地址如下：
 
-| 处理器                            | 子域名地址              | zone 顶点地址      |
-| --------------------------------- | ----------------------- | ------------------ |
+| 处理器                              | 子域名地址              | zone 顶点地址      |
+| ----------------------------------- | ----------------------- | ------------------ |
 | `support.ts`、`support+[ticket].ts` | `support@mail.acme.com` | `support@acme.com` |
-| `_default.ts`                     | 无 catch-all 规则       | `*@acme.com`       |
-| `[user].ts`、`[user]+[tag].ts`    | 不支持                  | `*@acme.com`       |
+| `_default.ts`                       | 无 catch-all 规则       | `*@acme.com`       |
+| `[user].ts`、`[user]+[tag].ts`      | 不支持                  | `*@acme.com`       |
 
 Cloudflare 的 catch-all 只覆盖 zone 顶点域名。在子域名上，`_default.ts` 只能处理由显式规则放进来的邮件，无法接收任意地址。
 

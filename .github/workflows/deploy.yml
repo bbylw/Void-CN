@@ -21,6 +21,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # Astro 7.4.13 要求 Node >=22.23.4；固定 Node 24，避免 runner 镜像默认版本漂移
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:

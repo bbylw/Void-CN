@@ -21,17 +21,17 @@ void-dev --help
 
 ## 定位实现
 
-| 目录                                                 | 用途                                                                 |
-| ---------------------------------------------------- | -------------------------------------------------------------------- |
-| `packages/void`                                      | 框架、应用运行时与 CLI                                               |
-| `packages/platform`                                  | 安装器契约、打包的 Worker 与平台迁移                                 |
-| `packages/deploy-core`、`packages/deploy-cloudflare` | 共享部署契约与 Cloudflare 上传代码                                   |
-| `platform/packages/api`                              | 用户、项目、部署、资源开通与管理端 API/UI                            |
-| `platform/packages/dispatch`                         | 应用路由与静态资源                                                   |
-| `platform/packages/proxy`                            | AI、远程绑定与重新校验                                               |
-| `platform/packages/email-gateway`                    | 入站邮件路由与租户投递                                               |
-| `platform/packages/tail`                             | 运行时日志摄取                                                       |
-| `platform/packages/dashboard`                        | Dashboard 源码与 `ui/` 中的本地 UI 组件                              |
+| 目录                                                 | 用途                                      |
+| ---------------------------------------------------- | ----------------------------------------- |
+| `packages/void`                                      | 框架、应用运行时与 CLI                    |
+| `packages/platform`                                  | 安装器契约、打包的 Worker 与平台迁移      |
+| `packages/deploy-core`、`packages/deploy-cloudflare` | 共享部署契约与 Cloudflare 上传代码        |
+| `platform/packages/api`                              | 用户、项目、部署、资源开通与管理端 API/UI |
+| `platform/packages/dispatch`                         | 应用路由与静态资源                        |
+| `platform/packages/proxy`                            | AI、远程绑定与重新校验                    |
+| `platform/packages/email-gateway`                    | 入站邮件路由与租户投递                    |
+| `platform/packages/tail`                             | 运行时日志摄取                            |
+| `platform/packages/dashboard`                        | Dashboard 源码与 `ui/` 中的本地 UI 组件   |
 
 `@voidcloud/*` 命名标识工作区的实现包，它们的 `private: true` 标记会阻止这些包发布到 npm。可部署的核心 Worker 会被打包进公共的 `@void/platform` 包。
 

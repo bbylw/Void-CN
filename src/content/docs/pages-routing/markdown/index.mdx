@@ -270,17 +270,17 @@ markdown 插件提供一个精简的 CSS 主题，有两个入口：
 }
 ```
 
-| 变量                | 亮色默认值                                                                     | 暗色默认值 | 说明                                                                   |
-| ------------------- | ------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------ |
-| `--vmd-font-body`   | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`                     | 同默认     | 正文字体栈                                                               |
-| `--vmd-font-mono`   | `ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace` | 同默认     | 等宽字体栈                                                               |
-| `--vmd-text`        | `#1a1a2e`                                                                      | `#e2e8f0`  | 主文本颜色                                                               |
-| `--vmd-text-muted`  | `#64748b`                                                                      | `#94a3b8`  | 次要 / 弱化文本（引用、行号、脚注）                                      |
-| `--vmd-link`        | `#2563eb`                                                                      | `#60a5fa`  | 链接颜色                                                                 |
-| `--vmd-link-hover`  | `#1d4ed8`                                                                      | `#93bbfd`  | 链接悬停颜色                                                             |
-| `--vmd-border`      | `#e2e8f0`                                                                      | `#334155`  | 边框（h2 下划线、表格、行内代码、`<kbd>`、水平分隔线）                   |
-| `--vmd-bg-soft`     | `#f8fafc`                                                                      | `#1e293b`  | 柔和背景（表头、行内代码、代码块、`<kbd>`）                              |
-| `--vmd-line-height` | `1.75`                                                                         | 同默认     | 正文行高                                                                 |
+| 变量                | 亮色默认值                                                                     | 暗色默认值 | 说明                                                   |
+| ------------------- | ------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------ |
+| `--vmd-font-body`   | `system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`                     | 同默认     | 正文字体栈                                             |
+| `--vmd-font-mono`   | `ui-monospace, "Cascadia Code", "Source Code Pro", Menlo, Consolas, monospace` | 同默认     | 等宽字体栈                                             |
+| `--vmd-text`        | `#1a1a2e`                                                                      | `#e2e8f0`  | 主文本颜色                                             |
+| `--vmd-text-muted`  | `#64748b`                                                                      | `#94a3b8`  | 次要 / 弱化文本（引用、行号、脚注）                    |
+| `--vmd-link`        | `#2563eb`                                                                      | `#60a5fa`  | 链接颜色                                               |
+| `--vmd-link-hover`  | `#1d4ed8`                                                                      | `#93bbfd`  | 链接悬停颜色                                           |
+| `--vmd-border`      | `#e2e8f0`                                                                      | `#334155`  | 边框（h2 下划线、表格、行内代码、`<kbd>`、水平分隔线） |
+| `--vmd-bg-soft`     | `#f8fafc`                                                                      | `#1e293b`  | 柔和背景（表头、行内代码、代码块、`<kbd>`）            |
+| `--vmd-line-height` | `1.75`                                                                         | 同默认     | 正文行高                                               |
 
 暗色取值通过 `prefers-color-scheme: dark`（自动模式）与 `[data-theme="dark"]`（显式切换）自动生效。想在偏好暗色的系统上强制亮色，在 `<html>` 上设置 `data-theme="light"`。
 
@@ -423,10 +423,10 @@ voidMarkdown({
 });
 ```
 
-| 选项        | 类型                              | 默认值                                             | 说明                                       |
-| ----------- | --------------------------------- | ---------------------------------------------------- | ------------------------------------------ |
-| `themes`    | `{ light: string; dark: string }` | `{ light: "github-light", dark: "github-dark" }`     | 代码块配色主题，如 `pierre-light` / `pierre-dark` |
-| `copyLabel` | `string`                          | `"Copy Code"`                                      | 代码复制按钮的提示文字与无障碍标签         |
+| 选项        | 类型                              | 默认值                                           | 说明                                              |
+| ----------- | --------------------------------- | ------------------------------------------------ | ------------------------------------------------- |
+| `themes`    | `{ light: string; dark: string }` | `{ light: "github-light", dark: "github-dark" }` | 代码块配色主题，如 `pierre-light` / `pierre-dark` |
+| `copyLabel` | `string`                          | `"Copy Code"`                                    | 代码复制按钮的提示文字与无障碍标签                |
 
 代码块语言无需额外配置。未知的主题名会让构建报错。
 

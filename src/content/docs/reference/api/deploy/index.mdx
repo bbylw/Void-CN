@@ -30,8 +30,8 @@ const { artifact, assets } = await prepareDeployArtifact('/path/to/app');
 ## Cloudflare Build Output
 
 <Callout type="warn" title="实验特性">
-  `prepareCfBuildOutput` 跟随 Cloudflare 草案阶段的 Build Output 格式。它的选项以及准备出的目录结构可能
-  在 Void 的各个版本之间发生变化。
+  `prepareCfBuildOutput` 跟随 Cloudflare 草案阶段的 Build Output
+  格式。它的选项以及准备出的目录结构可能 在 Void 的各个版本之间发生变化。
 </Callout>
 
 用 `prepareCfBuildOutput` 把已有的 Worker 构建产物准备好用于在 Cloudflare 发布：
@@ -56,10 +56,10 @@ try {
 
 传入包含生成的 `wrangler.json` 的 Worker 输出目录，例如 `dist/ssr` 或 `dist/server`。对于原生的 Cloudflare Build Output，传入包含 `.cloudflare/output/v1` 的项目根目录。用旧版本 Void 生成的构建产物，需要先重新构建，再用更新后的工具链准备。结果是一份供你发布流程使用的临时副本。对于由本地 Dockerfile 构建的容器，请在构建镜像时使用的那个 Docker 环境中发布。
 
-| 选项            | 说明                                                                                                                                       |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `accountId`     | 构建必须针对的 Cloudflare 账号。若构建属于另一个账号，返回 `null`。省略时保留构建自带的账号，或不设置账号。                                |
-| `mode`        | Vite 构建模式。原生输出会保留它构建时使用的模式，传入不同的值会返回 `null`。对其他输出，默认值为 `production`。                             |
-| `projectRoot` | 包含 `package.json` 及其已安装依赖的应用目录。默认为输入的目录。                                                                            |
+| 选项          | 说明                                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------------------- |
+| `accountId`   | 构建必须针对的 Cloudflare 账号。若构建属于另一个账号，返回 `null`。省略时保留构建自带的账号，或不设置账号。     |
+| `mode`        | Vite 构建模式。原生输出会保留它构建时使用的模式，传入不同的值会返回 `null`。对其他输出，默认值为 `production`。 |
+| `projectRoot` | 包含 `package.json` 及其已安装依赖的应用目录。默认为输入的目录。                                                |
 
 结果提供 `directory`、指向输入资源的可选 `assetsDirectory`，以及异步的 `dispose()` 方法。发布完成后调用 dispose 释放结果。不受支持的配置返回 `null`；构建文件缺失或无效会抛出错误。

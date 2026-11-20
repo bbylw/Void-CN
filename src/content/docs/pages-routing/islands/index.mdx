@@ -11,7 +11,7 @@ Islands 让你在整体保持静态的页面上添加可交互组件：服务端
 
 <Callout type="tip" title="前置条件">
 
-  Islands 模式建立在[页面路由](/docs/pages-routing)之上。使用前需要先有可用的页面配置（已安装框架适配器、存在 `pages/` 目录、配好 Vite 插件）。
+Islands 模式建立在[页面路由](/docs/pages-routing)之上。使用前需要先有可用的页面配置（已安装框架适配器、存在 `pages/` 目录、配好 Vite 插件）。
 
 </Callout>
 
@@ -124,15 +124,15 @@ export default function BlogIndex(props) {
 
 <Callout type="warn" title="TypeScript 配置">
 
-  导入属性要求 `tsconfig.json` 中设置 `"module": "ESNext"`：
+导入属性要求 `tsconfig.json` 中设置 `"module": "ESNext"`：
 
-  ```json
-  {
-    "compilerOptions": {
-      "module": "ESNext"
-    }
+```json
+{
+  "compilerOptions": {
+    "module": "ESNext"
   }
-  ```
+}
+```
 
 </Callout>
 
@@ -140,12 +140,12 @@ export default function BlogIndex(props) {
 
 `island` 属性的取值控制组件在何时完成 hydration：
 
-| 策略              | 何时 hydration           | 适用场景                       |
-| ----------------- | ------------------------ | ------------------------------ |
-| `"load"`          | 页面加载时               | 关键的交互 UI（表单、导航菜单）|
-| `"visible"`       | 元素进入视区时           | 首屏以下的内容                 |
-| `"idle"`          | 浏览器空闲时             | 非关键的增强功能               |
-| `"media:(query)"` | CSS 媒体查询匹配时       | 响应式组件（如仅移动端）       |
+| 策略              | 何时 hydration     | 适用场景                        |
+| ----------------- | ------------------ | ------------------------------- |
+| `"load"`          | 页面加载时         | 关键的交互 UI（表单、导航菜单） |
+| `"visible"`       | 元素进入视区时     | 首屏以下的内容                  |
+| `"idle"`          | 浏览器空闲时       | 非关键的增强功能                |
+| `"media:(query)"` | CSS 媒体查询匹配时 | 响应式组件（如仅移动端）        |
 
 ```tsx
 import Comments from './_Comments' with { island: 'visible' };

@@ -124,9 +124,10 @@ const { closed } = await room.actions.revokeSession(session.id, 4001);
 `getRoom()` 定位的就是 `connect()` 会连上的同一个实例：传同样的路由模式与同样的 params，自定义 `key` 也会生效。它读取当前运行时的 env，因此在 Void 运行的任何处理器里都可用；在处理器之外调用时，把你手上已有的 bindings 对象传进去：`getRoom('/relay/[accountId]', { params: { accountId }, env: bindings })`。
 
 <Callout type="warn" title="只用服务端可信的状态匹配连接">
-  从 URL、查询串或客户端消息里读到的 session id 可以是客户端任意发送的值，据此撤销会关错 socket。请从
-  `getSession()` 或你自己的记录里取 id，在 `onConnect` 中存进连接状态，再由撤销会话的代码传入同一个 id。会话被撤销时想立刻关闭闲置的
-  socket，就声明一个 room action 并从撤销处调用它。
+  从 URL、查询串或客户端消息里读到的 session id 可以是客户端任意发送的值，据此撤销会关错
+  socket。请从 `getSession()` 或你自己的记录里取 id，在 `onConnect`
+  中存进连接状态，再由撤销会话的代码传入同一个 id。会话被撤销时想立刻关闭闲置的 socket，就声明一个
+  room action 并从撤销处调用它。
 </Callout>
 
 - 每个 action 参数都要写类型标注：入参与返回值由定义推导，未标注的参数是 `never`。

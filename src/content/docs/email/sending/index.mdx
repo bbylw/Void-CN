@@ -62,24 +62,25 @@ void email destinations
 <Callout type="warn" title="什么时候适合用它">
   共享发件人适合团队告警、项目通知，以及回复入站邮件。
 
-  要给任意用户发邮件，请[注册你自己的域名](/docs/email/domains)、在你自己的 Cloudflare 账户上使用 [Workers Paid](/docs/email/domains)，或者在处理器里调用其他邮件服务商。
+要给任意用户发邮件，请[注册你自己的域名](/docs/email/domains)、在你自己的 Cloudflare 账户上使用 [Workers Paid](/docs/email/domains)，或者在处理器里调用其他邮件服务商。
+
 </Callout>
 
 ## 选项
 
-| 选项               | 类型                          | 说明                                                                                                            |
-| ------------------ | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `from`             | `string \| { email, name? }`  | 可选。被固定为项目发件人——见下文。                                                                             |
-| `to`               | `Address \| Address[]`        | 必填。一个或多个收件人。                                                                                        |
-| `subject`          | `string`                      | 必填。支持 UTF-8（按 RFC 2047 编码）。                                                                          |
-| `text`             | `string`                      | `text` / `html` 至少要有一个。                                                                                  |
-| `html`             | `string`                      | 两者都提供时按 `multipart/alternative` 发送。                                                                   |
-| `replyTo`          | `Address`                     | 可选的 `Reply-To` 头部。                                                                                        |
-| `cc`、`bcc`        | `Address \| Address[]`        | 可选。每个收件人会各自生成一份邮件信封。                                                                        |
-| `headers`          | `Record<string, string>`      | 自定义头部；保留头部（From、Date 等）会被忽略。                                                                 |
-| `threading`        | `{ inReplyTo?, references? }` | 可选。把邮件挂到先前的一条会话下。见[稍后回复](#稍后回复)。                                                    |
-| `attachments`      | `Attachment[]`                | 见[附件](#附件)。                                                                                               |
-| `idempotencyKey`   | `string`                      | 在 Void Platform 上可选：1–128 个可见的非空格 ASCII 字符。同一次发送重试时请复用同一个值。                     |
+| 选项             | 类型                          | 说明                                                                                       |
+| ---------------- | ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `from`           | `string \| { email, name? }`  | 可选。被固定为项目发件人——见下文。                                                         |
+| `to`             | `Address \| Address[]`        | 必填。一个或多个收件人。                                                                   |
+| `subject`        | `string`                      | 必填。支持 UTF-8（按 RFC 2047 编码）。                                                     |
+| `text`           | `string`                      | `text` / `html` 至少要有一个。                                                             |
+| `html`           | `string`                      | 两者都提供时按 `multipart/alternative` 发送。                                              |
+| `replyTo`        | `Address`                     | 可选的 `Reply-To` 头部。                                                                   |
+| `cc`、`bcc`      | `Address \| Address[]`        | 可选。每个收件人会各自生成一份邮件信封。                                                   |
+| `headers`        | `Record<string, string>`      | 自定义头部；保留头部（From、Date 等）会被忽略。                                            |
+| `threading`      | `{ inReplyTo?, references? }` | 可选。把邮件挂到先前的一条会话下。见[稍后回复](#稍后回复)。                                |
+| `attachments`    | `Attachment[]`                | 见[附件](#附件)。                                                                          |
+| `idempotencyKey` | `string`                      | 在 Void Platform 上可选：1–128 个可见的非空格 ASCII 字符。同一次发送重试时请复用同一个值。 |
 
 `to`、`cc`、`bcc` 加起来最多 50 个收件人。请使用 local-part 为 ASCII 的标准邮箱地址，国际化域名用 punycode 表示。
 
@@ -185,17 +186,17 @@ if (result.ok) {
 
 在 30 天内，用相同负载重复同一个键会返回已记录的结果，不会再向服务商提交一次。用不同负载复用同一个键会返回 `IDEMPOTENCY_CONFLICT`。响应丢失或服务商请求被中断可能返回 `OUTCOME_UNKNOWN`；请查看 `void email logs`，或用同一个键重发。换一个新键就是一次新的发送，可能造成重复投递。原生 Cloudflare 绑定发送不支持平台幂等键。
 
-| 错误码                   | 含义                                                           |
-| ------------------------ | -------------------------------------------------------------- |
-| `BINDING_MISSING`        | 没有配置邮件通道。                                             |
-| `INVALID_FROM`           | 发件人非法，或不属于该项目的授权范围。                         |
-| `INVALID_TO`             | 收件人列表非法，或超过 50 个收件人。                           |
-| `UNVERIFIED_DESTINATION` | 在当前策略下该收件人还需要验证。                               |
-| `MIME_ERROR`             | 邮件内容非法，或超出大小限制。                                 |
-| `QUOTA_EXCEEDED`         | 已用满平台或服务商配额。                                       |
-| `IDEMPOTENCY_CONFLICT`   | 该键已被用于另一个负载。                                       |
-| `OUTCOME_UNKNOWN`        | 发送可能已到达服务商；不要盲目重发。                           |
-| `UPSTREAM_ERROR`         | 服务商或平台拒绝了请求。                                       |
+| 错误码                   | 含义                                   |
+| ------------------------ | -------------------------------------- |
+| `BINDING_MISSING`        | 没有配置邮件通道。                     |
+| `INVALID_FROM`           | 发件人非法，或不属于该项目的授权范围。 |
+| `INVALID_TO`             | 收件人列表非法，或超过 50 个收件人。   |
+| `UNVERIFIED_DESTINATION` | 在当前策略下该收件人还需要验证。       |
+| `MIME_ERROR`             | 邮件内容非法，或超出大小限制。         |
+| `QUOTA_EXCEEDED`         | 已用满平台或服务商配额。               |
+| `IDEMPOTENCY_CONFLICT`   | 该键已被用于另一个负载。               |
+| `OUTCOME_UNKNOWN`        | 发送可能已到达服务商；不要盲目重发。   |
+| `UPSTREAM_ERROR`         | 服务商或平台拒绝了请求。               |
 
 平台默认额度是每个 UTC 月 200 次收件人投递尝试、滚动一分钟内 10 次。失败或不确定的尝试也可能计入这些限制。用 `void email usage` 查看你当前的额度。
 

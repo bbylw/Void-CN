@@ -7,17 +7,17 @@ Void 在启动时扫描源文件，自动识别项目用到哪些 Cloudflare 资
 
 ## 识别出的绑定
 
-| 绑定               | 类型                     | 通过导入识别                                                                                                                                          | 通过访问 env 识别                                                                |
-| ------------------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `DB`               | `D1Database`             | `import { db } from "void/db"`                                                                                                                        | `env.DB` 或 `c.env.DB`                                                           |
-| `KV`               | `KVNamespace`            | `import { kv } from "void/kv"`                                                                                                                        | `env.KV` 或 `c.env.KV`                                                           |
-| `STORAGE`          | `R2Bucket`               | `import { storage } from "void/storage"`                                                                                                              | `env.STORAGE` 或 `c.env.STORAGE`                                                 |
-| `AI`               | `Ai`                     | `import { ai } from "void/ai"`                                                                                                                        | `env.AI` 或 `c.env.AI`                                                           |
-| `SANDBOX`          | Managed Sandbox 能力     | `import { getSandbox } from "void/sandbox"`                                                                                                            | `getSandbox()`；原生 Cloudflare 环境还会暴露 `env.SANDBOX` / `c.env.SANDBOX`    |
-| Auth               | 无                       | `import { ... } from "void/auth"`，或从 `void/client` / `void/client/react` / `void/client/vue` / `void/client/svelte` / `void/client/solid` 导入 `auth` | 无                                                                               |
-| `QUEUE_*`          | `Queue`                  | `import { queues } from "void/queues"`                                                                                                                  | `env.QUEUE_*`                                                                    |
-| `VOID_LIVE`        | `DurableObjectNamespace` | `import { defineLiveStream } from "void/live"`                                                                                                         | 不适用                                                                           |
-| 由文件名推导       | `DurableObjectNamespace` | `durable-objects/` 中默认导出 `defineDurableState()` 的模块                                                                                              | 不适用                                                                           |
+| 绑定         | 类型                     | 通过导入识别                                                                                                                                             | 通过访问 env 识别                                                            |
+| ------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `DB`         | `D1Database`             | `import { db } from "void/db"`                                                                                                                           | `env.DB` 或 `c.env.DB`                                                       |
+| `KV`         | `KVNamespace`            | `import { kv } from "void/kv"`                                                                                                                           | `env.KV` 或 `c.env.KV`                                                       |
+| `STORAGE`    | `R2Bucket`               | `import { storage } from "void/storage"`                                                                                                                 | `env.STORAGE` 或 `c.env.STORAGE`                                             |
+| `AI`         | `Ai`                     | `import { ai } from "void/ai"`                                                                                                                           | `env.AI` 或 `c.env.AI`                                                       |
+| `SANDBOX`    | Managed Sandbox 能力     | `import { getSandbox } from "void/sandbox"`                                                                                                              | `getSandbox()`；原生 Cloudflare 环境还会暴露 `env.SANDBOX` / `c.env.SANDBOX` |
+| Auth         | 无                       | `import { ... } from "void/auth"`，或从 `void/client` / `void/client/react` / `void/client/vue` / `void/client/svelte` / `void/client/solid` 导入 `auth` | 无                                                                           |
+| `QUEUE_*`    | `Queue`                  | `import { queues } from "void/queues"`                                                                                                                   | `env.QUEUE_*`                                                                |
+| `VOID_LIVE`  | `DurableObjectNamespace` | `import { defineLiveStream } from "void/live"`                                                                                                           | 不适用                                                                       |
+| 由文件名推导 | `DurableObjectNamespace` | `durable-objects/` 中默认导出 `defineDurableState()` 的模块                                                                                              | 不适用                                                                       |
 
 从 `void/client` 或框架专用的客户端子路径（例如 `void/client/react`）导入 `auth` 这个 specifier 时，同样会触发 Auth 识别（只导入 `fetch` 则不会）。
 
@@ -31,29 +31,29 @@ Durable state 由 `durable-objects/` 中的文件推导。例如 `durable-object
 
 原生 Void 应用默认扫描这些目录。配置了 [`sourceDir`](/docs/config) 时，Void 改为扫描那棵源码树：
 
-| 目录          | 内容                                      |
-| ------------- | ----------------------------------------- |
-| `routes/`     | API 路由处理器                            |
-| `middleware/` | Hono 中间件                               |
-| `queues/`     | 队列消费者                                |
-| `pages/`      | 页面组件与配套的 `.server.ts` 文件        |
-| `crons/`      | 定时任务处理器                            |
-| `email/`      | 收件邮件处理器                            |
-| `src/`        | 应用源码                                  |
+| 目录          | 内容                               |
+| ------------- | ---------------------------------- |
+| `routes/`     | API 路由处理器                     |
+| `middleware/` | Hono 中间件                        |
+| `queues/`     | 队列消费者                         |
+| `pages/`      | 页面组件与配套的 `.server.ts` 文件 |
+| `crons/`      | 定时任务处理器                     |
+| `email/`      | 收件邮件处理器                     |
+| `src/`        | 应用源码                           |
 
 ### 框架模式
 
 对于[受支持的元框架](/docs/frameworks)，Void 扫描这些目录：
 
-| 目录      | 内容                    |
-| --------- | ----------------------- |
-| `src/`    | 应用源码                |
-| `app/`    | 框架的 app 目录         |
-| `routes/` | 框架路由                |
-| `server/` | 服务端代码              |
-| `pages/`  | 框架页面                |
-| `crons/`  | 定时任务处理器          |
-| `queues/` | 队列消费者              |
+| 目录      | 内容            |
+| --------- | --------------- |
+| `src/`    | 应用源码        |
+| `app/`    | 框架的 app 目录 |
+| `routes/` | 框架路由        |
+| `server/` | 服务端代码      |
+| `pages/`  | 框架页面        |
+| `crons/`  | 定时任务处理器  |
+| `queues/` | 队列消费者      |
 
 框架识别依据 `package.json` 的 dependencies 与 dev dependencies。请在框架的 Vite 配置中加入 `voidPlugin()`，以便开发期间也能进行推断。各框架的配置方式见对应的集成指南。
 

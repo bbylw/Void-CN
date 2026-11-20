@@ -7,61 +7,61 @@ description: 查询公开的导入路径、函数签名与返回类型。安装�
 
 ## API 主题
 
-| 主题                                             | 用途                                                       |
-| ------------------------------------------------ | ---------------------------------------------------------- |
-| [插件与配置](/docs/reference/api/plugin)         | 在 Vite 中引入 Void 并配置应用。                            |
-| [处理器与中间件](/docs/reference/api/handlers)   | HTTP 路由、校验、定时任务、队列与渲染。                     |
-| [Rewrite](/docs/reference/api/rewrites)          | 保持请求 URL 不变的前提下由另一条路由响应。                 |
-| [身份认证](/docs/reference/api/auth)             | 会话、用户与认证客户端。                                    |
-| [Fetch 客户端](/docs/reference/api/client)       | 类型化请求与错误。                                          |
-| [Durable State 与 WebSocket](/docs/reference/api/durable) | 持久化对象与类型化连接。                            |
-| [数据库与填充数据](/docs/reference/api/database) | 查询、操作符与 seed 脚本。                                  |
-| [KV、存储、AI 与日志](/docs/reference/api/resources) | 资源客户端、缓存重验证与日志。                          |
-| [部署产物](/docs/reference/api/deploy)           | 为托管部署打包已构建的应用。                                |
-| [类型](/docs/reference/api/types)                | 类型化 URL、路由类型、处理器上下文与 head 元数据。          |
-| [环境变量](/docs/reference/api/env)              | 经过校验的环境变量值与绑定类型。                            |
-| [Pages 适配器](/docs/reference/api/pages)        | React、Vue、Svelte、Solid 与 Markdown。                     |
+| 主题                                                      | 用途                                               |
+| --------------------------------------------------------- | -------------------------------------------------- |
+| [插件与配置](/docs/reference/api/plugin)                  | 在 Vite 中引入 Void 并配置应用。                   |
+| [处理器与中间件](/docs/reference/api/handlers)            | HTTP 路由、校验、定时任务、队列与渲染。            |
+| [Rewrite](/docs/reference/api/rewrites)                   | 保持请求 URL 不变的前提下由另一条路由响应。        |
+| [身份认证](/docs/reference/api/auth)                      | 会话、用户与认证客户端。                           |
+| [Fetch 客户端](/docs/reference/api/client)                | 类型化请求与错误。                                 |
+| [Durable State 与 WebSocket](/docs/reference/api/durable) | 持久化对象与类型化连接。                           |
+| [数据库与填充数据](/docs/reference/api/database)          | 查询、操作符与 seed 脚本。                         |
+| [KV、存储、AI 与日志](/docs/reference/api/resources)      | 资源客户端、缓存重验证与日志。                     |
+| [部署产物](/docs/reference/api/deploy)                    | 为托管部署打包已构建的应用。                       |
+| [类型](/docs/reference/api/types)                         | 类型化 URL、路由类型、处理器上下文与 head 元数据。 |
+| [环境变量](/docs/reference/api/env)                       | 经过校验的环境变量值与绑定类型。                   |
+| [Pages 适配器](/docs/reference/api/pages)                 | React、Vue、Svelte、Solid 与 Markdown。            |
 
 ## 面向用户的导入
 
 从以下路径导入 Void 对应用开放的 API：
 
-| 导入路径                  | 内容                                                           |
-| ------------------------- | -------------------------------------------------------------- |
-| `void`                    | `voidPlugin`、handler/类型的重新导出、`defer`、`Deferred`、`DeferredState`、`InferProps`、`HeadConfig`、`HeadDescriptor` |
-| `void/handler`            | `defineHandler`、`defineMiddleware`、`basicAuth`、`defineScheduled`、`defineQueue`、`defineRender`、`defineHead`、类型 |
-| `void/auth`               | `defineAuth`、`getUser`、`getSession`、`requireAuth`、`AuthUser`、`AuthSession`、`AuthState` |
-| `void/client`             | `fetch`、`fetchStream`、`FetchError`、`auth`、`createAuthClient`、`AuthUser`、`AuthSession`、`AuthState` |
-| `void/client/{framework}` | 与 `void/client` 相同，并为 `react`、`vue`、`svelte`、`solid` 提供框架专属的 Better Auth 客户端 |
-| `void/ws`                 | `defineRoom`、`defineWebSocket`、`connect`、WebSocket 上下文、连接与 action 类型 |
-| `void/ws/server`          | `getRoom`、`RoomHandle`、`RoomOptions`、`RoomPath`。仅在服务端可用：从路由、auth 钩子、队列与定时任务中调用 room action。 |
-| `void/durable`            | `defineDurableState`、`defineDurableObject`、类型化的 state/RPC/context/migration 类型 |
-| `void/sse`                | `eventStream`、`formatSse`、`formatSseText`、`getLastEventId`、`SseStreamClosedError`、SSE 消息与流类型 |
-| `void/sse/client`         | `connectEventStream`、浏览器 `EventSource` 包装类型 |
-| `void/live`               | `defineLiveStream`、SSE 主题分发运行时类型。仅在服务端可用。 |
-| `void/live/client`        | `connectLiveStream`，浏览器端辅助方法：一条 SSE 连接加上 POST 的订阅/退订控制。 |
-| `void/response`           | `convertReturnValue` |
-| `void/validator`          | `runValidation`、`ValidatorSlots`、`HandlerInput` |
-| `void/drizzle-zod`        | 重新导出 [`drizzle-zod`](https://orm.drizzle.team/docs/zod)，用于从 schema 派生 Drizzle 表的 Zod 校验器 |
-| `void/drizzle-valibot`    | 重新导出 [`drizzle-valibot`](https://orm.drizzle.team/docs/valibot)，用于从 schema 派生 Drizzle 表的 Valibot 校验器 |
-| `void/drizzle-arktype`    | 重新导出 [`drizzle-arktype`](https://orm.drizzle.team/docs/arktype)，用于从 schema 派生 Drizzle 表的 ArkType 校验器 |
-| `void/schema-d1`          | 重新导出 [`drizzle-orm/sqlite-core`](https://orm.drizzle.team/docs/column-types/sqlite)，用于 D1 的表与列构造器 |
-| `void/schema-pg`          | 重新导出 [`drizzle-orm/pg-core`](https://orm.drizzle.team/docs/column-types/pg)，用于 PostgreSQL 的表与列构造器 |
-| `void/schema-mysql`       | 重新导出 `drizzle-orm/mysql-core`，用于 MySQL 的表与列构造器 |
-| `void/database-provider`  | `defineDatabaseProvider` 以及 `void db connect --provider` 使用的适配器类型 |
-| `void/db`                 | `db`（当前 dialect 对应的 Drizzle D1、PostgreSQL 或 MySQL 实例）、`createDb`、D1 会话辅助方法（`setSession`、`getBookmark`）、查询操作符（`eq`、`and`、`or`、`desc`、`like`、`inArray` 等） |
-| `void/seed`               | `defineSeed`、`SeedContext`、`SeedFn`，用于以编程方式编写 `void db seed` 模块 |
-| `void/kv`                 | `kv`、`createKV`、类型化的 KV client/map 类型 |
-| `void/storage`            | `storage`、`createStorage`，用于推断出的 R2 绑定或指定的某个 `R2Bucket` |
-| `void/ai`                 | `ai`、`VoidAi`、模型输入与响应类型 |
-| `void/limits`             | `UsageLimit`、`UsageLimitData` 与 `readUsageLimit`。AI 与 Sandbox 的限额会以 `UsageLimit` 拒绝；在 Void 路由与 Pages action 中未被捕获的限额会返回结构化的 HTTP 429 响应。 |
-| `void/isr`                | `revalidate(options)`，用于按需失效 ISR 缓存 |
-| `void/log`                | `logger` 结构化日志辅助方法 |
-| `void/routes`             | [`routeUrl()`](/docs/reference/api/types)、`RouteDestination`、`RoutePath`、`RouteOptions`、`RouteUrl`、`Href`、`RouteUrlInput` 以及生成的路由映射表 |
-| `void/queues`             | `queues` 代理，用于向类型化队列发送消息 |
-| `void/email`              | `sendEmail`、`createEmail`、`defineEmail`、`parseEmail`、`replyEmail`、`MimeError`、`ParseEmailError`，以及地址、附件、结果与处理器类型。见[邮件](/docs/email)。 |
-| `void/email/testing`      | `createEmailTestHarness` 与 `createInboundTestHarness`，用于捕获发送记录并把测试邮件投递给 `email/` 处理器。 |
+| 导入路径                  | 内容                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `void`                    | `voidPlugin`、handler/类型的重新导出、`defer`、`Deferred`、`DeferredState`、`InferProps`、`HeadConfig`、`HeadDescriptor`                                                                                                                                                                                                                                           |
+| `void/handler`            | `defineHandler`、`defineMiddleware`、`basicAuth`、`defineScheduled`、`defineQueue`、`defineRender`、`defineHead`、类型                                                                                                                                                                                                                                             |
+| `void/auth`               | `defineAuth`、`getUser`、`getSession`、`requireAuth`、`AuthUser`、`AuthSession`、`AuthState`                                                                                                                                                                                                                                                                       |
+| `void/client`             | `fetch`、`fetchStream`、`FetchError`、`auth`、`createAuthClient`、`AuthUser`、`AuthSession`、`AuthState`                                                                                                                                                                                                                                                           |
+| `void/client/{framework}` | 与 `void/client` 相同，并为 `react`、`vue`、`svelte`、`solid` 提供框架专属的 Better Auth 客户端                                                                                                                                                                                                                                                                    |
+| `void/ws`                 | `defineRoom`、`defineWebSocket`、`connect`、WebSocket 上下文、连接与 action 类型                                                                                                                                                                                                                                                                                   |
+| `void/ws/server`          | `getRoom`、`RoomHandle`、`RoomOptions`、`RoomPath`。仅在服务端可用：从路由、auth 钩子、队列与定时任务中调用 room action。                                                                                                                                                                                                                                          |
+| `void/durable`            | `defineDurableState`、`defineDurableObject`、类型化的 state/RPC/context/migration 类型                                                                                                                                                                                                                                                                             |
+| `void/sse`                | `eventStream`、`formatSse`、`formatSseText`、`getLastEventId`、`SseStreamClosedError`、SSE 消息与流类型                                                                                                                                                                                                                                                            |
+| `void/sse/client`         | `connectEventStream`、浏览器 `EventSource` 包装类型                                                                                                                                                                                                                                                                                                                |
+| `void/live`               | `defineLiveStream`、SSE 主题分发运行时类型。仅在服务端可用。                                                                                                                                                                                                                                                                                                       |
+| `void/live/client`        | `connectLiveStream`，浏览器端辅助方法：一条 SSE 连接加上 POST 的订阅/退订控制。                                                                                                                                                                                                                                                                                    |
+| `void/response`           | `convertReturnValue`                                                                                                                                                                                                                                                                                                                                               |
+| `void/validator`          | `runValidation`、`ValidatorSlots`、`HandlerInput`                                                                                                                                                                                                                                                                                                                  |
+| `void/drizzle-zod`        | 重新导出 [`drizzle-zod`](https://orm.drizzle.team/docs/zod)，用于从 schema 派生 Drizzle 表的 Zod 校验器                                                                                                                                                                                                                                                            |
+| `void/drizzle-valibot`    | 重新导出 [`drizzle-valibot`](https://orm.drizzle.team/docs/valibot)，用于从 schema 派生 Drizzle 表的 Valibot 校验器                                                                                                                                                                                                                                                |
+| `void/drizzle-arktype`    | 重新导出 [`drizzle-arktype`](https://orm.drizzle.team/docs/arktype)，用于从 schema 派生 Drizzle 表的 ArkType 校验器                                                                                                                                                                                                                                                |
+| `void/schema-d1`          | 重新导出 [`drizzle-orm/sqlite-core`](https://orm.drizzle.team/docs/column-types/sqlite)，用于 D1 的表与列构造器                                                                                                                                                                                                                                                    |
+| `void/schema-pg`          | 重新导出 [`drizzle-orm/pg-core`](https://orm.drizzle.team/docs/column-types/pg)，用于 PostgreSQL 的表与列构造器                                                                                                                                                                                                                                                    |
+| `void/schema-mysql`       | 重新导出 `drizzle-orm/mysql-core`，用于 MySQL 的表与列构造器                                                                                                                                                                                                                                                                                                       |
+| `void/database-provider`  | `defineDatabaseProvider` 以及 `void db connect --provider` 使用的适配器类型                                                                                                                                                                                                                                                                                        |
+| `void/db`                 | `db`（当前 dialect 对应的 Drizzle D1、PostgreSQL 或 MySQL 实例）、`createDb`、D1 会话辅助方法（`setSession`、`getBookmark`）、查询操作符（`eq`、`and`、`or`、`desc`、`like`、`inArray` 等）                                                                                                                                                                        |
+| `void/seed`               | `defineSeed`、`SeedContext`、`SeedFn`，用于以编程方式编写 `void db seed` 模块                                                                                                                                                                                                                                                                                      |
+| `void/kv`                 | `kv`、`createKV`、类型化的 KV client/map 类型                                                                                                                                                                                                                                                                                                                      |
+| `void/storage`            | `storage`、`createStorage`，用于推断出的 R2 绑定或指定的某个 `R2Bucket`                                                                                                                                                                                                                                                                                            |
+| `void/ai`                 | `ai`、`VoidAi`、模型输入与响应类型                                                                                                                                                                                                                                                                                                                                 |
+| `void/limits`             | `UsageLimit`、`UsageLimitData` 与 `readUsageLimit`。AI 与 Sandbox 的限额会以 `UsageLimit` 拒绝；在 Void 路由与 Pages action 中未被捕获的限额会返回结构化的 HTTP 429 响应。                                                                                                                                                                                         |
+| `void/isr`                | `revalidate(options)`，用于按需失效 ISR 缓存                                                                                                                                                                                                                                                                                                                       |
+| `void/log`                | `logger` 结构化日志辅助方法                                                                                                                                                                                                                                                                                                                                        |
+| `void/routes`             | [`routeUrl()`](/docs/reference/api/types)、`RouteDestination`、`RoutePath`、`RouteOptions`、`RouteUrl`、`Href`、`RouteUrlInput` 以及生成的路由映射表                                                                                                                                                                                                               |
+| `void/queues`             | `queues` 代理，用于向类型化队列发送消息                                                                                                                                                                                                                                                                                                                            |
+| `void/email`              | `sendEmail`、`createEmail`、`defineEmail`、`parseEmail`、`replyEmail`、`MimeError`、`ParseEmailError`，以及地址、附件、结果与处理器类型。见[邮件](/docs/email)。                                                                                                                                                                                                   |
+| `void/email/testing`      | `createEmailTestHarness` 与 `createInboundTestHarness`，用于捕获发送记录并把测试邮件投递给 `email/` 处理器。                                                                                                                                                                                                                                                       |
 | `void/sandbox`            | `getSandbox`、`sandbox`、`SandboxLimitError`、`SandboxUnavailableError`，以及 SDK 1.0 的文件、备份与挂载辅助方法。`getSandbox(id)` 会解析出一个客户端。命令、文件、端口请求与进程结束都返回 Promise；超出限额时以 `SandboxLimitError` 拒绝，它继承自 `UsageLimit`。容器状态会保留到不活跃（默认十分钟）、崩溃或重启为止。API 与部署要求见[沙箱](/docs/sandboxes)。 |
-| `void/env`                | `defineEnv`、`env`、schema 辅助方法（`string`、`number`、`boolean`、`url`、`email`、`oneOf`、`json`），以及全局 Cloudflare env 类型 |
-| `void/nitro`              | 供 Nuxt 与 Analog 使用的 Nitro 模块。把 `'void/nitro'` 加入 Nitro 的 `modules`，服务端路由即可获得应用的 `void/db` 与 `@schema` |
-| `void/sveltekit`          | SvelteKit 集成辅助方法：`withVoidTSConfig()` 与 `mergeVoidSvelteKitTsconfig()` |
+| `void/env`                | `defineEnv`、`env`、schema 辅助方法（`string`、`number`、`boolean`、`url`、`email`、`oneOf`、`json`），以及全局 Cloudflare env 类型                                                                                                                                                                                                                                |
+| `void/nitro`              | 供 Nuxt 与 Analog 使用的 Nitro 模块。把 `'void/nitro'` 加入 Nitro 的 `modules`，服务端路由即可获得应用的 `void/db` 与 `@schema`                                                                                                                                                                                                                                    |
+| `void/sveltekit`          | SvelteKit 集成辅助方法：`withVoidTSConfig()` 与 `mergeVoidSvelteKitTsconfig()`                                                                                                                                                                                                                                                                                     |

@@ -55,7 +55,7 @@ if (c.isRewritten()) return next();
 
 不带 `?` 的目标会保留请求带来的查询串：`c.rewrite('/search')` 保留 `?q=...`，而 `c.rewrite('/search?q=all')` 会把它替换掉。
 
-编辑器会通过 [`RewriteDestination`](/docs/reference/api/rewrites) 提示已知路由。开启 [`routing.typedRoutes`](/docs/config) 后，不匹配任何路由的字符串会被拒绝。对于运行时拼出来的路径，请从 `void/routes` 导入 `RouteUrl` 并做断言，例如 `` c.rewrite(`/en${c.req.path}` as RouteUrl) ``。
+编辑器会通过 [`RewriteDestination`](/docs/reference/api/rewrites) 提示已知路由。开启 [`routing.typedRoutes`](/docs/config) 后，不匹配任何路由的字符串会被拒绝。对于运行时拼出来的路径，请从 `void/routes` 导入 `RouteUrl` 并做断言，例如 ``c.rewrite(`/en${c.req.path}` as RouteUrl)``。
 
 ### 运行时 rewrite 到不了静态资源
 

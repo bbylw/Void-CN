@@ -23,11 +23,11 @@ import Callout from '@/components/docs/Callout.astro';
 
 在 `void init` 期间选择数据库，或在 `void.config.ts` 中设置 `database`：
 
-|              | [D1（SQLite）](/docs/database/d1) | [PostgreSQL](/docs/database/postgresql) | [MySQL](/docs/database/mysql) |
-| ------------ | --------------------------------- | --------------------------------------- | ----------------------------- |
-| 配置         | 默认                              | `"database": "pg"`                      | `"database": "mysql"`         |
-| 托管方       | Void                              | 自带数据库                              | 自带数据库                    |
-| 连接方式     | 自动的 D1 绑定                    | Hyperdrive                              | Hyperdrive                    |
+|          | [D1（SQLite）](/docs/database/d1) | [PostgreSQL](/docs/database/postgresql) | [MySQL](/docs/database/mysql) |
+| -------- | --------------------------------- | --------------------------------------- | ----------------------------- |
+| 配置     | 默认                              | `"database": "pg"`                      | `"database": "mysql"`         |
+| 托管方   | Void                              | 自带数据库                              | 自带数据库                    |
+| 连接方式 | 自动的 D1 绑定                    | Hyperdrive                              | Hyperdrive                    |
 
 <Callout type="tip" title="Void 平台会关闭 Hyperdrive 查询缓存">
   这样读取能反映已完成的写入。已有连接会在项目下一次部署时更新。
@@ -436,8 +436,9 @@ void gen model posts title:string body:text published:boolean
 `void db restore` 只作用于直连 Cloudflare 部署的 D1（基于 Time Travel），需要单次指定目标时给它加 `--platform cloudflare`。
 
 <Callout type="warn" title="恢复会丢弃之后的写入">
-  回档会丢弃所选时间点之后的所有写入，Time Travel 的历史也有限：Workers Free 保留 7 天，Workers Paid 保留 30
-  天；更早的迁移只能用一个新的迁移反向修正。Void 执行前会要求确认，并打印一条可撤销本次恢复的命令；脚本与 CI 用
+  回档会丢弃所选时间点之后的所有写入，Time Travel 的历史也有限：Workers Free 保留 7 天，Workers Paid
+  保留 30 天；更早的迁移只能用一个新的迁移反向修正。Void
+  执行前会要求确认，并打印一条可撤销本次恢复的命令；脚本与 CI 用
   `--yes`。恢复之后请确认已部署的代码能与恢复到的 schema 配合。
 </Callout>
 
@@ -460,9 +461,10 @@ export default defineConfig({
 新建数据库默认不带副本。省略 `readReplication` 时，部署不会改动数据库已有的副本设置——也就是说要关掉已有副本，必须显式写 `false` 再部署，光升级版本或删掉这个选项都没用。开启后，`void/db` 的 `db` 会为每个 Void 请求使用一个 D1 session，读取可以在靠近请求的位置执行，且同一请求中后续的查询能看到至少相同的数据。没有 Void 请求作用域的框架处理器会让每个数据库操作从主库开始；`createDb` 则为你传入的绑定开启一个可用副本的 session。
 
 <Callout type="warn" title="旧部署可能已经带副本">
-  Void 0.21.3 曾自动开启 D1 读副本，用该版本或其后的版本部署过的项目可能已经有副本，而副本会在请求之间提供陈旧数据。请升级到支持
-  `database.readReplication` 的版本（自托管的平台也要一起升级），把它设为 `false` 后重新部署。平台无法应用这个设置时，`void deploy`
-  会在上传任何东西之前报错停下。
+  Void 0.21.3 曾自动开启 D1
+  读副本，用该版本或其后的版本部署过的项目可能已经有副本，而副本会在请求之间提供陈旧数据。请升级到支持
+  `database.readReplication` 的版本（自托管的平台也要一起升级），把它设为 `false`
+  后重新部署。平台无法应用这个设置时，`void deploy` 会在上传任何东西之前报错停下。
 </Callout>
 
 ### 用 primary-first session 避开陈旧读
