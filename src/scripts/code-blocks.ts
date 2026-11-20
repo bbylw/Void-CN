@@ -36,18 +36,74 @@ const LANG_LABEL: Record<string, string> = {
 
 const COPY_LABEL = '复制';
 const DONE_LABEL = '已复制';
+const FAIL_LABEL = '复制失败';
+const OK_MESSAGE = '已复制到剪贴板';
+const FAIL_MESSAGE = '复制失败，请手动选中代码后复制';
 
+/**
+ * 全局复用的 aria-live 播报区（单个、polite）。
+ * 屏幕阅读器不会可靠播报按钮内部被替换的内容，也不会可靠播报 aria-label 的变化，
+ * 所以「已复制 / 复制失败」要写在这个位于按钮之外的区域里。
+ * 用 sr-only（clip/position）而不是 display:none 或 visibility:hidden —— 后者会把节点
+ * 移出可访问性树，导致文本不被播报。
+ */
+const LIVE_ID = 'code-copy-live';
+let lastMessage = '';
+let liveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function liveRegion(): HTMLElement | null {
+  if (!document.body) return null;
+  const existing = document.getElementById(LIVE_ID);
+  if (existing) return existing;
+  const region = document.createElement('span');
+  region.id = LIVE_ID;
+  region.setAttribute('role', 'status');
+  region.setAttribute('aria-live', 'polite');
+  region.className = 'sr-only';
+  document.body.append(region);
+  return region;
+}
+
+function announce(message: string) {
+  const region = liveRegion();
+  if (!region) return;
+  let text = message;
+  // VoiceOver 会跳过与上一条完全相同的文本（即使中间清空过），补一个不换行空格区分，它不会被读出来
+  if (text === lastMessage) text += '\u00A0';
+  lastMessage = text;
+  clearTimeout(liveTimer);
+  region.textContent = '';
+  // 先空后写：同一帧内的清空 + 写入会被读屏合并成一次变更，rAF 保证这是一次新的播报
+  requestAnimationFrame(() => {
+    region.textContent = text;
+  });
+  // 残留的「已复制」会被读屏浏览模式重复读到，超时后清掉
+  liveTimer = setTimeout(() => {
+    region.textContent = '';
+  }, 2500);
+}
+
+/** 返回是否复制成功：降级路径也可能失败，失败同样要让用户知道 */
 async function copyText(text: string) {
   try {
     await navigator.clipboard.writeText(text);
+    return true;
   } catch {
+    // 非安全上下文（http）或权限被拒时的最后手段：execCommand 已废弃，但能让复制仍然可用
     const ta = document.createElement('textarea');
     ta.value = text;
+    ta.setAttribute('readonly', '');
     ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
     document.body.appendChild(ta);
     ta.select();
-    document.execCommand('copy');
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
     ta.remove();
+    return ok;
   }
 }
 
@@ -86,15 +142,25 @@ function attachCopy(figure: HTMLElement) {
   button.innerHTML = `${COPY_ICON}<span>${COPY_LABEL}</span>`;
 
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const setLabel = (label: string, icon: string, copied: boolean) => {
+    button.innerHTML = `${icon}<span>${label}</span>`;
+    // 可见文本与无障碍名保持一致：不一致时读屏念出的名字与用户看到的按钮对不上
+    button.setAttribute('aria-label', label);
+    button.title = label;
+    if (copied) button.setAttribute('data-copied', '');
+    else button.removeAttribute('data-copied');
+  };
+
   button.addEventListener('click', async () => {
-    await copyText(pre.innerText.replace(/\n$/, ''));
-    button.setAttribute('data-copied', '');
-    button.innerHTML = `${DONE_ICON}<span>${DONE_LABEL}</span>`;
+    const text = pre.innerText.replace(/\n$/, '');
+    if (!text) return; // 空代码块既不复制也不播报，避免无意义的噪音
+    const ok = await copyText(text);
+    // 重复点击清掉旧计时器重新开始；不禁用按钮 —— 复制是幂等操作，
+    // 禁用会丢焦点、误报「不可用」，还会让失败后无法立刻重试。
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      button.removeAttribute('data-copied');
-      button.innerHTML = `${COPY_ICON}<span>${COPY_LABEL}</span>`;
-    }, 1600);
+    setLabel(ok ? DONE_LABEL : FAIL_LABEL, ok ? DONE_ICON : COPY_ICON, ok);
+    announce(ok ? OK_MESSAGE : FAIL_MESSAGE);
+    timer = setTimeout(() => setLabel(COPY_LABEL, COPY_ICON, false), 1600);
   });
 
   slot.appendChild(button);

@@ -1,6 +1,15 @@
 ---
 import '../styles/global.css';
 import { SITE } from '../data/site';
+/**
+ * 关键字体 preload：import woff2 拿到构建后的哈希 URL，与 global.css 里 @font-face 的
+ * src 指向同一文件（Vite 按内容哈希发射资源，两处会去重成同一个 URL），
+ * 因此 preload 不会造成重复下载，只是把请求提前到样式表解析之前。
+ * 只预载首屏正文（IBM Plex Sans）与标题（Space Grotesk）两款：
+ * JetBrains Mono 主要出现在折叠线以下的代码块，按 perf-html 指南不做预载，避免抢占带宽。
+ */
+import ibmPlexSansUrl from '@fontsource-variable/ibm-plex-sans/files/ibm-plex-sans-latin-wght-normal.woff2';
+import spaceGroteskUrl from '@fontsource-variable/space-grotesk/files/space-grotesk-latin-wght-normal.woff2';
 
 interface Props {
   title?: string;
@@ -34,6 +43,40 @@ const ogImage = new URL('/og.png', Astro.site ?? 'https://void-cn.pages.dev').hr
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
 
+    <!-- 主题基线：默认跟随系统；手动覆盖时由下方脚本把 content 改成 light / dark（见 ThemeToggle） -->
+    <meta name="color-scheme" content="light dark" />
+    <!-- 单一 theme-color：无 JS 时 SSR 渲染深色，故静态值取深色；有 JS 时由脚本按实际渲染色改写。
+         原来带 media 的两条会跟随系统偏好而非用户的手动覆盖，覆盖时浏览器界面颜色会与页面失真。 -->
+    <meta name="theme-color" content="#0b0b0d" />
+    <script is:inline>
+      (() => {
+        // 防 FOUC：首屏渲染前定好深/浅，并让 <meta> 与渲染色一致。
+        // 刻意只做一次「读取 + 应用」；系统偏好监听与跨标签同步交给 ThemeToggle 的脚本，
+        // 以免把逻辑堆进阻塞解析的内联脚本。localStorage 不可用时（隐私模式）仍按系统偏好上色。
+        document.documentElement.classList.add('js');
+        const root = document.documentElement;
+        let stored = null;
+        try {
+          stored = localStorage.getItem('void-theme');
+        } catch {}
+        const override = stored === 'dark' || stored === 'light' ? stored : null;
+        const dark = override
+          ? override === 'dark'
+          : matchMedia('(prefers-color-scheme: dark)').matches;
+        root.classList.toggle('dark', dark);
+        // 只有手动覆盖才改写 meta；跟随系统时保持 light dark，让 CSS 把配色交回系统偏好。
+        if (override) {
+          const scheme = document.querySelector('meta[name="color-scheme"]');
+          if (scheme) scheme.content = override;
+        }
+        const accentChrome = document.querySelector('meta[name="theme-color"]');
+        if (accentChrome) accentChrome.content = dark ? '#0b0b0d' : '#f4f4f2';
+      })();
+    </script>
+
+    <link rel="preload" href={ibmPlexSansUrl} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={spaceGroteskUrl} as="font" type="font/woff2" crossorigin />
+
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical.href} />
@@ -49,9 +92,6 @@ const ogImage = new URL('/og.png', Astro.site ?? 'https://void-cn.pages.dev').hr
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description} />
 
-    <meta name="theme-color" content="#0b0b0d" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#f4f4f2" media="(prefers-color-scheme: light)" />
-
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -61,18 +101,34 @@ const ogImage = new URL('/og.png', Astro.site ?? 'https://void-cn.pages.dev').hr
     <link rel="alternate" hreflang="zh-CN" href={canonical.href} />
     <link rel="alternate" hreflang="x-default" href={canonical.href} />
 
-    <script is:inline>
-      (() => {
-        document.documentElement.classList.add('js');
-        try {
-          const stored = localStorage.getItem('void-theme');
-          const dark = stored
-            ? stored === 'dark'
-            : window.matchMedia('(prefers-color-scheme: dark)').matches;
-          document.documentElement.classList.toggle('dark', dark);
-          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
-        } catch {}
-      })();
+    <!-- 跨文档 view transition 的新页快照需等正文解析完，否则会淡入到空白页（正文之后无需再阻塞）。 -->
+    <link rel="expect" href="#main" blocking="render" />
+
+    <!-- Speculation Rules：本站是纯静态 MPA，prefetch 收益明确、代价低。
+         只做 prefetch（不做 prerender）：prerender 会提前执行目标页的脚本，
+         对这个站点属于「用不上却先付钱」。eagerness 用 moderate：等悬停等较强信号再拉，
+         避免文档页动辄上百条侧栏链接被全量预取。不支持的浏览器会忽略整个标签。
+         注意：href_matches 只匹配 pathname，带 ? 的模式是非法模式且会静默废掉整条规则，
+         排除带查询参数的链接必须走 selector_matches。 -->
+    <script type="speculationrules">
+      {
+        "prefetch": [
+          {
+            "where": {
+              "and": [
+                { "href_matches": "/*" },
+                { "not": { "href_matches": "/search-index.json*" } },
+                {
+                  "not": {
+                    "selector_matches": "a[href^='#'], a[href*='?'], a[download], a[rel~='nofollow']"
+                  }
+                }
+              ]
+            },
+            "eagerness": "moderate"
+          }
+        ]
+      }
     </script>
 
     <slot name="head" />

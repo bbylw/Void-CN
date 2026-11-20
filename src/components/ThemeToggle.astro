@@ -2,7 +2,7 @@
 /**
  * 深浅色主题切换（零 JS 框架）。
  * 图标用 `dark:` 变体跟随 <html class="dark">，首屏无闪烁、无需 hydration。
- * 初始主题由 BaseLayout 的内联脚本在渲染前确定。
+ * 初始主题由 BaseLayout 的内联脚本在渲染前确定；本组件的脚本负责交互与后续同步。
  */
 interface Props {
   class?: string;
@@ -52,17 +52,77 @@ const { class: className = '' } = Astro.props;
 </button>
 
 <script>
+  /**
+   * 两态按钮 + 三态数据模型（跟随系统 / light / dark）：
+   * 目标色取「当前渲染色」的反面（用户意图是反转所见，而非反转系统默认）；
+   * 若目标恰与系统偏好一致，视为撤销调整 → 删除存储值回到跟随系统，否则字面存储。
+   * 分歧只在写入时判断一次，绝不因系统偏好后来变得与存储值相同而回头清除，否则永远无法固定配色。
+   */
   const STORAGE_KEY = 'void-theme';
+  /** theme-color 用页面底色令牌的值，保证浏览器界面与首屏一致 */
+  const THEME_COLOR = { dark: '#0b0b0d', light: '#f4f4f2' } as const;
+
+  const root = document.documentElement;
+  const schemeMeta = document.querySelector<HTMLMetaElement>('meta[name="color-scheme"]');
+  const chromeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  const systemMedia = window.matchMedia('(prefers-color-scheme: dark)');
+  const system = () => (systemMedia.matches ? 'dark' : 'light');
+
+  const readStored = (): 'dark' | 'light' | null => {
+    try {
+      const value = localStorage.getItem(STORAGE_KEY);
+      return value === 'dark' || value === 'light' ? value : null;
+    } catch {
+      // 站点数据被禁用时读取会抛错：不持久化，但页面仍要能上色
+      return null;
+    }
+  };
+
+  // 内存态镜像 localStorage；setItem 抛错时以它为准，保证渲染不失败
+  let override: 'dark' | 'light' | null = readStored();
+
+  function render() {
+    const current = override ?? system();
+    const dark = current === 'dark';
+    root.classList.toggle('dark', dark);
+    // <meta name="color-scheme"> 只是呈现提示，global.css 用 :has() 把它映射回 color-scheme 属性；
+    // 跟随系统时写回 light dark，原生控件（滚动条、表单、highlight）才继续跟着系统走。
+    if (schemeMeta) schemeMeta.content = override ?? 'light dark';
+    if (chromeMeta) chromeMeta.content = THEME_COLOR[current];
+
+    // 按钮描述的是「点下去会到哪」，所以标签取当前渲染色之外的一侧
+    const label = dark ? '浅色主题' : '深色主题';
+    document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]').forEach((btn) => {
+      btn.setAttribute('aria-label', `切换到${label}`);
+      btn.setAttribute('title', label);
+    });
+  }
 
   document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const dark = document.documentElement.classList.toggle('dark');
-      document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+      const target = (override ?? system()) === 'dark' ? 'light' : 'dark';
+      override = target === system() ? null : target;
       try {
-        localStorage.setItem(STORAGE_KEY, dark ? 'dark' : 'light');
+        if (override) localStorage.setItem(STORAGE_KEY, override);
+        else localStorage.removeItem(STORAGE_KEY);
       } catch {}
-      btn.setAttribute('aria-label', dark ? '切换到浅色主题' : '切换到深色主题');
-      btn.setAttribute('title', dark ? '浅色主题' : '深色主题');
+      render();
     });
   });
+
+  // 另一个标签页改了主题就跟进（clear() 时 key 为 null）
+  window.addEventListener('storage', (event) => {
+    if (event.key === STORAGE_KEY || event.key === null) {
+      override = readStored();
+      render();
+    }
+  });
+
+  // 系统偏好变化：仅在无手动覆盖时跟随；有覆盖时保留用户的选择
+  systemMedia.addEventListener('change', () => {
+    if (!override) render();
+  });
+
+  // 与内联脚本的结论对齐一次：修正 SSR 固定值带来的按钮标签偏差
+  render();
 </script>

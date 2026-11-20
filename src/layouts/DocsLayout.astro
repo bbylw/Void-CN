@@ -35,6 +35,7 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
     <div class="flex gap-10 xl:gap-14">
       <!-- 侧边栏 -->
       <aside
+        data-docs-scroller
         class="sticky top-16 hidden h-[calc(100dvh-4rem)] w-[16.5rem] shrink-0 overflow-y-auto py-8 pr-1 lg:block scroll-thin"
       >
         <DocsSidebar currentPath={Astro.url.pathname} />
@@ -92,6 +93,9 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
           </div>
 
           <DocsPager prev={prev} next={next} />
+          <!-- 文末标记：目录 scrollspy 用它判断「已读到结尾」，
+               从而在最后一节很短、标题进不了触发带时仍点亮最后一节。零高度、不介入排版。 -->
+          <div data-doc-end aria-hidden="true" class="h-px"></div>
         </article>
       </main>
 
@@ -106,7 +110,7 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
 
   <!-- 移动端：目录抽屉 -->
   <div class="fixed bottom-5 left-5 z-40 xl:hidden">
-    <details class="group">
+    <details class="group" data-doc-drawer>
       <summary
         class="flex cursor-pointer list-none items-center gap-2 rounded-full border px-3.5 py-2 text-[0.78rem] font-medium shadow-[var(--shadow-card)]"
         style="border-color:var(--c-line-strong);background:var(--c-surface);color:var(--c-fg);backdrop-filter:blur(12px)"
@@ -123,9 +127,15 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
           <path d="M3.5 5.5h13M3.5 10h9M3.5 14.5h13"></path>
         </svg>
         目录
+        <!-- 开合指示：summary 常驻文档流，旋转过渡在开与关两个方向都会播放；
+             reduced-motion 下由全局 CSS 把 transition-duration 归零，即刻切换 -->
+        <Icon
+          name="chevronRight"
+          class="size-3 rotate-90 opacity-60 transition-transform duration-200 group-open:-rotate-90"
+        />
       </summary>
       <div
-        class="absolute bottom-12 left-0 max-h-[60dvh] w-[min(21rem,calc(100vw-2.5rem))] overflow-y-auto rounded-[var(--radius-card)] border p-3 shadow-[var(--shadow-pop)] scroll-thin"
+        class="doc-drawer__panel absolute bottom-12 left-0 max-h-[60dvh] w-[min(21rem,calc(100vw-2.5rem))] overflow-y-auto rounded-[var(--radius-card)] border p-3 shadow-[var(--shadow-pop)] scroll-thin"
         style="border-color:var(--c-line-strong);background:var(--c-surface)"
       >
         <p class="eyebrow px-2 pt-1 pb-2">本页目录</p>
@@ -159,4 +169,75 @@ const tocHeadings = headings.filter((h) => h.depth === 2 || h.depth === 3);
   article :global(h3:hover > a::before) {
     opacity: 0.7;
   }
+
+  /* 移动端目录抽屉：只给「出现」一个克制的淡入+微升；
+     details 关闭时内容被直接移出渲染树，原生方式无法播放退场，
+     退场反馈由 summary 上箭头的旋转过渡承担（两个方向都会动）。
+     动效整体在 prefers-reduced-motion 下不声明（静态视图为默认态）。 */
+  @media (prefers-reduced-motion: no-preference) {
+    @keyframes doc-drawer-in {
+      from {
+        opacity: 0;
+        translate: 0 6px;
+      }
+    }
+
+    details[open] > .doc-drawer__panel {
+      /* opacity + translate：合成器线程可处理，不触发布局 */
+      animation: doc-drawer-in 0.18s ease-out;
+    }
+  }
 </style>
+
+<script>
+  /**
+   * 移动端目录抽屉的关闭路径：
+   * 1) 点了里面的链接（目录项跨小节跳转、侧边栏项跳转新页）→ 收起；
+   * 2) Esc → 收起并把焦点交还 summary，避免内容被隐藏后焦点落到 body；
+   * 3) 点击弹层外部 → 收起。
+   * 不锁整页滚动（弹层是可滚动的短面板，锁背景反而会让正文无法阅读）。
+   */
+  const initDocDrawer = () => {
+    const drawer = document.querySelector<HTMLDetailsElement>('[data-doc-drawer]');
+    if (!drawer) return;
+    if (drawer.dataset.ready) return; // astro:page-load 重复触发时不叠加监听
+    drawer.dataset.ready = '1';
+
+    const summary = drawer.querySelector<HTMLElement>('summary');
+
+    // 打开时才挂全局监听，关闭即摘除：不给页面留常驻的 document 级处理器
+    const onDocClick = (event: MouseEvent) => {
+      // 原生模态 <dialog>（搜索/移动菜单）打开时自己处理点击与 Esc
+      if (document.querySelector('dialog[open]')) return;
+      if (event.target instanceof Node && drawer.contains(event.target)) return;
+      drawer.open = false;
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (document.querySelector('dialog[open]')) return;
+      drawer.open = false;
+      summary?.focus();
+    };
+
+    // toggle 事件在 summary 的那次 click 分发完之后才排队触发，因此打开动作本身不会被下面的监听误关
+    drawer.addEventListener('toggle', () => {
+      if (drawer.open) {
+        // capture + click：触摸/鼠标都会命中，且早于内部可能存在的 stopPropagation
+        document.addEventListener('click', onDocClick, true);
+        document.addEventListener('keydown', onKeyDown);
+      } else {
+        document.removeEventListener('click', onDocClick, true);
+        document.removeEventListener('keydown', onKeyDown);
+      }
+    });
+
+    drawer.addEventListener('click', (event) => {
+      const link = (event.target as Element | null)?.closest<HTMLAnchorElement>('a[href]');
+      // summary 本身不是链接，不会误关；触摸拖动产生的 click 同样命中链接 → 收起
+      if (link) drawer.open = false;
+    });
+  };
+
+  initDocDrawer();
+  document.addEventListener('astro:page-load', initDocDrawer);
+</script>

@@ -13,7 +13,8 @@ const current = norm(currentPath);
 
 {
   compact ? (
-    <ul class="space-y-1">
+    // compact = 移动端目录抽屉里的实例：不做滚动位置恢复（抽屉每次打开都从头看）
+    <ul data-docs-sidebar="compact" class="space-y-1">
       {DOCS_NAV.map((g) => (
         <li>
           <p
@@ -48,7 +49,7 @@ const current = norm(currentPath);
       ))}
     </ul>
   ) : (
-    <nav aria-label="文档导航" class="pb-4">
+    <nav aria-label="文档导航" data-docs-sidebar="" class="pb-4">
       {DOCS_NAV.map((g) => (
         <div class="mb-5">
           <h2 class="eyebrow px-2 pb-1.5">{g.label}</h2>
@@ -100,3 +101,64 @@ const current = norm(currentPath);
     </nav>
   )
 }
+
+<script>
+  /**
+   * 侧边栏（112 项长导航）滚动位置：
+   * 1) 翻页后恢复上一页的滚动位置 —— 视线接着上一页，不必从头再找；
+   * 2) 恢复后若当前项仍不在可视区，再微调容器 scrollTop；
+   * 3) 全程只动滚动容器，不动整页（scrollIntoView 会沿祖先滚动链把正文也拉走）。
+   */
+  const SCROLL_KEY = 'void-docs-sidebar-scroll';
+
+  const initSidebarScroll = () => {
+    document.querySelectorAll<HTMLElement>('[data-docs-sidebar]').forEach((nav) => {
+      if (nav.dataset.docsSidebar === 'compact') return;
+      // astro:page-load 重复触发时只初始化一次，避免叠加 scroll 监听
+      if (nav.dataset.scrollReady) return;
+      nav.dataset.scrollReady = '1';
+
+      const scroller = nav.closest<HTMLElement>('[data-docs-scroller]');
+      // 找不到滚动容器，或桌面侧边栏当前不显示（窄屏 display:none → offsetParent 为 null）时跳过：
+      // 否则会把 0 写回 sessionStorage，覆盖掉桌面端记下的位置。
+      if (!scroller || scroller.offsetParent === null) return;
+
+      try {
+        const saved = sessionStorage.getItem(SCROLL_KEY);
+        if (saved !== null) scroller.scrollTop = Number(saved) || 0;
+      } catch {}
+
+      const active = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (active) {
+        const box = scroller.getBoundingClientRect();
+        const item = active.getBoundingClientRect();
+        const pad = 24;
+        if (item.top < box.top + pad) {
+          scroller.scrollTop -= box.top + pad - item.top;
+        } else if (item.bottom > box.bottom - pad) {
+          scroller.scrollTop += item.bottom - (box.bottom - pad);
+        }
+      }
+
+      let queued = false;
+      scroller.addEventListener(
+        'scroll',
+        () => {
+          // rAF 合帧：滚动中每帧最多写一次 sessionStorage，且只读 scrollTop（不触发布局）
+          if (queued) return;
+          queued = true;
+          requestAnimationFrame(() => {
+            queued = false;
+            try {
+              sessionStorage.setItem(SCROLL_KEY, String(scroller.scrollTop));
+            } catch {}
+          });
+        },
+        { passive: true },
+      );
+    });
+  };
+
+  initSidebarScroll();
+  document.addEventListener('astro:page-load', initSidebarScroll);
+</script>
