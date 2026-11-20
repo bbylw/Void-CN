@@ -1,9 +1,19 @@
 // 滚动入场：为 .reveal 元素在进入视口时添加 .is-in。
+// 支持 CSS 滚动驱动动画的浏览器由 global.css 的 @supports 分支接管（位置驱动、无需 JS），
+// 这里只服务不支持 animation-timeline: view() 的浏览器，用 IntersectionObserver 触发一次 transition。
 // 尊重 prefers-reduced-motion：直接显示，不做位移。
 const reduced = () =>
   typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// 与 global.css 里 @supports 的判据保持一致，避免两套入场效果同时生效。
+const cssScrollDriven = () =>
+  typeof CSS !== 'undefined' &&
+  typeof CSS.supports === 'function' &&
+  CSS.supports('(animation-timeline: view()) and (animation-range: entry)');
+
 function initReveal() {
+  if (cssScrollDriven()) return;
+
   const els = document.querySelectorAll<HTMLElement>('.reveal:not(.is-in)');
   if (!els.length) return;
 

@@ -13,22 +13,12 @@ const { headings, nested = false } = Astro.props;
 
 {
   headings.length > 0 ? (
-    <nav aria-label="本页目录" data-toc={nested ? 'nested' : undefined} class="pb-10">
+    <nav aria-label="本页目录" data-toc={nested ? 'nested' : 'page'} class="pb-10">
       <p class="eyebrow mb-3 px-3">本页目录</p>
-      <ul class="relative space-y-0.5 border-l" style="border-color:var(--c-line)">
+      <ul class="toc-list relative space-y-0.5">
         {headings.map((h) => (
           <li>
-            <a
-              href={`#${h.slug}`}
-              data-toc-link={h.slug}
-              class="block border-l-2 py-[0.28rem] text-[0.8rem] leading-snug transition-all duration-200"
-              style={{
-                marginLeft: '-1px',
-                paddingLeft: h.depth === 3 ? '1.6rem' : '0.75rem',
-                borderColor: 'transparent',
-                color: 'var(--c-fg-subtle)',
-              }}
-            >
+            <a href={`#${h.slug}`} data-toc-link={h.slug} data-depth={h.depth} class="toc-link">
               {h.text}
             </a>
           </li>
@@ -42,38 +32,165 @@ const { headings, nested = false } = Astro.props;
   )
 }
 
+<style>
+  /* 高亮状态只由 aria-current="location" 驱动：脚本改一个属性，视觉与读屏语义天然同源。
+     旧实现逐条写 inline style（color/borderColor/fontWeight × 每个链接），既触发样式重算，
+     又让视觉状态和无障碍状态各写各的，容易走偏。 */
+  .toc-list {
+    border-left: 1px solid var(--c-line);
+  }
+
+  .toc-link {
+    display: block;
+    margin-left: -1px;
+    border-left: 2px solid transparent;
+    padding-block: 0.28rem;
+    padding-inline-start: 0.75rem;
+    font-size: 0.8rem;
+    line-height: 1.375;
+    font-weight: 400;
+    color: var(--c-fg-subtle);
+    /* 只过渡颜色：加粗与左边线是状态切换，不做空间位移，reduced-motion 下无需额外处理 */
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .toc-link[data-depth='3'] {
+    padding-inline-start: 1.6rem;
+  }
+
+  .toc-link[aria-current='location'] {
+    border-left-color: var(--c-accent);
+    font-weight: 600;
+    color: var(--c-accent);
+  }
+</style>
+
 <script>
+  /**
+   * 目录高亮（scrollspy）。
+   *
+   * 旧实现：scroll 回调里对每个标题 getBoundingClientRect() 线性扫描 —— 每帧强制同步布局，
+   * 长文档滚动时是掉帧的主因。新实现交给 IntersectionObserver：浏览器只在标题穿越
+   * 「触发带」时回调，脚本不再读几何，回调频次与标题数量无关。
+   */
+
+  /** 每实例一份：slug -> 该实例内的链接（桌面 aside 与移动抽屉各一份，同 slug 成组保存） */
+  type LinkGroups = Map<string, HTMLAnchorElement[]>;
+  type BandState = 'above' | 'in' | 'below';
+
+  /** 模块级持有观察器：astro:page-load 重跑时先断开旧的，避免已脱离文档的节点继续回调 */
+  let observers: IntersectionObserver[] = [];
+
+  /** 阅读线：正文滚动时标题停在粘性表头下沿的位置，与全局 scroll-padding-top 同源 */
+  const readingLinePx = () => {
+    const v = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop);
+    return Number.isFinite(v) ? v : 104; // 兜底 = 6.5rem
+  };
+
   const initToc = () => {
-    const links = [...document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')];
-    if (!links.length) return;
+    observers.forEach((o) => o.disconnect());
+    observers = [];
 
-    const bySlug = new Map(links.map((l) => [l.dataset.tocLink!, l]));
-    const targets = links
-      .map((l) => document.getElementById(l.dataset.tocLink!))
-      .filter((el): el is HTMLElement => Boolean(el));
+    const roots = [...document.querySelectorAll<HTMLElement>('[data-toc]')];
+    if (!roots.length) return;
 
-    let currentId = '';
-    const paint = () => {
-      for (const [slug, link] of bySlug) {
-        const on = slug === currentId;
-        link.style.color = on ? 'var(--c-accent)' : 'var(--c-fg-subtle)';
-        link.style.borderColor = on ? 'var(--c-accent)' : 'transparent';
-        link.style.fontWeight = on ? '600' : '400';
+    // 关键修复：按容器作用域查询。旧实现全局抓 [data-toc-link] 并用 Map 以 slug 为键，
+    // 桌面与移动两份实例的同名 slug 互相覆盖，结果只有一份实例会被点亮。
+    const groups: LinkGroups = new Map();
+    for (const root of roots) {
+      for (const link of root.querySelectorAll<HTMLAnchorElement>('[data-toc-link]')) {
+        const slug = link.dataset.tocLink;
+        if (!slug) continue;
+        const list = groups.get(slug);
+        if (list) list.push(link);
+        else groups.set(slug, [link]);
       }
+    }
+
+    // 只保留页面上真实存在的标题（MDX slug 与正文 id 一一对应，此处为防御性过滤）
+    const nodes = new Map<string, HTMLElement>();
+    for (const slug of groups.keys()) {
+      const el = document.getElementById(slug);
+      if (el) nodes.set(slug, el);
+    }
+    if (!nodes.size) return;
+    const slugs = [...nodes.keys()];
+
+    let current = '';
+    const apply = (slug: string) => {
+      if (slug === current) return;
+      groups.get(current)?.forEach((a) => a.removeAttribute('aria-current'));
+      current = slug;
+      if (slug) groups.get(slug)?.forEach((a) => a.setAttribute('aria-current', 'location'));
     };
 
-    const onScroll = () => {
-      let active = '';
-      for (const t of targets) {
-        if (t.getBoundingClientRect().top <= 140) active = t.id;
+    if (!('IntersectionObserver' in window)) {
+      // 无 IntersectionObserver 的旧浏览器：退化为「点哪亮哪」，
+      // 不回滚到每帧 getBoundingClientRect 扫描（那正是本次要移除的开销）。
+      for (const [slug, links] of groups) {
+        for (const link of links) link.addEventListener('click', () => apply(slug));
       }
-      if (active !== currentId) {
-        currentId = active;
-        paint();
-      }
+      return;
+    }
+
+    const line = readingLinePx();
+    const state = new Map<string, BandState>();
+    let atEnd = false;
+
+    const resolve = () => {
+      let lastAbove = '';
+      for (const s of slugs) if (state.get(s) === 'above') lastAbove = s;
+      const last = slugs[slugs.length - 1]!;
+      // 页底短小节：最后一节的标题可能再也抬不到阅读线上（滚到底也只剩半屏）。
+      // 文末标记已可见 + 上一节已在线上方 + 最后一节的标题在视野内
+      // → 认定最后一节，否则它永远点不亮。没有上一节兜底时不启用，
+      // 免得一屏就能读完的短页刚进来就把最后一项点亮。
+      if (atEnd && lastAbove && state.get(last) === 'in') return last;
+      // 常规语义（与旧实现一致）：最后一个越过阅读线的标题；还没越过就不高亮
+      return lastAbove;
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
+
+    const spy = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const slug = (entry.target as HTMLElement).id;
+          if (entry.isIntersecting) state.set(slug, 'in');
+          else state.set(slug, entry.boundingClientRect.top <= line ? 'above' : 'below');
+        }
+        apply(resolve());
+      },
+      // 触发带 = 阅读线（表头下沿）到视口底：
+      // 带内 = 标题已可见但还没越过线，上方 = 已越过，下方 = 还没进视野。
+      // 判定只用「是否越过线」这一件事，所以不会像整屏扫描那样每帧读几何。
+      { rootMargin: `-${line}px 0px 0px 0px`, threshold: 0 },
+    );
+    for (const el of nodes.values()) spy.observe(el);
+    observers.push(spy);
+
+    // 文末标记（DocsLayout 提供）单独一个观察器：它只回答「读到结尾了吗」，
+    // 不参与带内判定，所以用更宽的范围（进入视口即算）。
+    const end = document.querySelector('[data-doc-end]');
+    if (end) {
+      const endObserver = new IntersectionObserver(
+        ([entry]) => {
+          atEnd = entry?.isIntersecting ?? false;
+          apply(resolve());
+        },
+        { rootMargin: '0px 0px -10% 0px', threshold: 0 },
+      );
+      endObserver.observe(end);
+      observers.push(endObserver);
+    }
+
+    for (const [s, el] of nodes) {
+      // 锚点目标可聚焦：键盘用户从目录跳转后能用 Tab 从该小节继续向下浏览
+      el.setAttribute('tabindex', '-1');
+      // 首屏已在阅读线上方的标题先归位（整页只读一次几何，非每帧），避免首次回调前无高亮
+      if (el.getBoundingClientRect().top <= line) state.set(s, 'above');
+    }
+    apply(resolve());
   };
 
   initToc();

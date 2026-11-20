@@ -28,10 +28,11 @@ async function boot() {
 }
 
 function openDialog() {
-  if (mounted) {
-    window.dispatchEvent(new CustomEvent('search:open'));
-    return;
-  }
+  // 无论是否已挂载都先广播一次：
+  // 已挂载 → 组件收到后 showModal 展开；未挂载 → 让移动端抽屉等其它模态先收起，
+  // 避免搜索对话框叠在抽屉之上形成两层模态。
+  window.dispatchEvent(new CustomEvent('search:open'));
+  if (mounted) return;
   void boot();
 }
 

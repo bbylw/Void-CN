@@ -27,6 +27,61 @@
     format('woff2-variations');
 }
 
+/* ── 度量对齐的本地回退（visually-stable-font-fallbacks）──────────────
+   swap 期浏览器先用回退字形排版，webfont 到位后再换回，两者 x 高度/行进指标
+   不同就会推动后续内容 → CLS。这里给每款 webfont 配一个「本地度量替身」：
+   size-adjust 把回退字形缩放到与 webfont 相同的 x 高度，三个 override 把
+   行盒（ascent/descent/gap）也钉到 webfont 的值上。
+
+   数值来源：用 fontTools 直接读 woff2 的 OS/2.sxHeight 与 hhea 行进指标（单位归一到 em）：
+     Space Grotesk  x .486 / asc .984 / desc .292 / gap 0
+     IBM Plex Sans  x .516 / asc 1.025 / desc .275 / gap 0
+     JetBrains Mono x .550 / asc 1.020 / desc .300 / gap 0
+   回退侧取 Arial 与 Courier New；Linux 上没有它们时用度量兼容的
+   Liberation Sans / Liberation Mono 代测（Red Hat 明确按 Arial/Courier New 度量对齐）：
+     Arial          x .52832 / asc .90527 / desc .21191 / gap .03271
+     Courier New    x .52832 / asc .83252 / desc .30029 / gap 0
+   推导（CSS Fonts 4：size-adjust 同时缩放字形与指标，override 为 font-size 的百分比）：
+     size-adjust      = x(webfont) / x(fallback)
+     *-override       = metric(webfont) / size-adjust
+   本站正文普遍带显式 line-height，因此行盒收益有限，主要收益来自 x 高度对齐后的
+   文字视觉大小与折行位置不变。中文不受影响：Arial / Courier New 没有 CJK 字形，
+   逐字符匹配会继续落到栈后面的 PingFang SC / Microsoft YaHei，中文栈保持原样。
+   不支持这些 descriptor 的旧浏览器（Baseline 2024-07 前）直接忽略，退回普通回退字体。
+   每个 face 都显式声明 font-weight: 100 900：不写时它可能只被当成单一字重，粗体标题就会掉回系统字体。
+   ────────────────────────────────────────────────────────────────── */
+@font-face {
+  font-family: 'IBM Plex Sans Fallback';
+  font-weight: 100 900;
+  font-style: normal;
+  src: local('Arial'), local('Liberation Sans');
+  size-adjust: 97.67%;
+  ascent-override: 104.95%;
+  descent-override: 28.16%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'Space Grotesk Fallback';
+  font-weight: 100 900;
+  font-style: normal;
+  src: local('Arial'), local('Liberation Sans');
+  size-adjust: 91.99%;
+  ascent-override: 106.97%;
+  descent-override: 31.74%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'JetBrains Mono Fallback';
+  font-weight: 100 900;
+  font-style: normal;
+  /* 等宽用 Courier New 系（Liberation Mono 度量兼容）：advance 0.6em 与 JetBrains Mono 一致 */
+  src: local('Courier New'), local('Liberation Mono');
+  size-adjust: 104.1%;
+  ascent-override: 97.98%;
+  descent-override: 28.82%;
+  line-gap-override: 0%;
+}
+
 /* ────────────────────────────────────────────────────────────────
    Void 中文站 · 设计系统 —— 石墨 × 信号橙
    冷灰石墨底 + 唯一点缀色（信号橙）。工程感、克制、技术编辑。
@@ -35,15 +90,19 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  /* 每款 webfont 后面紧跟它的度量对齐替身，再才是系统字体：
+     swap 期与加载失败时都用替身排版，尺寸与最终态一致。 */
   --font-sans:
-    'IBM Plex Sans Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
+    'IBM Plex Sans Variable', 'IBM Plex Sans Fallback', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC',
+    'Source Han Sans SC', sans-serif;
   --font-display:
-    'Space Grotesk Variable', 'IBM Plex Sans Variable', -apple-system, 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+    'Space Grotesk Variable', 'Space Grotesk Fallback', 'IBM Plex Sans Variable',
+    'IBM Plex Sans Fallback', -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    'Noto Sans SC', sans-serif;
   --font-mono:
-    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas, 'PingFang SC',
-    'Microsoft YaHei', monospace;
+    'JetBrains Mono Variable', 'JetBrains Mono Fallback', ui-monospace, SFMono-Regular, Menlo,
+    Consolas, 'PingFang SC', 'Microsoft YaHei', monospace;
 
   --text-display: clamp(2.75rem, 1rem + 5.6vw, 5.6rem);
   --text-display--line-height: 1.01;
@@ -107,7 +166,8 @@
     --c-glass: rgb(255 255 255 / 0.82);
     --shadow-card: 0 1px 2px rgb(24 24 27 / 0.05), 0 14px 34px -14px rgb(24 24 27 / 0.14);
     --shadow-pop: 0 2px 5px rgb(24 24 27 / 0.06), 0 26px 64px -22px rgb(24 24 27 / 0.26);
-    color-scheme: light;
+    /* 基础值保持 light dark：作者样式若硬编码单侧方案，<meta name="color-scheme"> 就永远是 no-op */
+    color-scheme: light dark;
   }
 
   .dark {
@@ -132,6 +192,17 @@
     --c-glass: rgb(19 19 22 / 0.82);
     --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 18px 44px -18px rgb(0 0 0 / 0.72);
     --shadow-pop: 0 2px 6px rgb(0 0 0 / 0.5), 0 32px 74px -24px rgb(0 0 0 / 0.86);
+    color-scheme: dark;
+  }
+
+  /* 把 <meta name="color-scheme"> 的手动覆盖映射回 color-scheme 属性：meta 只是呈现提示，
+     作者 CSS 会盖掉它，不映射就改不动原生控件（滚动条 / 表单 / ::selection 的系统色）。
+     :has() 的特异性高于 .dark，覆盖时能压过它；不支持 :has() 的旧浏览器直接丢弃整条规则，
+     于是退回「.dark 决定一切」的既有行为，无 JS 时也不会错。 */
+  :root:has(> head > meta[name='color-scheme'][content='light']) {
+    color-scheme: light;
+  }
+  :root:has(> head > meta[name='color-scheme'][content='dark']) {
     color-scheme: dark;
   }
 
@@ -441,12 +512,44 @@
       opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
       transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
     transition-delay: calc(var(--reveal-i, 0) * 70ms);
-    will-change: transform, opacity;
+    /* 不设常驻 will-change：入场是一次性效果，长期挂着会白占合成层；
+       transition / animation 期间浏览器会自行提升，结束后自动释放。 */
   }
   .js .reveal.is-in {
     opacity: 1;
     transform: none;
-    will-change: auto;
+  }
+
+  /* 支持滚动驱动动画的浏览器：入场进度改由元素在 scrollport 里的位置决定，
+     不依赖 JS（reveal.ts 用同一判据 CSS.supports 退出 IO 路径）。
+     交错的取舍：scroll-driven 下 animation-delay 被时间轴接管而失效，
+     于是把 --reveal-i 折算成 animation-range 的偏移量，同一屏内仍按序号错峰进入，
+     观感等价于原来每档 70ms 的 delay。 */
+  @media (prefers-reduced-motion: no-preference) {
+    @supports ((animation-timeline: view()) and (animation-range: entry)) {
+      @keyframes void-reveal-in {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      .js .reveal {
+        /* 基态交给动画（fill: both），这里只需关掉 transition 那条路径的样式 */
+        opacity: 1;
+        transform: none;
+        transition: none;
+        animation: void-reveal-in linear both;
+        /* timeline / range 必须写在 animation 简写之后，否则会被简写重置 */
+        animation-timeline: view(block);
+        animation-range: entry calc(var(--reveal-i, 0) * 6%) entry
+          calc(46% + var(--reveal-i, 0) * 6%);
+      }
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -456,6 +559,55 @@
       transition: none;
     }
   }
+}
+
+/* ── 跨文档 view transition（MPA，渐进增强）────────────────────────
+   不支持的浏览器会忽略 @view-transition 这条陌生 at-rule，导航仍是普通跳转，零回归。
+   只做克制的 root 交叉淡入 + 头部保持稳定，时长 170ms：文档站换页频繁，
+   过渡太长会拖慢「点击 → 阅读」的节奏。
+   新页快照的时序问题由 BaseLayout 里的 <link rel="expect" href="#main"> 兜住；
+   reveal 入场不会拍到半透明：支持跨文档过渡的浏览器（Chrome/Edge/Safari 18.2+）
+   同样支持 animation-timeline: view()，首屏元素的入场进度由滚动位置决定，快照里已是可见态。
+   ────────────────────────────────────────────────────────────────── */
+@view-transition {
+  navigation: auto;
+}
+
+/* reduced-motion 下彻底不做过渡（而不是把它调慢） */
+@media (prefers-reduced-motion: reduce) {
+  @view-transition {
+    navigation: none;
+  }
+}
+
+/* 头部在源页与新页里几何完全一致：给它一个稳定的 view-transition-name，
+   它就脱离整体淡入淡出、保持静止，玻璃背板不会闪一下。
+   选择器对齐 SiteHeader.astro 的 data-site-header；每页只渲染一个 SiteHeader
+   （首页 / 文档 / 404 共用），不存在重名（重名会让整个过渡被跳过）。
+   但头部子树里挂着移动端抽屉与搜索浮层两个 <dialog>：它们开在 top layer，
+   被算进头部快照会走形，所以「有对话框开着」时不加名字，退回整体淡入淡出。 */
+header[data-site-header]:not(:has(dialog[open])) {
+  view-transition-name: site-header;
+}
+
+::view-transition-old(site-header),
+::view-transition-new(site-header) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 170ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 过渡期间禁用平滑滚动：html 的 scroll-behavior: smooth 会把新页的滚动位置恢复
+   变成一段动画，与快照里的位置对不上 → 画面错位。
+   本条写在顶层（不进 @layer），因此能盖过 Tailwind 的 .scroll-smooth 工具类；
+   不支持 :active-view-transition 的浏览器会丢弃整条规则，行为不变。 */
+html:active-view-transition {
+  scroll-behavior: auto;
 }
 
 /* ── Markdown / MDX 排版 ────────────────────────────────────── */

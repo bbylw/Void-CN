@@ -1,7 +1,11 @@
 ---
 /**
  * 移动端抽屉导航（零 JS 框架）。
- * 抽屉常驻 DOM，用 hidden 属性切换；打开时锁定背景滚动，Esc 或点击链接关闭。
+ *
+ * 用原生 <dialog> 承载模态层：焦点陷阱、Esc / 平台返回手势、top-layer、
+ * light dismiss 与关闭后的焦点恢复全部由浏览器提供，脚本只负责开合与动画时序。
+ * 滚动锁定改由 CSS 的滚动链 containment 完成（见 <style>），不再改 body 的 overflow，
+ * 因此也不会出现「抽走滚动条 → 页面横向跳动」的副作用。
  */
 import SearchTrigger from './SearchTrigger.astro';
 import { HOME_NAV } from '../data/site';
@@ -11,6 +15,8 @@ import { HOME_NAV } from '../data/site';
   type="button"
   data-menu-open
   aria-label="打开菜单"
+  aria-controls="mm-drawer"
+  aria-expanded="false"
   class="grid size-9 place-items-center rounded-lg border md:hidden"
   style="border-color:var(--c-line);color:var(--c-fg-muted)"
 >
@@ -27,31 +33,21 @@ import { HOME_NAV } from '../data/site';
   </svg>
 </button>
 
-<div
-  data-menu-drawer
-  hidden
-  class="fixed inset-0 z-[90] md:hidden"
-  role="dialog"
-  aria-modal="true"
-  aria-label="导航菜单"
->
-  <button
-    data-menu-backdrop
-    class="absolute inset-0 cursor-default"
-    style="background:color-mix(in oklab, var(--c-bg-sunken) 80%, transparent);backdrop-filter:blur(4px)"
-    aria-label="关闭菜单"
-    tabindex="-1"
-  >
-  </button>
+<!-- MANDATORY: 不写 role="dialog" / aria-modal —— 原生模态已提供；
+     light dismiss 由脚本里的 target 判定承担（dialog 盒铺满视口，原生 closedby 不会触发）。 -->
+<dialog id="mm-drawer" class="mm-drawer" data-menu-drawer closedby="any" aria-label="导航菜单">
   <div
-    class="absolute inset-x-0 top-0 flex flex-col gap-5 rounded-b-[var(--radius-panel)] border-b p-5 pb-7"
+    data-menu-sheet
+    class="mm-sheet flex w-full flex-col gap-5 rounded-b-[var(--radius-panel)] border-b p-5 pb-7"
     style="background:var(--c-bg);border-color:var(--c-line)"
   >
     <div class="flex items-center justify-between">
       <span class="eyebrow">导航</span>
+      <!-- autofocus：打开时焦点落在关闭按钮上，Esc/退格手势天然回到原处 -->
       <button
         type="button"
         data-menu-close
+        autofocus
         aria-label="关闭菜单"
         class="grid size-9 place-items-center rounded-lg border"
         style="border-color:var(--c-line);color:var(--c-fg-muted)"
@@ -94,29 +90,201 @@ import { HOME_NAV } from '../data/site';
 
     <a href="/docs/quickstart" data-menu-link class="btn btn-primary mt-1 w-full"> 快速开始 </a>
   </div>
-</div>
+</dialog>
+
+<!-- is:global：::backdrop / @starting-style 这类伪元素与嵌套 at-rule 不适合被 Astro 作用域改写，
+     这里用组件专有的 .mm-drawer / .mm-sheet 类名自成语义边界。 -->
+<style is:global>
+  /* 关闭态收回：UA 的 display:none 会被下面的打开态覆盖，必须成对声明 */
+  .mm-drawer {
+    display: none;
+  }
+  .mm-drawer[open] {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mm-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    /* 重置 UA 给 dialog 的居中/限宽/内边距：抽屉需要铺满视口，面板贴在顶部 */
+    margin: 0;
+    padding: 0;
+    width: auto;
+    height: auto;
+    min-width: 0; /* 覆盖 UA 的 min-width:min-content，否则窄屏会被内容撑出视口 */
+    max-width: none;
+    min-height: 0;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent; /* 底色交给 .mm-sheet：dialog 盒＝背板命中区 */
+    box-shadow: none;
+    color: inherit;
+    opacity: 0;
+    /* prevent-page-scroll-under-modal-dialog：滚动手势不外溢到页面 */
+    overscroll-behavior: contain;
+    transition-property: opacity, display, overlay;
+    transition-duration: 0.22s;
+    transition-timing-function: ease-out;
+    transition-behavior: allow-discrete;
+  }
+
+  /* 背板视觉沿用旧手写层的半透明 + 模糊，只是换成原生 ::backdrop */
+  .mm-drawer::backdrop {
+    background: color-mix(in oklab, var(--c-bg-sunken) 80%, transparent);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    overflow: hidden; /* ::backdrop 默认不是滚动容器，加 overflow 才吃 overscroll-behavior */
+    overscroll-behavior: contain;
+    opacity: 0;
+    transition-property: opacity, display, overlay;
+    transition-duration: 0.22s;
+    transition-timing-function: ease-out;
+    transition-behavior: allow-discrete;
+  }
+
+  .mm-sheet {
+    transition: transform 0.22s ease-out;
+  }
+
+  /* 打开态：:where(:not([data-closing])) 让降级路径能在元素仍留在 top-layer 时播退出 */
+  .mm-drawer[open]:where(:not([data-closing])) {
+    opacity: 1;
+  }
+  .mm-drawer[open]:where(:not([data-closing]))::backdrop {
+    opacity: 1;
+  }
+
+  @starting-style {
+    .mm-drawer[open] {
+      opacity: 0;
+    }
+    .mm-drawer[open]::backdrop {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .mm-drawer .mm-sheet {
+      transform: translateY(-100%);
+    }
+    .mm-drawer[open]:where(:not([data-closing])) .mm-sheet {
+      transform: none;
+    }
+    @starting-style {
+      .mm-drawer[open] .mm-sheet {
+        transform: translateY(-100%);
+      }
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* 位移只存在于 no-preference 分支；这里把淡入压到极短（全局 CSS 还会再夹一次） */
+    .mm-drawer,
+    .mm-drawer::backdrop {
+      transition-duration: 0.1s;
+    }
+  }
+
+  /* 桌面端不出现抽屉（等价于旧容器的 md:hidden）；规则放在打开态之后，靠层叠顺序取胜 */
+  @media (min-width: 48rem) {
+    .mm-drawer,
+    .mm-drawer[open] {
+      display: none;
+    }
+  }
+</style>
 
 <script>
   const openBtn = document.querySelector<HTMLButtonElement>('[data-menu-open]');
-  const drawer = document.querySelector<HTMLElement>('[data-menu-drawer]');
+  const drawer = document.querySelector<HTMLDialogElement>('[data-menu-drawer]');
+
+  let displayTransitionCache: boolean | undefined;
+  /**
+   * 探测「离散 display 过渡」是否真的生效：Firefox 会解析 allow-discrete 却不实现，
+   * 只看 CSS.supports 会误判，退出时元素直接消失。
+   */
+  function canTransitionDisplay(): boolean {
+    if (displayTransitionCache !== undefined) return displayTransitionCache;
+    if (!window.CSS?.supports?.('transition-behavior', 'allow-discrete') || !document.body) {
+      return false;
+    }
+    const probe = document.createElement('div');
+    // 故意用 transition 简写：不解析 allow-discrete 的浏览器会丢掉整条声明，display:none 立即生效
+    probe.style.cssText = 'transition: display 1s allow-discrete !important; display: block;';
+    document.body.appendChild(probe);
+    getComputedStyle(probe).display;
+    probe.style.display = 'none';
+    displayTransitionCache = getComputedStyle(probe).display === 'block';
+    probe.remove();
+    return displayTransitionCache;
+  }
+
+  /**
+   * 关闭抽屉并保证滑出动画可见：支持的浏览器直接 close()（CSS 让它留在 top-layer 播完）；
+   * 其余浏览器先打 data-closing 触发退出过渡，等动画结束再 close()。
+   */
+  async function animateCloseDialog(dialog: HTMLDialogElement) {
+    if (!dialog.open) return;
+    if (window.CSS?.supports?.('overlay', 'auto') && canTransitionDisplay()) {
+      dialog.close();
+      return;
+    }
+    dialog.setAttribute('data-closing', '');
+    const animations = dialog.getAnimations({ subtree: true });
+    if (animations.length) {
+      await Promise.race([
+        Promise.allSettled(animations.map((a) => a.finished)),
+        new Promise((resolve) => setTimeout(resolve, 2000)), // 兜底：动画异常不结束也能关闭
+      ]);
+    }
+    if (!dialog.hasAttribute('data-closing')) return; // 动画期间又被打开
+    dialog.removeAttribute('data-closing');
+    dialog.close();
+  }
+
   if (openBtn && drawer) {
+    // 开合的唯一入口：状态同步给 aria-expanded，模态行为全部交给原生 dialog
     const setOpen = (open: boolean) => {
-      drawer.hidden = !open;
-      document.body.style.overflow = open ? 'hidden' : '';
+      openBtn.setAttribute('aria-expanded', String(open));
       if (open) {
-        drawer.querySelector<HTMLButtonElement>('[data-menu-close]')?.focus();
+        if (!drawer.open) drawer.showModal();
       } else {
-        openBtn.focus();
+        // 焦点由原生交还给打开按钮，无需手写 focus()
+        void animateCloseDialog(drawer);
       }
     };
+
     openBtn.addEventListener('click', () => setOpen(true));
-    drawer.querySelector('[data-menu-backdrop]')?.addEventListener('click', () => setOpen(false));
     drawer.querySelector('[data-menu-close]')?.addEventListener('click', () => setOpen(false));
     drawer
       .querySelectorAll('[data-menu-link]')
       .forEach((a) => a.addEventListener('click', () => setOpen(false)));
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !drawer.hidden) setOpen(false);
+
+    // Esc / 平台返回手势：拦下原生的即时关闭，改走带滑出动画的路径。
+    // 连续按 Esc 且中间无用户激活时 cancel 可能不可取消，此时交给原生。
+    drawer.addEventListener('cancel', (e) => {
+      if (e.cancelable) e.preventDefault();
+      setOpen(false);
+    });
+    // 原生 light dismiss（closedby="any"）直接关闭后回写 aria-expanded
+    drawer.addEventListener('close', () => setOpen(false));
+
+    // light dismiss：dialog 盒铺满视口、面板在内部，target 落在 dialog 自身即面板之外。
+    // 盒铺满视口后点击永远落在盒内，原生 closedby 不会触发，这条判定是所有浏览器的主路径。
+    drawer.addEventListener('click', (e) => {
+      if (e.target === drawer) setOpen(false);
+    });
+
+    // 抽屉里的搜索触发：菜单收起、搜索展开，避免两层模态叠在一起
+    window.addEventListener('search:open', () => setOpen(false));
+
+    // 视口变宽时抽屉本来就不该出现（CSS 已隐藏），但它仍是模态：直接关闭以免页面持续 inert
+    window.matchMedia('(min-width: 48rem)').addEventListener('change', (e) => {
+      if (e.matches && drawer.open) setOpen(false);
     });
   }
 </script>
